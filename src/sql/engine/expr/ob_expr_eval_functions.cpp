@@ -311,6 +311,7 @@
 #include "ob_expr_icu_version.h"
 #include "ob_expr_sql_mode_convert.h"
 #include "ob_expr_initcap.h"
+#include "ob_expr_python_udf.h"
 
 namespace oceanbase
 {
@@ -990,7 +991,8 @@ static ObExpr::EvalFunc g_expr_eval_functions[] = {
   NULL,                                                               /* 589 */
   NULL,                                                               /* 590 */
   NULL,                                                               /* 591 */
-  ObExprNlsInitCap::calc_nls_initcap_expr                             /* 592 */
+  ObExprNlsInitCap::calc_nls_initcap_expr,                             /* 592 */
+  ObExprPythonUdf::eval_python_udf                                     /* python udf */
 };
 
 static ObExpr::EvalBatchFunc g_expr_eval_batch_functions[] = {
@@ -1105,7 +1107,9 @@ static ObExpr::EvalBatchFunc g_expr_eval_batch_functions[] = {
   ObExprDecode::eval_decode_batch,                                    /* 108 */
   ObExprCoalesce::calc_batch_coalesce_expr,                           /* 109 */
   ObExprIsNot::calc_batch_is_not_null,                                /* 110 */
-  ObExprNlsInitCap::calc_nls_initcap_batch                            /* 111 */
+  ObExprNlsInitCap::calc_nls_initcap_batch,                            /* 111 */
+  ObExprPythonUdf::eval_python_udf_batch,                             /* python udf */
+  ObExprPythonUdf::eval_python_udf_batch_buffer                       /* python udf buffer*/
 };
 
 REG_SER_FUNC_ARRAY(OB_SFA_SQL_EXPR_EVAL,

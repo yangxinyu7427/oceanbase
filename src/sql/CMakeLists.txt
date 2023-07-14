@@ -125,6 +125,7 @@ ob_set_subtarget(ob_sql engine
   engine/user_defined_function/ob_user_defined_function.cpp
   engine/window_function/ob_window_function_op.cpp
   engine/opt_statistics/ob_optimizer_stats_gathering_op.cpp
+  engine/python_udf_engine/python_udf_engine.cpp
 )
 
 ob_set_subtarget(ob_sql engine_aggregate
@@ -621,6 +622,7 @@ ob_set_subtarget(ob_sql engine_expr
   engine/expr/ob_expr_st_contains.cpp
   engine/expr/ob_expr_st_within.cpp
   engine/expr/ob_expr_sql_mode_convert.cpp
+  engine/expr/ob_expr_python_udf.cpp
 )
 
 ob_set_subtarget(ob_sql engine_join
@@ -1189,6 +1191,8 @@ if (${ARCHITECTURE} STREQUAL "x86_64")
 		-mtune=core-avx2 -mavx2 -mfma -mbmi2 -mavx512vl -mavx512bw
 	)
 endif()
+
+target_link_libraries(ob_sql PUBLIC python_lib)
 
 target_link_libraries(ob_sql PUBLIC ob_base)
 target_compile_definitions(ob_sql PUBLIC SQL_COMPILATION)
