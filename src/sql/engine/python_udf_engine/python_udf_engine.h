@@ -10,7 +10,7 @@
 #include <string>
 #include <exception>
 #include "python_udf_schema.h"
-//#include "python_udf_util.h"
+#include "python_udf_util.h"
 #include <sys/time.h>
 #include <frameobject.h>
 #include <fstream>
@@ -41,7 +41,8 @@ namespace oceanbase
 
         //------------------------------------Udf------------------------------------
         class pythonUdf {
-        private:
+        public:
+        //private:
             char* pycall;//code
             std::string name;
             int arg_count;//参数数量
@@ -70,7 +71,7 @@ namespace oceanbase
             pythonUdf();
             ~pythonUdf();
             std::string get_name();
-            bool init_python_udf(std::string name, char* pycall, PyUdfSchema::PyUdfArgType* arg_list, int length, PyUdfSchema::PyUdfRetType* rt_type);
+            bool init_python_udf(std::string name, char* pycall, PyUdfSchema::PyUdfArgType* arg_list, int length, PyUdfSchema::PyUdfRetType* rt_type, int batch_size = 256 /* default */ );
             int get_arg_count();
             //设置参数->重载
             bool set_arg_at(int i, long const& arg);
@@ -124,6 +125,25 @@ namespace oceanbase
             //测试result
             ObDatum *resultptr;
             void setptr();
+
+            double lastTime;
+            bool staticBatch;
+            //调整batch size -> Clipper AIMD
+            void changeBatchAIMD(double time) {
+                if(lastTime == 0) {
+                    lastTime = time;
+                    batch_size += 256;
+                    return;
+                } else {
+                    if(time < lastTime * 0.9 && batch_size < 4096) { //消耗时间降低10%
+                        lastTime = time;
+                        batch_size += 256;
+                    } else {  //终止逻辑
+                        //batch_size = (1 - 0.1) * batch_size; //退避系数 0.1
+                        return;
+                    }
+                }
+            }
         };
 
         //互斥锁
@@ -137,6 +157,7 @@ namespace oceanbase
             std::map<std::string, pythonUdf*> udf_pool;
             //只能有一个实例存在
             static pythonUdfEngine *current_engine;
+            double tu;
             
         public:
             pythonUdfEngine(/* args */);
@@ -144,8 +165,14 @@ namespace oceanbase
             //懒汉模式
             static pythonUdfEngine* init_python_udf_engine() {
                 if(current_engine == NULL) {
+                    struct timeval t1, t2, tsub;
+                    //double tu;
                     //pthread_mutex_lock(&mutex);
+                    gettimeofday(&t1, NULL);
                     current_engine = new pythonUdfEngine();
+                    gettimeofday(&t2, NULL);
+                    timersub(&t2, &t1, &tsub);
+                    current_engine->tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec) / 1000;
                     //pthread_mutex_unlock(&mutex);
                 }
                 return current_engine;

@@ -13,7 +13,7 @@ namespace oceanbase
         pythonUdfEngine* pythonUdfEngine::current_engine = NULL;
 
         pythonUdfEngine::pythonUdfEngine(/* args */) {
-            Py_InitializeEx(Py_IsInitialized());
+            Py_InitializeEx(!Py_IsInitialized());
         }
 
         pythonUdfEngine::~pythonUdfEngine() {
@@ -61,7 +61,7 @@ namespace oceanbase
             arg_count = 0;
             arg_types = nullptr;
             rt_type = nullptr;
-            batch_size = 4096; //default
+            batch_size = 0; //set in init
             currentIndex = 0;
             //test time
             tv = nullptr;
@@ -70,6 +70,9 @@ namespace oceanbase
             numpyArrays = nullptr;
             ObResultArray = nullptr;
             currentResult = nullptr;
+
+            //
+            lastTime = 0;
         }
 
         pythonUdf::~pythonUdf() {
@@ -107,7 +110,7 @@ namespace oceanbase
         }
 
         //初始化udf
-        bool pythonUdf::init_python_udf(std::string name, char* pycall, PyUdfSchema::PyUdfArgType* arg_list, int length, PyUdfSchema::PyUdfRetType* rt_type) {
+        bool pythonUdf::init_python_udf(std::string name, char* pycall, PyUdfSchema::PyUdfArgType* arg_list, int length, PyUdfSchema::PyUdfRetType* rt_type, int batch_size) {
             try{
                 _import_array(); //load numpy api
 
@@ -120,6 +123,7 @@ namespace oceanbase
                 this->arg_count = length;
                 this->arg_types = arg_list;
                 this->rt_type = rt_type;
+                this->batch_size = batch_size;
                 //load main module
                 pModule = PyImport_AddModule("__main__");
                 if(!pModule)

@@ -27,7 +27,8 @@
 
 static const char* SAY_HELLO = "This is Python UDF.";
 static const char* file = "/etc/buf";
-static const char *fileName = "/home/test/log/time_transform_log";
+//static const char *fileName = "/home/test/log/expedia/transform_execute_update_log.csv";
+static const char *fileName = "/home/test/log/expedia/batch_size_log";
 
 namespace oceanbase {
 using namespace common;
@@ -77,7 +78,11 @@ int ObExprPythonUdf::get_python_udf(pythonUdf* &pyudf, const ObExpr& expr)
     //udf构造参数
     //char pycall[] = "import numpy as np\nimport pickle\ndef pyinitial():\n\tglobal model\n\tmodel_path = '/home/test/model/iris_model.pkl'\n\twith open(model_path, 'rb') as m:\n\t\tmodel = pickle.load(m)\ndef pyfun(*args):\n\tx = np.column_stack(args)\n\ty = model.predict(x)\n\treturn y";
     //char pycall[] = "import pickle\nimport numpy as np\nimport pandas as pd\nfrom sklearn.preprocessing import OneHotEncoder\nfrom sklearn.preprocessing import StandardScaler\ndef pyinitial(): pass\ndef pyfun(*args):\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\n\twith open(scaler_path, 'rb') as f:\n\t\tscaler = pickle.load(f)\n\twith open(enc_path, 'rb') as f:\n\t\tenc = pickle.load(f)\n\twith open(model_path, 'rb') as f:\n\t\tmodel = pickle.load(f)\n\tdata = np.column_stack(args)\n\tdata = np.split(data, np.array([8]), axis = 1)\n\tnumerical = data[0]\n\tcategorical = data[1]\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\n\treturn model.predict(X)";
-    char pycall[] = "import pickle\nimport numpy as np\nimport pandas as pd\nfrom sklearn.preprocessing import OneHotEncoder\nfrom sklearn.preprocessing import StandardScaler\ndef pyinitial():\n\tglobal scaler, enc, model\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\n\twith open(scaler_path, 'rb') as f:\n\t\tscaler = pickle.load(f)\n\twith open(enc_path, 'rb') as f:\n\t\tenc = pickle.load(f)\n\twith open(model_path, 'rb') as f:\n\t\tmodel = pickle.load(f)\ndef pyfun(*args):\n\tdata = np.column_stack(args)\n\tdata = np.split(data, np.array([8]), axis = 1)\n\tnumerical = data[0]\n\tcategorical = data[1]\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\n\treturn model.predict(X)";
+    //char pycall[] = "def pyinitial():\n\tpass\ndef pyfun(*args):\n\treturn args[0]";
+
+    //original
+    //char pycall[] = "import pickle\nimport numpy as np\nimport pandas as pd\nfrom sklearn.preprocessing import OneHotEncoder\nfrom sklearn.preprocessing import StandardScaler\ndef pyinitial():\n\tglobal scaler, enc, model\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\n\twith open(scaler_path, 'rb') as f:\n\t\tscaler = pickle.load(f)\n\twith open(enc_path, 'rb') as f:\n\t\tenc = pickle.load(f)\n\twith open(model_path, 'rb') as f:\n\t\tmodel = pickle.load(f)\ndef pyfun(*args):\n\tdata = np.column_stack(args)\n\tdata = np.split(data, np.array([8]), axis = 1)\n\tnumerical = data[0]\n\tcategorical = data[1]\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\n\treturn model.predict(X)";
+    
     /*char pycall[] = "import pickle\
 \nimport time\
 \nimport numpy as np\
@@ -118,26 +123,57 @@ int ObExprPythonUdf::get_python_udf(pythonUdf* &pyudf, const ObExpr& expr)
 \n\t\tf.write('\\n')
 \n\t\tf.write(str(process))\
 \n\treturn y";*/
-    /*char pycall[] = "import pickle\
-    \nimport numpy as np\nimport pandas as pd\
-    \nfrom sklearn.preprocessing import OneHotEncoder\
-    \nfrom sklearn.preprocessing import StandardScaler\
-    \ndef pyinitial():\n\tglobal scaler, enc, model\
-    \n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\
-    \n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\
-    \n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\
-    \n\twith open(scaler_path, 'rb') as f:\
-    \n\t\tscaler = pickle.load(f)\
-    \n\twith open(enc_path, 'rb') as f:\
-    \n\t\tenc = pickle.load(f)\
-    \n\twith open(model_path, 'rb') as f:\
-    \n\t\tmodel = pickle.load(f)\
-    \ndef pyfun(*args):\
-    \n\tdata = np.column_stack(args)\
-    \n\tfile_path = '/home/test/log/expedia/exception.csv'\
-    \n\tnp.savetxt(file_path, data, fmt = '%s', delimiter=',')\
-    \n\treturn args[10]";*/
     
+    /*char pycall[] = "import pickle\
+\nimport numpy as np\nimport pandas as pd\
+\nfrom sklearn.preprocessing import OneHotEncoder\
+\nfrom sklearn.preprocessing import StandardScaler\
+\ndef pyinitial():\n\tglobal scaler, enc, model\
+\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\
+\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\
+\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\
+\n\twith open(scaler_path, 'rb') as f:\
+\n\t\tscaler = pickle.load(f)\
+\n\twith open(enc_path, 'rb') as f:\
+\n\t\tenc = pickle.load(f)\
+\n\twith open(model_path, 'rb') as f:\
+\n\t\tmodel = pickle.load(f)\
+\ndef pyfun(*args):\
+\n\tdata = np.column_stack(args)\
+\n\tfile_path = '/home/test/log/expedia/exception.csv'\
+\n\tnp.savetxt(file_path, data, fmt = '%s', delimiter=',')\
+\n\treturn args[10]";*/
+    
+    //ONNX
+    char pycall[] = "import numpy as np\
+\nimport pandas as pd\
+\nimport onnxruntime as ort\
+\ndef pyinitial():\
+\n\tglobal onnx_session\
+\n\tonnx_path = '/home/Code/expedia_onnx/expedia.onnx'\
+\n\tonnx_session = ort.InferenceSession(onnx_path)\
+\ndef pyfun(*args):\
+\n\tnumerical_columns = ['prop_location_score1', 'prop_location_score2', 'prop_log_historical_price', 'price_usd',\
+'orig_destination_distance', 'prop_review_score', 'avg_bookings_usd', 'stdev_bookings_usd']\
+\n\tcategorical_columns = ['position', 'prop_country_id', 'prop_starrating', 'prop_brand_bool', 'count_clicks',\
+'count_bookings', 'year', 'month', 'weekofyear', 'time', 'site_id', 'visitor_location_country_id',\
+'srch_destination_id', 'srch_length_of_stay', 'srch_booking_window', 'srch_adults_count',\
+'srch_children_count', 'srch_room_count', 'srch_saturday_night_bool', 'random_bool']\
+\n\tinput_columns = numerical_columns + categorical_columns\
+\n\ttype_map = {\
+\n\t'int32': np.int64,\
+\n\t'int64': np.int64,\
+\n\t'float64': np.float32,\
+\n\t'object': str,\
+\n\t}\
+\n\tinfer_batch = {\
+\n\t\telem: args[i].astype(type_map[args[i].dtype.name]).reshape((-1, 1))\
+\n\t\tfor i, elem in enumerate(input_columns)\
+\n\t}\
+\n\tlabel = onnx_session.get_outputs()[0]\
+\n\toutputs = onnx_session.run([label.name], infer_batch)[0]\
+\n\treturn outputs";
+
     //类型
     int size = expr.arg_cnt_;
     //int size = 28;
@@ -319,7 +355,7 @@ int ObExprPythonUdf::eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                     const ObBitVector &skip, const int64_t batch_size)
 {
   
-  //struct timeval t1, t2, t3, t4, tsub;
+  struct timeval t1, t2, t3, t4, tsub;
   //record start time
   //gettimeofday(&t1, NULL);
 
@@ -376,15 +412,13 @@ int ObExprPythonUdf::eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
 
   //设置udf运行参数
   
-  //gettimeofday(&t1, NULL);
+  
   _import_array(); //load numpy api
 
   PyObject** arrays = new PyObject*[udfPtr->get_arg_count()];
-
-  //int* intptr = new int[real_param];
+  
   //转换得到numpy array
   for (int i = 0; i < udfPtr->get_arg_count(); i++) {
-    
     //获取参数datum vector
     ObDatumVector param_datums = expr.args_[i]->locate_expr_datumvector(ctx);
     ObDatum* argDatum = NULL;
@@ -465,14 +499,6 @@ int ObExprPythonUdf::eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       return ret;
     }
 
-    /*
-    //转换得到numpy array --> 多元素 --> batch size
-    if(OB_FAIL(obdatum2array(param_datums, expr.args_[i]->datum_meta_.type_, numpyarray, batch_size, real_param, data, my_skip, eval_flags))){
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("fail to obdatum2array", K(ret));
-      return ret;
-    }*/
-
     //插入pArg
     if(!udfPtr->set_arg_at(i, numpyarray)){
       ret = OB_ERR_UNEXPECTED;
@@ -526,9 +552,6 @@ int ObExprPythonUdf::eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     case ObMediumIntType:
     case ObInt32Type:
     case ObIntType: {
-      /*
-      int* numptr = NULL;
-      PyArray_AsCArray(result, numptr, elements, 1, NULL);*/
       for (int64_t j = 0; OB_SUCC(ret) && (j < batch_size); ++j) {
         //去重
         if (skip.at(j) || eval_flags.at(j)) 
@@ -600,21 +623,28 @@ int ObExprPythonUdf::eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
      
     out.close();
   }*/
- 
+
   return ret;
 }
+
 
 int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx &ctx,
                                     const ObBitVector &skip, const int64_t batch_size)
 {
+  struct timeval t1, t2, t3, t4, tsub;
+  //record start time
+  //gettimeofday(&t1, NULL);
+
   LOG_DEBUG("eval python udf in batch buffer mode", K(batch_size));
   int ret = OB_SUCCESS;
 
-  //返回值指针
+  //返回值
   ObDatum *results = expr.locate_batch_datums(ctx);
+
   if (OB_ISNULL(results)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("expr results frame is not init", K(ret));
+    return ret;
   }
 
   //获取udf实例并核验
@@ -654,43 +684,65 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
     }
   }
   //真实batch_size
-  const int64_t real_param = batch_size - my_skip.accumulate_bit_cnt(batch_size);
+  //const int64_t real_param = batch_size - my_skip.accumulate_bit_cnt(batch_size);
+  int64_t real_param = 0;
+  for (int i = 0; i < batch_size; i++) {
+    if (my_skip.at(i) || eval_flags.at(i))
+      continue;
+    else
+      ++real_param;
+  }
 
+  //设置udf运行参数
+  
+  
   _import_array(); //load numpy api
 
-  int readyRows = real_param;
-  int i, j, k;
-  j = 0;
-  do {
-    //探测余量
-    int bufferCapacity = udfPtr->detectCapacity(readyRows);
-    readyRows -= bufferCapacity;
-    //插入ObResult指针数组
-    udfPtr->addNewObResult(results, bufferCapacity);
-    //填充ObResult, i:loc, j:pos
-    for(i = 0; j < batch_size && i < bufferCapacity; j++) {
-      if(!my_skip.at(j) && !eval_flags.at(j)) 
-        udfPtr->insertObResult(i++, j);
-    }
-    //行列不同的取参数过程是否会对性能造成影响？
-    //填充numpy Array, i:列号, k: loc
-    for (i = 0; i < udfPtr->get_arg_count(); i++) {
+  PyObject** arrays = new PyObject*[udfPtr->get_arg_count()];
+  
+  //change iteration
+  int rowSize = real_param;
+  int currentRow = 0; //index in skip[]
+
+  while(rowSize != 0) {
+    gettimeofday(&t1, NULL);
+    //do eval after separating
+    int evalSize = 0;
+    if(rowSize > udfPtr->batch_size)
+      evalSize = udfPtr->batch_size;
+    else
+      evalSize = rowSize;
+    //获取参数
+    for (int i = 0; i < udfPtr->get_arg_count(); i++) {
+      //一次处理的长度
+      npy_intp elements[1] = {evalSize};
+      PyObject *numpyarray = NULL;
       //获取参数datum vector
       ObDatumVector param_datums = expr.args_[i]->locate_expr_datumvector(ctx);
       ObDatum* argDatum = NULL;
-      switch(expr.args_[i]->datum_meta_.type_) {
+      ObObjType type = expr.args_[i]->datum_meta_.type_;
+      int evalIndex = 0; //size of array <= evalSize
+      int currentIndex = currentRow; 
+      switch(type) {
         case ObCharType:
         case ObVarcharType:
         case ObTinyTextType:
         case ObTextType:
         case ObMediumTextType:
         case ObLongTextType: {
-          //unicode
-          for (k = 0; k < bufferCapacity ;k++) {
-            int pos = udfPtr->getIndexObResult(k);
-            argDatum = param_datums.at(pos);
-            ObString str = argDatum->get_string();
-            udfPtr->insertNumpyArray(i, k, str.ptr(), str.length());
+          //string in numpy array
+          numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
+          //set numpy data
+          while(evalIndex < evalSize) {
+            if (skip.at(currentIndex) || eval_flags.at(currentIndex)) {
+              ++currentIndex;
+              continue;
+            } else {
+              argDatum = param_datums.at(currentIndex++);
+              ObString str = argDatum->get_string();
+              PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, evalIndex++), 
+                PyUnicode_FromStringAndSize(str.ptr(), str.length()));
+            }
           }
           break;
         }
@@ -699,20 +751,32 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
         case ObMediumIntType:
         case ObInt32Type:
         case ObIntType: {
-          //int
-          for (k = 0; k < bufferCapacity ; k++) {
-            int pos = udfPtr->getIndexObResult(k);
-            argDatum = param_datums.at(pos);
-            udfPtr->insertNumpyArray(i, k, argDatum->get_int());
+          //integer in numpy array
+          numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
+          //set numpy data
+          while(evalIndex < evalSize) {
+            if (skip.at(currentIndex) || eval_flags.at(currentIndex)) {
+              ++currentIndex;
+              continue;
+            } else {
+              argDatum = param_datums.at(currentIndex++);
+              PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, evalIndex++), PyLong_FromLong(argDatum->get_int()));
+            }
           }
           break;
         }
         case ObDoubleType: {
-          //double
-          for (k = 0; k < bufferCapacity ; k++) {
-            int pos = udfPtr->getIndexObResult(k);
-            argDatum = param_datums.at(pos);
-            udfPtr->insertNumpyArray(i, k, argDatum->get_double());
+          //double in numpy array
+          numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
+          //set numpy data
+          while(evalIndex < evalSize) {
+            if (skip.at(currentIndex) || eval_flags.at(currentIndex)) {
+              ++currentIndex;
+              continue;
+            } else {
+              argDatum = param_datums.at(currentIndex++);
+              PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, evalIndex++), PyFloat_FromDouble(argDatum->get_double()));
+            }
           }
           break;
         }
@@ -728,13 +792,160 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
           return ret;
         }
       }
+      // check array size
+      if(evalIndex != evalSize) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("incorrect array size", K(ret));
+        return ret;
+      }
+      //插入pArg
+      if(!udfPtr->set_arg_at(i, numpyarray)){
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("fail to set numpy array arg", K(ret));
+        return ret;
+      }
+      //设置指针
+      arrays[i] = numpyarray;
     }
-    //移动下标
-    udfPtr->moveIndex(bufferCapacity);
-  } while (readyRows != 0);
+    gettimeofday(&t2, NULL);
+    //执行Python Code
+    if(!udfPtr->execute()) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("execute error", K(ret));
+      return ret;
+    }
+    gettimeofday(&t3, NULL);
+    //获取返回值
+    PyObject* result = NULL;
+    if(!udfPtr->get_result(result)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("have not get result", K(ret));
+      return ret;
+    }
+    //向上传递返回值
+    PyObject* value = NULL;
+    //根据类型填入返回值
+    //迭代思路：
+    //evalIndex 从 0 至 evalSize，代表UDF结果集的下标
+    //currentRow 代表 frame 下标，每次迭代增加
+    switch (expr.datum_meta_.type_)
+    {
+      case ObCharType:
+      case ObVarcharType:
+      case ObTinyTextType:
+      case ObTextType:
+      case ObMediumTextType:
+      case ObLongTextType: {
+        for (int64_t evalIndex = 0; OB_SUCC(ret) && (evalIndex < evalSize); ++currentRow) {
+          //去重
+          if (skip.at(currentRow) || eval_flags.at(currentRow)) 
+            continue;
+          else {
+            numpy2value(result, evalIndex++, value);
+            results[currentRow].set_string(common::ObString(PyUnicode_AS_DATA(value)));
+          }
+        }
+        break;
+      }
+      case ObTinyIntType:
+      case ObSmallIntType:
+      case ObMediumIntType:
+      case ObInt32Type:
+      case ObIntType: {
+        for (int64_t evalIndex = 0; OB_SUCC(ret) && (evalIndex < evalSize); ++currentRow) {
+          //去重
+          if (skip.at(currentRow) || eval_flags.at(currentRow)) 
+            continue;
+          else {
+            numpy2value(result, evalIndex++, value);
+            results[currentRow].set_int(PyLong_AsLong(value));
+          }
+        }
+        break;
+      }
+      case ObDoubleType:{
+        for (int64_t evalIndex = 0; OB_SUCC(ret) && (evalIndex < evalSize); ++currentRow) {
+          //去重
+          if (skip.at(currentRow) || eval_flags.at(currentRow)) 
+            continue;
+          else {
+            numpy2value(result, evalIndex++, value);
+            results[currentRow].set_double(PyFloat_AsDouble(value));
+          }
+        }
+        break;
+      }
+      case ObNumberType: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("not support ObNumberType", K(ret));
+        break;
+      }
+      default: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unknown result type", K(ret));
+        break;
+      }
+    }
+    //释放资源
+    for (int i = 0; i < udfPtr->get_arg_count(); i++) {
+      PyArray_XDECREF((PyArrayObject *)arrays[i]);
+    }
+    PyArray_XDECREF((PyArrayObject *)result);
+
+    //控制循环条件
+    rowSize -= evalSize;
+
+    gettimeofday(&t4, NULL);
+
+    //change batch size
+    timersub(&t3, &t2, &tsub);
+    double tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec) / 1000; //推理时间
+    if(evalSize == udfPtr->batch_size) {
+      udfPtr->changeBatchAIMD(tu / evalSize); //时间 per tuple
+      //output
+      std::ofstream out;
+      out.open(fileName, std::ios::app);
+      if(out.is_open()) {
+        out << "real param size: " << real_param  << std::endl;
+        out << "time of execute: " << tu << " ms"  << std::endl;
+        out << "current batch size: " << udfPtr->batch_size << std::endl << std::endl;
+      }
+    }
+    //输出
+    /*std::ofstream out;
+    out.open(fileName, std::ios::app);
+    if(out.is_open()) {
+      out << "real param size: " << real_param  << std::endl;
+      //out << real_param  << ", ";
+
+      double tu;
+      timersub(&t2, &t1, &tsub);
+      tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec)/1000;
+      out << "time of transform: " << tu << " ms" << std::endl;
+      //out << tu  << ", ";
+
+      timersub(&t3, &t2, &tsub);
+      tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec)/1000;
+      out << "time of execute: " << tu << " ms"  << std::endl;
+      //out << tu  << ", ";
+
+      timersub(&t4, &t3, &tsub);
+      tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec)/1000;
+      out << "time of update: " << tu << " ms"  << std::endl << std::endl;
+      //out << tu  << std::endl;
+      
+      out.close();
+    }*/
+
+  }
+  //删除指针
+  delete[] arrays;
 
   return ret;
 }
+
 
 int ObExprPythonUdf::cg_expr(ObExprCGCtx& op_cg_ctx, const ObRawExpr& raw_expr, ObExpr& rt_expr) const
 {
@@ -751,7 +962,7 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& op_cg_ctx, const ObRawExpr& raw_expr, 
     }
   }
   if(is_batch) {
-    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_python_udf_batch;
+    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_python_udf_batch_buffer;
   }
   return  OB_SUCCESS;
 }
