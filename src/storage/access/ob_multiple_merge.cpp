@@ -65,7 +65,8 @@ ObMultipleMerge::ObMultipleMerge()
       block_row_store_(nullptr),
       out_project_cols_(),
       lob_reader_(),
-      scan_state_(ScanState::NONE)
+      scan_state_(ScanState::NONE),
+      batch_buffer_()
 {
 }
 

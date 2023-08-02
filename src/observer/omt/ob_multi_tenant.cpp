@@ -453,6 +453,8 @@ int ObMultiTenant::init(ObAddr myaddr,
     }
   }
 
+  //initialize Python Intepreter
+
   if (OB_SUCC(ret)) {
     is_inited_ = true;
     LOG_INFO("succ to init multi tenant");
