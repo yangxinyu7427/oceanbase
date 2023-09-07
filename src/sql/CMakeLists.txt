@@ -1152,6 +1152,7 @@ ob_set_subtarget(ob_sql rewrite
   rewrite/ob_transformer_impl.cpp
   rewrite/ob_transform_dblink.cpp
   rewrite/ob_union_find.cpp
+  rewrite/ob_transform_pullup_filter.cpp
 )
 
 ob_set_subtarget(ob_sql session

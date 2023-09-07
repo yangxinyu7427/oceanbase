@@ -47,6 +47,7 @@
 #include "sql/rewrite/ob_transform_count_to_exists.h"
 #include "sql/rewrite/ob_transform_expr_pullup.h"
 #include "sql/rewrite/ob_transform_dblink.h"
+#include "sql/rewrite/ob_transform_pullup_filter.h"
 #include "common/ob_smart_call.h"
 #include "sql/engine/ob_exec_context.h"
 
@@ -313,6 +314,10 @@ int ObTransformerImpl::transform_rule_set(ObDMLStmt *&stmt,
     if (OB_SUCC(ret) && i == max_iteration_count_) {
       LOG_INFO("transformer ends without convergence", K(max_iteration_count_));
     }
+  }
+  { //pull up python udf filter
+    bool trans_happened = false;
+    APPLY_RULE_IF_NEEDED(PULL_UP_FILTER, ObTransformPullUpFilter);
   }
   return ret;
 }

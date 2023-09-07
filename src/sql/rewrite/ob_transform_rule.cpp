@@ -133,6 +133,7 @@ const char* ObTransformerCtx::get_trans_type_string(uint64_t trans_type)
     TRANS_TYPE_TO_STR(SIMPLIFY_WINFUNC)
     TRANS_TYPE_TO_STR(SELECT_EXPR_PULLUP)
     TRANS_TYPE_TO_STR(PROCESS_DBLINK)
+    TRANS_TYPE_TO_STR(PULL_UP_FILTER)
     default:  return NULL;
   }
 }
