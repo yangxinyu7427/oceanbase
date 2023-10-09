@@ -100,6 +100,8 @@
 #include "sql/resolver/cmd/ob_drop_restore_point_stmt.h"
 #include "sql/resolver/ddl/ob_create_directory_stmt.h"
 #include "sql/resolver/ddl/ob_drop_directory_stmt.h"
+#include "sql/resolver/ddl/ob_create_model_stmt.h"
+#include "sql/resolver/ddl/ob_drop_model_stmt.h"
 #include "sql/engine/ob_exec_context.h"
 #include "sql/engine/cmd/ob_empty_query_executor.h"
 #include "sql/engine/cmd/ob_dcl_executor.h"
@@ -142,6 +144,7 @@
 #include "sql/resolver/ddl/ob_create_context_resolver.h"
 #include "sql/resolver/ddl/ob_drop_context_resolver.h"
 #include "sql/engine/cmd/ob_context_executor.h"
+#include "sql/engine/cmd/ob_model_executor.h"
 
 namespace oceanbase
 {
@@ -753,6 +756,14 @@ int ObCmdExecutor::execute(ObExecContext &ctx, ObICmd &cmd)
       }
       case stmt::T_DROP_FUNC: {
         DEFINE_EXECUTE_CMD(ObDropFuncStmt, ObDropFuncExecutor);
+        break;
+      }
+      case stmt::T_CREATE_MODEL: {
+        DEFINE_EXECUTE_CMD(ObCreateModelStmt, ObCreateModelExecutor);
+        break;
+      }
+      case stmt::T_DROP_MODEL: {
+        DEFINE_EXECUTE_CMD(ObDropModelStmt, ObDropModelExecutor);
         break;
       }
       case stmt::T_CREATE_SEQUENCE: {

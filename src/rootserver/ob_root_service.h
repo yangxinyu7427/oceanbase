@@ -557,6 +557,11 @@ public:
   int drop_user_defined_function(const obrpc::ObDropUserDefinedFunctionArg &arg);
   //----End of functions for managing UDF----
 
+  //----Functions for managing Model
+  int create_model(const obrpc::ObCreateModelArg &arg);
+  int drop_model(const obrpc::ObDropModelArg &arg);
+  //----End of functions for managing Model
+
   //----Functions for managing routines----
   int create_routine(const obrpc::ObCreateRoutineArg &arg);
   int drop_routine(const obrpc::ObDropRoutineArg &arg);
