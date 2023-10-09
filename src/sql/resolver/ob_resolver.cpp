@@ -130,6 +130,9 @@
 #include "pl/ob_pl_package.h"
 #include "sql/resolver/ddl/ob_create_context_resolver.h"
 #include "sql/resolver/ddl/ob_drop_context_resolver.h"
+#include "sql/resolver/ddl/ob_create_model_resolver.h"
+#include "sql/resolver/ddl/ob_drop_model_resolver.h"
+
 namespace oceanbase
 {
 using namespace common;
@@ -1060,6 +1063,14 @@ int ObResolver::resolve(IsPrepared if_prepared, const ParseNode &parse_tree, ObS
       }
       case T_CHECKPOINT_SLOG: {
         REGISTER_STMT_RESOLVER(CheckpointSlog);
+        break;
+      }
+      case T_CREATE_MODEL: {
+        REGISTER_STMT_RESOLVER(CreateModel);
+        break;
+      }
+      case T_DROP_MODEL: {
+        REGISTER_STMT_RESOLVER(DropModel);
         break;
       }
       default: {

@@ -68,6 +68,7 @@
 #include "share/config/ob_config.h" // ObConfigArray
 #include "logservice/palf/log_meta_info.h"//LogConfigVersion
 #include "share/scn.h"//SCN
+#include "share/schema/ob_python_udf.h"
 
 namespace oceanbase
 {
@@ -5431,6 +5432,38 @@ public:
     return !name_.empty();
   }
   virtual bool is_allow_when_upgrade() const { return true; }
+  TO_STRING_KV(K_(tenant_id), K_(name));
+
+  uint64_t tenant_id_;
+  common::ObString name_;
+  bool if_exist_;
+};
+
+struct ObCreateModelArg : public ObDDLArg
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObCreateModelArg(): ObDDLArg(), python_udf_() {}
+  virtual ~ObCreateModelArg() {}
+
+  bool is_valid() const {
+    return !python_udf_.get_name_str().empty();
+  }
+  TO_STRING_KV(K_(python_udf));
+
+  share::schema::ObPythonUDF python_udf_;
+};
+
+struct ObDropModelArg : public ObDDLArg
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObDropModelArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), name_() {}
+  virtual ~ObDropModelArg() {}
+
+  bool is_valid() const {
+    return !name_.empty();
+  }
   TO_STRING_KV(K_(tenant_id), K_(name));
 
   uint64_t tenant_id_;

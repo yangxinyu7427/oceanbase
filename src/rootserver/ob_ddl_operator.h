@@ -836,6 +836,16 @@ public:
                                  const common::ObString *ddl_stmt_str/*=NULL*/);
   //----End of functions for managing UDF----
 
+  //----Functions for managing model----
+  int create_model(share::schema::ObPythonUDF &PythonUdf_info,
+                   common::ObMySQLTransaction &trans,
+                   const common::ObString *ddl_stmt_str/*=NULL*/);
+  int drop_model(const uint64_t tenant_id,
+                 const common::ObString &name,
+                 common::ObMySQLTransaction &trans,
+                 const common::ObString *ddl_stmt_str/*=NULL*/);
+  //----End of functions for managing model----
+
   //----Functions for label security----
   int handle_label_se_policy_function(share::schema::ObSchemaOperationType ddl_type,
                                       const common::ObString &ddl_stmt_str,

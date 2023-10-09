@@ -294,7 +294,7 @@ END_P SET_VAR DELIMITER
         MASTER_SSL_CRL MASTER_SSL_CRLPATH MASTER_SSL_KEY MASTER_USER MAX MAX_CONNECTIONS_PER_HOUR MAX_CPU
         LOG_DISK_SIZE MAX_IOPS MEMORY_SIZE MAX_QUERIES_PER_HOUR MAX_ROWS MAX_SIZE
         MAX_UPDATES_PER_HOUR MAX_USER_CONNECTIONS MEDIUM MEMORY MEMTABLE MESSAGE_TEXT META MICROSECOND
-        MIGRATE MIN MIN_CPU MIN_IOPS MINOR MIN_ROWS MINUS MINUTE MODE MODIFY MONTH MOVE
+        MIGRATE MIN MIN_CPU MIN_IOPS MINOR MIN_ROWS MINUS MINUTE MODE MODEL MODIFY MONTH MOVE
         MULTILINESTRING MULTIPOINT MULTIPOLYGON MUTEX MYSQL_ERRNO MIGRATION MAX_USED_PART_ID MAXIMIZE
         MATERIALIZED MEMBER MEMSTORE_PERCENT MINVALUE
 
@@ -496,6 +496,9 @@ END_P SET_VAR DELIMITER
 %type <node> opt_storage_name opt_calibration_list calibration_info_list
 %type <node> switchover_tenant_stmt switchover_clause
 %type <node> recover_tenant_stmt recover_point_clause
+/*新增*/ 
+%type <node> create_model_stmt drop_model_stmt
+%type <node> function_element_list function_element param_name param_type
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -551,6 +554,8 @@ stmt:
     }
   }
   | create_function_stmt    { $$ = $1; check_question_mark($$, result); }
+  | create_model_stmt       { $$ = $1; check_question_mark($$, result); }
+  | drop_model_stmt         { $$ = $1; check_question_mark($$, result); }
   | drop_function_stmt      { $$ = $1; check_question_mark($$, result); }
   | create_table_like_stmt  { $$ = $1; check_question_mark($$, result); }
   | create_database_stmt    { $$ = $1; check_question_mark($$, result); }
@@ -4353,6 +4358,85 @@ AGGREGATE
   malloc_terminal_node($$, result->malloc_pool_, T_INT);
   $$->value_ = 2;
 }
+;
+
+param_type:
+STRING
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 1;
+}
+|
+INTEGER
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 2;
+}
+|
+REAL
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 3;
+}
+|
+DECIMAL
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 4;
+}
+|
+FIXED {
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 4;
+}
+|
+NUMERIC
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_INT);
+  $$->value_ = 4;
+}
+;
+
+create_model_stmt:
+CREATE MODEL NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_VALUE '}'
+{
+  ParseNode *function_elements = NULL;
+  merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $5);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_MODEL, 4, 
+                           $3,                             /* model name */
+                           function_elements,              /* function parameter */
+                           $8,                             /* return type */
+                           $10);                           /* python model code */
+}
+;
+
+drop_model_stmt:
+DROP MODEL opt_if_exists NAME_OB
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_MODEL, 2, $3, $4);
+}
+;
+
+function_element_list:
+function_element
+{
+  $$ = $1;
+}
+| function_element_list ',' function_element
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_LINK_NODE, 2, $1, $3);
+}
+;
+
+function_element:
+param_name param_type
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_PARAM_DEFINITION, 2, $1, $2);
+}
+;
+
+param_name:
+NAME_OB { $$ = $1; }
 ;
 
 ret_type:
@@ -16924,6 +17008,7 @@ ACCOUNT
 |       MINUTE
 |       MINUS
 |       MODE
+|       MODEL
 |       MODIFY
 |       MONTH
 |       MOVE

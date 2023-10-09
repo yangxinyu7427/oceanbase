@@ -5808,6 +5808,41 @@ int ObRootService::drop_user_defined_function(const obrpc::ObDropUserDefinedFunc
   return ret;
 }
 
+int ObRootService::create_model(const obrpc::ObCreateModelArg &arg)
+{
+  int ret = OB_SUCCESS;
+  ObPythonUDF PythonUdf_info_ = arg.python_udf_;
+  if (!inited_) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not init", K(ret));
+  } else if (!arg.is_valid()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid arg", K(arg), K(ret));
+  }  //check udf exist后续增加
+  else if (OB_FAIL(ddl_service_.create_model(PythonUdf_info_, arg.ddl_stmt_str_))) {
+    LOG_WARN("failed to create model", K(arg), K(ret));
+  } else {/*do nothing*/}
+
+  return ret;
+}
+
+int ObRootService::drop_model(const obrpc::ObDropModelArg &arg)
+{
+  int ret = OB_SUCCESS;
+  LOG_WARN("get into ObRootService::drop_model", K(ret));
+  if (!inited_) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not init", K(ret));
+  } else if (!arg.is_valid()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid arg", K(arg), K(ret));
+  } else if (OB_FAIL(ddl_service_.drop_model(arg))) {
+    LOG_WARN("failed to alter model", K(arg), K(ret));
+  } else {/*do nothing*/}
+
+  return ret;
+}
+
 bool ObRootService::is_sys_tenant(const ObString &tenant_name)
 {
   return (0 == tenant_name.case_compare(OB_SYS_TENANT_NAME)
