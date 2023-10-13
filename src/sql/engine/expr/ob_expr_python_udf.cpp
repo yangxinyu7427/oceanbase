@@ -24,6 +24,7 @@
 
 #include "storage/ob_storage_util.h"
 #include "sql/engine/expr/ob_expr_python_udf.h"
+#include "sql/engine/python_udf_engine/python_udf_pycall.h"
 
 static const char* SAY_HELLO = "This is Python UDF.";
 static const char* file = "/etc/buf";
@@ -76,104 +77,7 @@ int ObExprPythonUdf::get_python_udf(pythonUdf* &pyudf, const ObExpr& expr)
   pythonUdf *udfPtr = nullptr;
   if(!udfEngine -> get_python_udf(name, udfPtr)) {
     //udf构造参数
-    //char pycall[] = "import numpy as np\nimport pickle\ndef pyinitial():\n\tglobal model\n\tmodel_path = '/home/test/model/iris_model.pkl'\n\twith open(model_path, 'rb') as m:\n\t\tmodel = pickle.load(m)\ndef pyfun(*args):\n\tx = np.column_stack(args)\n\ty = model.predict(x)\n\treturn y";
-    //char pycall[] = "import pickle\nimport numpy as np\nimport pandas as pd\nfrom sklearn.preprocessing import OneHotEncoder\nfrom sklearn.preprocessing import StandardScaler\ndef pyinitial(): pass\ndef pyfun(*args):\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\n\twith open(scaler_path, 'rb') as f:\n\t\tscaler = pickle.load(f)\n\twith open(enc_path, 'rb') as f:\n\t\tenc = pickle.load(f)\n\twith open(model_path, 'rb') as f:\n\t\tmodel = pickle.load(f)\n\tdata = np.column_stack(args)\n\tdata = np.split(data, np.array([8]), axis = 1)\n\tnumerical = data[0]\n\tcategorical = data[1]\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\n\treturn model.predict(X)";
-    //char pycall[] = "def pyinitial():\n\tpass\ndef pyfun(*args):\n\treturn args[0]";
-
-    //original
-    //char pycall[] = "import pickle\nimport numpy as np\nimport pandas as pd\nfrom sklearn.preprocessing import OneHotEncoder\nfrom sklearn.preprocessing import StandardScaler\ndef pyinitial():\n\tglobal scaler, enc, model\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\n\twith open(scaler_path, 'rb') as f:\n\t\tscaler = pickle.load(f)\n\twith open(enc_path, 'rb') as f:\n\t\tenc = pickle.load(f)\n\twith open(model_path, 'rb') as f:\n\t\tmodel = pickle.load(f)\ndef pyfun(*args):\n\tdata = np.column_stack(args)\n\tdata = np.split(data, np.array([8]), axis = 1)\n\tnumerical = data[0]\n\tcategorical = data[1]\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\n\treturn model.predict(X)";
-    
-    /*char pycall[] = "import pickle\
-\nimport time\
-\nimport numpy as np\
-\nimport pandas as pd\
-\nfrom sklearn.preprocessing import OneHotEncoder\
-\nfrom sklearn.preprocessing import StandardScaler\
-\ndef pyinitial():\
-\n\tglobal preprocess, process\
-\n\tpreprocess = 0\
-\n\tprocess = 0\
-\n\tglobal scaler, enc, model\
-\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\
-\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\
-\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\
-\n\twith open(scaler_path, 'rb') as f:\
-\n\t\tscaler = pickle.load(f)\
-\n\twith open(enc_path, 'rb') as f:\
-\n\t\tenc = pickle.load(f)\
-\n\twith open(model_path, 'rb') as f:\
-\n\t\tmodel = pickle.load(f)\
-\ndef pyfun(*args):\
-\n\tglobal preprocess, process\
-\n\tstart = time.time()\
-\n\tdata = np.column_stack(args)\
-\n\tdata = np.split(data, np.array([8]), axis = 1)\
-\n\tnumerical = data[0]\
-\n\tcategorical = data[1]\
-\n\tX = np.hstack((scaler.transform(numerical), enc.transform(categorical).toarray()))\
-\n\tend = time.time()\
-\n\tpreprocess += end - start\
-\n\tstart = time.time()\
-\n\ty = model.predict(X)\
-\n\tend = time.time()\
-\n\tprocess += end - start\
-\n\ttime_path = '/home/test/log/expedia/runtime'\
-\n\twith open(time_path, 'w') as f:\
-\n\t\tf.write(str(preprocess))\
-\n\t\tf.write('\\n')
-\n\t\tf.write(str(process))\
-\n\treturn y";*/
-    
-    /*char pycall[] = "import pickle\
-\nimport numpy as np\nimport pandas as pd\
-\nfrom sklearn.preprocessing import OneHotEncoder\
-\nfrom sklearn.preprocessing import StandardScaler\
-\ndef pyinitial():\n\tglobal scaler, enc, model\
-\n\tscaler_path = '/home/test/model/expedia_standard_scale_model.pkl'\
-\n\tenc_path = '/home/test/model/expedia_one_hot_encoder.pkl'\
-\n\tmodel_path = '/home/test/model/expedia_lr_model.pkl'\
-\n\twith open(scaler_path, 'rb') as f:\
-\n\t\tscaler = pickle.load(f)\
-\n\twith open(enc_path, 'rb') as f:\
-\n\t\tenc = pickle.load(f)\
-\n\twith open(model_path, 'rb') as f:\
-\n\t\tmodel = pickle.load(f)\
-\ndef pyfun(*args):\
-\n\tdata = np.column_stack(args)\
-\n\tfile_path = '/home/test/log/expedia/exception.csv'\
-\n\tnp.savetxt(file_path, data, fmt = '%s', delimiter=',')\
-\n\treturn args[10]";*/
-    
-    //ONNX
-    char pycall[] = "import numpy as np\
-\nimport pandas as pd\
-\nimport onnxruntime as ort\
-\ndef pyinitial():\
-\n\tglobal onnx_session\
-\n\tonnx_path = '/home/Code/expedia_onnx/expedia.onnx'\
-\n\tonnx_session = ort.InferenceSession(onnx_path)\
-\ndef pyfun(*args):\
-\n\tnumerical_columns = ['prop_location_score1', 'prop_location_score2', 'prop_log_historical_price', 'price_usd',\
-'orig_destination_distance', 'prop_review_score', 'avg_bookings_usd', 'stdev_bookings_usd']\
-\n\tcategorical_columns = ['position', 'prop_country_id', 'prop_starrating', 'prop_brand_bool', 'count_clicks',\
-'count_bookings', 'year', 'month', 'weekofyear', 'time', 'site_id', 'visitor_location_country_id',\
-'srch_destination_id', 'srch_length_of_stay', 'srch_booking_window', 'srch_adults_count',\
-'srch_children_count', 'srch_room_count', 'srch_saturday_night_bool', 'random_bool']\
-\n\tinput_columns = numerical_columns + categorical_columns\
-\n\ttype_map = {\
-\n\t'int32': np.int64,\
-\n\t'int64': np.int64,\
-\n\t'float64': np.float32,\
-\n\t'object': str,\
-\n\t}\
-\n\tinfer_batch = {\
-\n\t\telem: args[i].astype(type_map[args[i].dtype.name]).reshape((-1, 1))\
-\n\t\tfor i, elem in enumerate(input_columns)\
-\n\t}\
-\n\tlabel = onnx_session.get_outputs()[0]\
-\n\toutputs = onnx_session.run([label.name], infer_batch)[0]\
-\n\treturn outputs";
-
+    char* pycall = expedia_onnx; // define in python_udf_pycall.h
     //类型
     int size = expr.arg_cnt_;
     //int size = 28;
