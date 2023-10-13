@@ -1,5 +1,6 @@
-#include "python_udf_engine.h"
+#define USING_LOG_PREFIX SQL_ENG
 
+#include "sql/engine/python_udf_engine/python_udf_engine.h"
 
 static const char *fileName = "/home/test/log/batch_buffer_log";
 
@@ -13,7 +14,7 @@ namespace oceanbase
         pythonUdfEngine* pythonUdfEngine::current_engine = NULL;
 
         pythonUdfEngine::pythonUdfEngine(/* args */) {
-            Py_InitializeEx(!Py_IsInitialized());
+            //Py_InitializeEx(!Py_IsInitialized());
         }
 
         pythonUdfEngine::~pythonUdfEngine() {
@@ -24,17 +25,17 @@ namespace oceanbase
             }
             udf_pool.clear();
             //销毁当前engine
-            Py_FinalizeEx();
+            //Py_FinalizeEx();
             pythonUdfEngine* current_engine = nullptr;
         }
 
         //填入udf
-        bool pythonUdfEngine::insert_python_udf(std::string name, pythonUdf *udf) {
-            return udf_pool.insert(std::pair<std::string, pythonUdf*>(name, udf)).second;
+        bool pythonUdfEngine::insert_python_udf(pid_t tid, pythonUdf *udf) {
+            return udf_pool.insert(std::pair<pid_t, pythonUdf*>(tid, udf)).second;
         }
         //从udf_pool中获取已生成udf
-        bool pythonUdfEngine::get_python_udf(std::string name, pythonUdf *& udf) {
-            auto iter = udf_pool.find(name);
+        bool pythonUdfEngine::get_python_udf(pid_t tid, pythonUdf *& udf) {
+            auto iter = udf_pool.find(tid);
             if(iter != udf_pool.end()){
                 udf = iter->second;
                 return true;

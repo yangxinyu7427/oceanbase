@@ -9,13 +9,13 @@
 #include <map>
 #include <string>
 #include <exception>
-#include "python_udf_schema.h"
-#include "python_udf_util.h"
 #include <sys/time.h>
 #include <frameobject.h>
 #include <fstream>
-
+#include <sys/syscall.h>
 #include "share/datum/ob_datum_util.h"
+
+#include "sql/engine/python_udf_engine/python_udf_schema.h"
 #endif
 
 namespace oceanbase
@@ -154,7 +154,7 @@ namespace oceanbase
         class pythonUdfEngine {
         private:
             //key-value map,存储已经初始化的python_udf
-            std::map<std::string, pythonUdf*> udf_pool;
+            std::map<pid_t, pythonUdf*> udf_pool;
             //只能有一个实例存在
             static pythonUdfEngine *current_engine;
             double tu;
@@ -163,22 +163,20 @@ namespace oceanbase
             pythonUdfEngine(/* args */);
             ~pythonUdfEngine();
             //懒汉模式
-            static pythonUdfEngine* init_python_udf_engine() {
+            static pythonUdfEngine* init_python_udf_engine(pid_t tid) {
                 if(current_engine == NULL) {
                     struct timeval t1, t2, tsub;
                     //double tu;
-                    //pthread_mutex_lock(&mutex);
                     gettimeofday(&t1, NULL);
                     current_engine = new pythonUdfEngine();
                     gettimeofday(&t2, NULL);
                     timersub(&t2, &t1, &tsub);
                     current_engine->tu = tsub.tv_sec*1000 + (1.0 * tsub.tv_usec) / 1000;
-                    //pthread_mutex_unlock(&mutex);
                 }
                 return current_engine;
             }
-            bool insert_python_udf(std::string name, pythonUdf *udf);
-            bool get_python_udf(std::string name, pythonUdf *& udf);//获取udf，只能有一个同名实例存在
+            bool insert_python_udf(pid_t, pythonUdf *udf);
+            bool get_python_udf(pid_t name, pythonUdf *& udf);//获取udf，只能有一个同名实例存在
             bool show_names(std::string* names);//获取全部udf的名称
 
             bool endAll();//结束所有UDF的等待过程，进行提交
