@@ -68,12 +68,12 @@ int ObExprPythonUdf::calc_resultN(common::ObObj &result,
 int ObExprPythonUdf::get_python_udf(pythonUdf* &pyudf, const ObExpr& expr) 
 {
   int ret = OB_SUCCESS;
-  //初始化引擎
-  pythonUdfEngine* udfEngine = pythonUdfEngine::init_python_udf_engine();
+  //获取当前工作线程tid并初始化引擎
+  pid_t tid = syscall(SYS_gettid);
+  pythonUdfEngine* udfEngine = pythonUdfEngine::init_python_udf_engine(tid);
   //获取udf实例
   std::string name = "expedia";
   pythonUdf *udfPtr = nullptr;
-  pid_t tid = syscall(SYS_gettid); //工作线程tid
   if(!udfEngine -> get_python_udf(tid, udfPtr)) {
     //udf构造参数
     char* pycall = expedia_onnx; // define in python_udf_pycall.h
@@ -134,10 +134,9 @@ int ObExprPythonUdf::get_python_udf(pythonUdf* &pyudf, const ObExpr& expr)
     }
 
     //插入udf_pool
-    udfEngine->insert_python_udf(udfPtr->get_name(), udfPtr);
+    udfEngine->insert_python_udf(tid, udfPtr);
   }
   pyudf = udfPtr;
-  pyudf->resultptr = nullptr;
   //validation
   if(pyudf == NULL) {
     ret = OB_ERR_UNEXPECTED;
