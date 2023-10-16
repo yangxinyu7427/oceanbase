@@ -255,6 +255,7 @@ ObSchemaServiceSQLImpl::ObSchemaServiceSQLImpl()
       tablespace_service_(*this),
       profile_service_(*this),
       audit_service_(*this),
+      model_service_(*this),
       rw_lock_(common::ObLatchIds::SCHEMA_REFRESH_INFO_LOCK),
       last_operation_tenant_id_(OB_INVALID_TENANT_ID),
       sequence_id_(OB_INVALID_ID),
@@ -2628,6 +2629,7 @@ FETCH_NEW_SCHEMA_ID(SYS_PL_OBJECT, sys_pl_object);
 FETCH_NEW_SCHEMA_ID(RLS_POLICY, rls_policy);
 FETCH_NEW_SCHEMA_ID(RLS_GROUP, rls_group);
 FETCH_NEW_SCHEMA_ID(RLS_CONTEXT, rls_context);
+FETCH_NEW_SCHEMA_ID(MODEL, model);
 
 #undef FETCH_NEW_SCHEMA_ID
 

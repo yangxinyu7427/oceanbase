@@ -2215,7 +2215,13 @@ typedef enum ObItemType
   T_NULL_IF_EXETERNAL,
   T_EMPTY_FIELD_AS_NULL,
   T_ADMIN_STORAGE,// used to support oss storage for clog/sstable
-  T_MAX //Attention: add a new type before T_MAX
+  T_MAX, //Attention: add a new type before T_MAX
+
+  //新增
+  T_CREATE_MODEL,
+  T_DROP_MODEL,  
+  T_FUNCTION_ELEMENT_LIST,
+  T_PARAM_DEFINITION,
 } ObItemType;
 
 typedef enum ObCacheType

@@ -145,6 +145,12 @@ public:
   RPC_S(PRD drop_udf, obrpc::OB_DROP_USER_DEFINED_FUNCTION, (ObDropUserDefinedFunctionArg));
   //----End of definitions for managing udf----
 
+  //----Definitions for managing model----
+  RPC_S(PRD create_model, obrpc::OB_CREATE_MODEL, (ObCreateModelArg));
+  RPC_S(PRD drop_model, obrpc::OB_DROP_MODEL, (ObDropModelArg));
+  //----End of definitions for managing model----
+
+
   //----Definitions for managing sequence----
   RPC_S(PRD do_sequence_ddl, obrpc::OB_DO_SEQUENCE_DDL, (ObSequenceDDLArg));
   //----End of definitions for managing sequence----
