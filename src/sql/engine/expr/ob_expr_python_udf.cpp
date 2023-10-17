@@ -150,6 +150,18 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
 {
   int ret = OB_SUCCESS;
 
+  //获取当前工作线程tid并初始化引擎
+  pid_t tid = syscall(SYS_gettid);
+  pythonUdfEngine* udfEngine = pythonUdfEngine::init_python_udf_engine(tid);
+  
+  //Ensure GIL
+  bool nStatus = PyGILState_Check();
+  PyGILState_STATE gstate;
+  if(!nStatus) {
+    gstate = PyGILState_Ensure();
+    nStatus = true;
+  }
+
   //获取udf实例并核验
   pythonUdf *udfPtr = NULL;
   if(OB_FAIL(get_python_udf(udfPtr, expr))){
@@ -161,10 +173,13 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
     LOG_WARN("wrong arg count", K(ret));
     return ret;
   }
-
+  
   //设置udf运行参数
+  _import_array(); //load numpy api
   ObDatum *argDatum = NULL;
   PyObject *numpyarray = NULL;
+  PyObject **arrays = new PyObject*[udfPtr->get_arg_count()];
+  npy_intp elements[1] = {1};
   for(int i = 0;i < udfPtr->get_arg_count();i++) {
     //get args from expr
     if(expr.args_[i]->eval(ctx, argDatum) != OB_SUCCESS){
@@ -173,10 +188,48 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
       return ret;
     }
     //转换得到numpy array --> 单一元素
-    if(OB_FAIL(obdatum2array(argDatum, expr.args_[i]->datum_meta_.type_, numpyarray, 1))){
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("fail to obdatum2array", K(ret));
-      return ret;
+    switch(expr.args_[i]->datum_meta_.type_) {
+      case ObCharType:
+      case ObVarcharType:
+      case ObTinyTextType:
+      case ObTextType:
+      case ObMediumTextType:
+      case ObLongTextType: {
+        //str in OB
+        ObString str = argDatum->get_string();
+        //put str into numpy array
+        numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
+        PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, 0), 
+          PyUnicode_FromStringAndSize(str.ptr(), str.length()));
+        break;
+      }
+      case ObTinyIntType:
+      case ObSmallIntType:
+      case ObMediumIntType:
+      case ObInt32Type:
+      case ObIntType: {
+        //put integer into numpy array
+        numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
+        PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, 0), PyLong_FromLong(argDatum->get_int()));
+        break;
+      }
+      case ObDoubleType: {
+        //put double into numpy array
+        numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
+        PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, 0), PyFloat_FromDouble(argDatum->get_double()));
+        break;
+      }
+      case ObNumberType: {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("number type, fail in obdatum2array", K(ret));
+        return ret;
+      }
+      default: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unknown arg type, fail in obdatum2array", K(ret));
+        return ret;
+      }
     }
     //插入pArg
     if(!udfPtr->set_arg_at(i, numpyarray)){
@@ -184,6 +237,7 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
       LOG_WARN("fail to set numpy array arg", K(ret));
       return ret;
     }
+    arrays[i] = numpyarray;
   }
 
   //执行Python Code
@@ -193,22 +247,14 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
     return ret;
   }
   //获取返回值
-  PyObject* result = NULL;
+  PyObject *result = NULL;
   if(!udfPtr->get_result(result)){
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("have not get result", K(ret));
     return ret;
   }
-
-  //从numpy数组中取出返回值
-  PyObject* value = nullptr;
-  if(OB_FAIL(numpy2value(result, 0, value))){
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to obtain result value", K(ret));
-    return ret;
-  }
   
-  //根据类型填入返回值
+  //根据类型从numpy数组中取出返回值并填入返回值
   switch (expr.datum_meta_.type_)
   {
     case ObCharType:
@@ -217,7 +263,8 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
     case ObTextType:
     case ObMediumTextType:
     case ObLongTextType: {
-      expr_datum.set_string(common::ObString(PyUnicode_AS_DATA(value)));
+      expr_datum.set_string(common::ObString(PyUnicode_AS_DATA(
+        PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, 0)))));
       break;
     }
     case ObTinyIntType:
@@ -225,11 +272,13 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
     case ObMediumIntType:
     case ObInt32Type:
     case ObIntType: {
-      expr_datum.set_int(PyLong_AsLong(value));
+      expr_datum.set_int(PyLong_AsLong(
+        PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, 0))));
       break;
     }
     case ObDoubleType:{
-      expr_datum.set_double(PyFloat_AsDouble(value));
+      expr_datum.set_double(PyFloat_AsDouble(
+        PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, 0))));
       break;
     }
     case ObNumberType: {
@@ -247,9 +296,18 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
   }
 
   //释放资源
-  PyArray_XDECREF((PyArrayObject *)numpyarray);
+  for (int i = 0; i < udfPtr->get_arg_count(); i++) {
+    PyArray_XDECREF((PyArrayObject *)arrays[i]);
+  }
   PyArray_XDECREF((PyArrayObject *)result);
-  //not need to DECREF value
+
+  //删除数组指针
+  delete arrays;
+
+  //release GIL
+  if(nStatus)
+    PyGILState_Release(gstate);
+
   return ret;
 }
 
@@ -485,8 +543,8 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
           if (skip.at(currentRow) || eval_flags.at(currentRow)) 
             continue;
           else {
-            numpy2value(result, evalIndex++, value);
-            results[currentRow].set_string(common::ObString(PyUnicode_AS_DATA(value)));
+            results[currentRow].set_string(common::ObString(PyUnicode_AS_DATA(
+              PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, evalIndex++)))));
           }
         }
         break;
@@ -501,8 +559,8 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
           if (skip.at(currentRow) || eval_flags.at(currentRow)) 
             continue;
           else {
-            numpy2value(result, evalIndex++, value);
-            results[currentRow].set_int(PyLong_AsLong(value));
+            results[currentRow].set_int(PyLong_AsLong(
+              PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, evalIndex++))));
           }
         }
         break;
@@ -513,8 +571,8 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
           if (skip.at(currentRow) || eval_flags.at(currentRow)) 
             continue;
           else {
-            numpy2value(result, evalIndex++, value);
-            results[currentRow].set_double(PyFloat_AsDouble(value));
+            results[currentRow].set_double(PyFloat_AsDouble(
+              PyArray_GETITEM((PyArrayObject *)result, (char *)PyArray_GETPTR1((PyArrayObject *)result, evalIndex++))));
           }
         }
         break;
@@ -562,10 +620,9 @@ int ObExprPythonUdf::eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx 
 }
 
 
-int ObExprPythonUdf::cg_expr(ObExprCGCtx& op_cg_ctx, const ObRawExpr& raw_expr, ObExpr& rt_expr) const
+int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr, ObExpr& rt_expr) const
 {
-  UNUSED(raw_expr);
-  UNUSED(op_cg_ctx);
+  int ret = OB_SUCCESS;
   //绑定eval
   rt_expr.eval_func_ = ObExprPythonUdf::eval_python_udf;
   //绑定向量化eval
@@ -579,7 +636,7 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& op_cg_ctx, const ObRawExpr& raw_expr, 
   if(is_batch) {
     rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_python_udf_batch_buffer;
   }
-  return  OB_SUCCESS;
+  return ret;
 }
 
 //PyAPI Methods
@@ -595,162 +652,6 @@ bool Python_ReleaseGIL(bool state)
 		state == 0 ? PyGILState_LOCKED : PyGILState_UNLOCKED;
 	PyGILState_Release(gstate);
 	return 0;
-}
-
-//for one tuple
-int ObExprPythonUdf::obdatum2array(const ObDatum *argdatum, const ObObjType &type, PyObject *&array, const int64_t batch_size) {
-  _import_array(); //load numpy api
-  int ret = OB_SUCCESS;
-  npy_intp elements[1] = {batch_size};
-  switch(type) {
-    case ObCharType:
-    case ObVarcharType:
-    case ObTinyTextType:
-    case ObTextType:
-    case ObMediumTextType:
-    case ObLongTextType: {
-      //string in numpy array
-      array = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
-      //set numpy data
-      for(int i = 0; i < batch_size ; i++) {
-        ObString str = argdatum[i].get_string();
-        PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, i), 
-          PyUnicode_FromStringAndSize(str.ptr(), str.length()));
-      }
-      break;
-    }
-    case ObTinyIntType:
-    case ObSmallIntType:
-    case ObMediumIntType:
-    case ObInt32Type:
-    case ObIntType: {
-      //integer in numpy array
-      array = PyArray_EMPTY(1, elements, NPY_INT32, 0);
-      //set numpy data
-      for(int i = 0; i < batch_size ; i++) {
-        PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, i), PyLong_FromLong(argdatum[i].get_int()));
-      }
-      break;
-    }
-    case ObDoubleType: {
-      //double in numpy array
-      array = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
-      //set numpy data
-      for(int i = 0; i < batch_size ; i++) {
-        PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, i), PyFloat_FromDouble(argdatum[i].get_double()));
-      }
-      break;
-    }
-    case ObNumberType: {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("number type, fail in obdatum2array", K(ret));
-      return ret;
-    }
-    default: {
-      //error
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("unknown arg type, fail in obdatum2array", K(ret));
-      return ret;
-    }
-  }
-  return ret;
-}
-
-//for vectorization
-int ObExprPythonUdf::obdatum2array(const ObDatumVector &vector, const ObObjType &type, PyObject *&array, 
-                                   const int64_t batch_size, const int64_t real_param,  
-                                   const ObBitVector &skip, ObBitVector &eval_flags) {
-  //_import_array(); //load numpy api
-  int ret = OB_SUCCESS;
-  npy_intp elements[1] = {real_param};
-  ObDatum* argDatum = NULL;
-  int j = 0; //size of array <= batch_size
-  switch(type) {
-    case ObCharType:
-    case ObVarcharType:
-    case ObTinyTextType:
-    case ObTextType:
-    case ObMediumTextType:
-    case ObLongTextType: {
-      //string in numpy array
-      array = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
-      //set numpy data
-      for (int i = 0; i < batch_size ; i++) {
-        if (skip.at(i) || eval_flags.at(i)) {
-          continue;
-        } else {
-          argDatum = vector.at(i);
-          ObString str = argDatum->get_string();
-          PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, j++), 
-            PyUnicode_FromStringAndSize(str.ptr(), str.length()));
-        }
-      }
-      break;
-    }
-    case ObTinyIntType:
-    case ObSmallIntType:
-    case ObMediumIntType:
-    case ObInt32Type:
-    case ObIntType: {
-      //integer in numpy array
-      array = PyArray_EMPTY(1, elements, NPY_INT32, 0);
-      //set numpy data
-      for(int i = 0; i < batch_size ; i++) {
-        if (skip.at(i) || eval_flags.at(i)) {
-          continue;
-        } else {
-          argDatum = vector.at(i);
-          PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, j++), PyLong_FromLong(argDatum->get_int()));
-        }
-      }
-      break;
-    }
-    case ObDoubleType: {
-      //double in numpy array
-      array = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
-      //set numpy data
-      for(int i = 0; i < batch_size ; i++) {
-        if (skip.at(i) || eval_flags.at(i)) {
-          continue;
-        } else {
-          argDatum = vector.at(i);
-          PyArray_SETITEM((PyArrayObject *)array, (char *)PyArray_GETPTR1((PyArrayObject *)array, j++), PyFloat_FromDouble(argDatum->get_double()));
-        }
-      }
-      break;
-    }
-    case ObNumberType: {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("number type, fail in obdatum2array", K(ret));
-      return ret;
-    }
-    default: {
-      //error
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("unknown arg type, fail in obdatum2array", K(ret));
-      return ret;
-    }
-  }
-  // check array size
-  if(j != real_param) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("incorrect array size", K(ret));
-    return ret;
-  }
-  return ret;
-}
-
-int ObExprPythonUdf::numpy2value(PyObject *numpyarray, const int loc, PyObject *&value) {
-  //_import_array(); //load numpy api
-  int ret = OB_SUCCESS;
-  try {
-    value = PyArray_GETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, loc));
-  } catch(const std::exception& e) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail in numpy2value", K(ret));
-    return ret;
-  }
-  return ret;
 }
 
 }  // namespace sql

@@ -1,5 +1,5 @@
 #ifndef _OB_EXPR_PYTHON_UDF_
-#define  _OB_EXPR_PYTHON_UDF_
+#define _OB_EXPR_PYTHON_UDF_
 
 #include  "sql/engine/expr/ob_expr_operator.h"
 #include "sql/engine/python_udf_engine/python_udf_engine.h"
@@ -35,13 +35,6 @@ public:
                                           const ObBitVector &skip, const int64_t batch_size);
 
   static int get_python_udf(pythonUdf* &pyudf, const ObExpr& expr);
-
-  static int obdatum2array(const ObDatum *argdatum, const ObObjType &type, PyObject *&array, const int64_t batch_size);
-  static int obdatum2array(const ObDatumVector &vector, const ObObjType &type, PyObject *&array, 
-                           const int64_t batch_size, const int64_t real_param, 
-                           const ObBitVector &skip, ObBitVector &eval_flags);
-
-  static int numpy2value(PyObject *numpyarray,const int loc, PyObject *&value);
 
 private:
   DISALLOW_COPY_AND_ASSIGN(ObExprPythonUdf);
