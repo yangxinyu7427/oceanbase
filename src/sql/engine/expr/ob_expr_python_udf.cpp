@@ -102,7 +102,7 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   return ret;
 }
 
-int init_udf()
+int ObExprPythonUdf::init_udf()
 {
   int ret = OB_SUCCESS;
   if (OB_ISNULL(udf_meta_)) {
@@ -111,16 +111,33 @@ int init_udf()
     PyObject *pModule, *dic, *v, *pInitial;
     char* pycall = new char[udf_meta_.pycall.length()];
     strncpy(pycall, udf_meta_.pycall_.ptr(), udf_meta_.pycall.length());
-    pModule = PyImport_AddModule("__main__"); //load main module
-    dic = PyModule_GetDict(pModule); //get main module dic
-    v = PyRun_StringFlags(pycall, Py_file_input, dic, dic, NULL); //test pycall
-    pInitial = PyObject_GetAttrString(pModule, "pyinitial"); //get pyInitial()
-    if(!pInitial || !PyCallable_Check(pInitial)) {
+
+    // prepare python code
+    pModule = PyImport_AddModule("__main__"); // load main module
+    if(OB_ISNULL(pModule)) {
+      LOG_WARN("fail to import main module", K(ret));
+      goto destruction;
+    } 
+    dic = PyModule_GetDict(pModule); // get main module dic
+    if(OB_ISNULL(dic)) {
+      LOG_WARN("fail to get main module dic", K(ret));
+      goto destruction;
+    } 
+    PyDict_Clear(dic); // 清空之前的代码
+    v = PyRun_StringFlags(pycall, Py_file_input, dic, dic, NULL); // test pycall
+    if(OB_ISNULL(v)) {
+      LOG_WARN("fail to write pycall into module", K(ret));
+      goto destruction;
+    }
+    pInitial = PyObject_GetAttrString(pModule, "pyinitial"); // get pyInitial()
+    if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
       LOG_WARN("Fail to run initial Python code", K(ret));
+      goto destruction;
     } else {
       PyObject_CallObject(pInitial, NULL);
     }
-    // destruction
+
+    destruction: 
     Py_DECREF(pModule);
     Py_DECREF(dic);
     Py_DECREF(v);
