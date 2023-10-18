@@ -1865,6 +1865,24 @@ int ObSchemaChecker::get_udf_info(uint64_t tenant_id,
   return ret;
 }
 
+int ObSchemaChecker::get_python_udf_info(uint64_t tenant_id,
+                                         const common::ObString &udf_name,
+                                         const share::schema::ObPythonUDF *&udf_info,
+                                         bool &exist)
+{
+  int ret = OB_SUCCESS;
+  if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
+  } else if (OB_ISNULL(schema_mgr_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("invalid argument", K(ret), K(schema_mgr_));
+  } else if (OB_FAIL(schema_mgr_->get_python_udf_info(tenant_id, udf_name, udf_info, exist))) {
+    LOG_WARN("failed to get python udf schema", K(ret));
+  }
+  return ret;
+}
+
 int ObSchemaChecker::check_sequence_exist_with_name(const uint64_t tenant_id,
                                                     const uint64_t database_id,
                                                     const common::ObString &sequence_name,

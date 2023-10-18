@@ -624,6 +624,7 @@ static const NonReservedKeyword Mysql_none_reserved_keywords[] =
   {"preceding", PRECEDING},
   {"pctfree", PCTFREE},
   {"ps", PS},
+  {"python_udf", PYTHON_UDF},
   {"quarter", QUARTER},
   {"query", QUERY},
   {"quick", QUICK},
