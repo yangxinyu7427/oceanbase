@@ -177,6 +177,7 @@ protected:
   int remove_tenant(const uint64_t tenant_id, bool &remove_tenant_succ);
   uint32_t get_tenant_lock_bucket_idx(const uint64_t tenant_id);
   int update_tenant_unit_no_lock(const share::ObUnitInfoGetter::ObTenantConfig &unit);
+  void* _save; //for Python Interpreter Thread State
 
 protected:
       static const int DEL_TRY_TIMES = 30;

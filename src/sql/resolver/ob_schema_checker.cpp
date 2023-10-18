@@ -29,6 +29,7 @@
 #include "common/ob_smart_call.h"
 #include "share/schema/ob_sys_variable_mgr.h" // ObSimpleSysVariableSchema
 #include "sql/resolver/ob_stmt_resolver.h"
+#include "share/schema/ob_python_udf.h"
 
 using namespace oceanbase::sql;
 using namespace oceanbase::common;

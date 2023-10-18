@@ -7729,14 +7729,12 @@ int ObSchemaGetterGuard::check_model_exist_with_name(const uint64_t tenant_id,
 int ObSchemaGetterGuard::get_python_udf_info(const uint64_t tenant_id,
                                              const common::ObString &name,
                                              const share::schema::ObPythonUDF *&udf_info,
-                                             bool &exist
-                                             bool &judge)
+                                             bool &exist)
 {
   int ret = OB_SUCCESS;
   const ObSchemaMgr *mgr = NULL;
   udf_info = nullptr;
   exist = false;
-  judge = false;
   if (!check_inner_stat()) {
     ret = OB_INNER_STAT_ERROR;
     LOG_WARN("inner stat error", KR(ret));
@@ -7762,14 +7760,11 @@ int ObSchemaGetterGuard::get_python_udf_info(const uint64_t tenant_id,
                                   model_schema->get_model_id(),
                                   udf_info,
                                   model_schema->get_schema_version()))) {
-      LOG_WARN("get model schema failed", KR(ret), K(tenant_id), KPC(udf_schema));
+      LOG_WARN("get model schema failed", KR(ret), K(tenant_id), KPC(model_schema));
     } else if (OB_ISNULL(udf_info)) {
       LOG_INFO("model does not exist", K(tenant_id), K(name), KR(ret));
     } else {
       exist = true;
-      if (OB_FAIL(udf_info.check_python_udf(judge,))) {
-        LOG_INFO("model check failed",K(tenant_id), K(name), KR(ret));
-      }
     }
   }
   return ret;

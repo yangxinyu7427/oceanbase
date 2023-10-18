@@ -174,6 +174,7 @@ enum TRANSFORM_TYPE {
   COUNT_TO_EXISTS               ,
   SELECT_EXPR_PULLUP            ,
   PROCESS_DBLINK                ,
+  PULL_UP_FILTER                ,  // for python udf
   TRANSFORM_TYPE_COUNT_PLUS_ONE ,
 };
 

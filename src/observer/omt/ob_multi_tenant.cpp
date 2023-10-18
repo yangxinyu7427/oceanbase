@@ -104,6 +104,8 @@
 #include "sql/plan_cache/ob_plan_cache.h"
 #include "sql/plan_cache/ob_ps_cache.h"
 
+#include <Python.h>
+
 using namespace oceanbase;
 using namespace oceanbase::lib;
 using namespace oceanbase::common;
@@ -454,7 +456,8 @@ int ObMultiTenant::init(ObAddr myaddr,
   }
 
   //initialize Python Intepreter
-
+  Py_InitializeEx(!Py_IsInitialized());
+  _save = PyEval_SaveThread();
   if (OB_SUCC(ret)) {
     is_inited_ = true;
     LOG_INFO("succ to init multi tenant");
@@ -531,6 +534,8 @@ void ObMultiTenant::destroy()
     SpinWLockGuard guard(lock_);
     tenants_.clear();
     is_inited_ = false;
+    PyEval_RestoreThread((PyThreadState *)_save);
+    Py_FinalizeEx(); // Python Intepreter
   }
 }
 

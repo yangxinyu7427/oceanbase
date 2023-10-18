@@ -63,10 +63,13 @@ public:
   //the ObSimpleUDFSchema must have the same interface just like ObUDF.
   //ObSchemaRetrieveUtils's template function will use these interface.
   inline int set_name(const common::ObString &name) { return deep_copy_str(name, model_name_); }
-  inline void set_ret(const enum ObPythonUDF::PyUdfType ret) { ret_ = ObPythonUDF::PyUdfType(ret); }
+  inline void set_ret(const enum ObPythonUDF::PyUdfRetType ret) { ret_ = ret; }
+  inline void set_ret(const int ret) { ret_ = ObPythonUDF::PyUdfRetType(ret); }
   inline void set_arg_num(const int arg_num) { arg_num_ = arg_num; }
   void set_arg_names(const char* arg_name);
+  int set_arg_names(const common::ObString arg_name);
   void set_arg_types(const std::string type_string);
+  int set_arg_types(const common::ObString type_string);
   inline int set_pycall(const common::ObString &pycall) { return deep_copy_str(pycall, pycall_); }
 
   inline const char *get_name() const { return extract_str(model_name_); }
@@ -76,7 +79,7 @@ public:
   inline const common::ObString &get_arg_names_str() const { return arg_names_; }
   inline const char *get_arg_types() const { return extract_str(arg_types_); }
   inline const common::ObString &get_arg_types_str() const { return arg_types_; }
-  inline enum ObPythonUDF::PyUdfType get_ret() const { return ret_; }
+  inline enum ObPythonUDF::PyUdfRetType get_ret() const { return ret_; }
   inline const char *get_pycall() const { return extract_str(pycall_); }
   inline const common::ObString &get_pycall_str() const { return pycall_; }
 
@@ -87,7 +90,7 @@ private:
   int arg_num_;
   common::ObString arg_names_;
   common::ObString arg_types_;
-  enum ObPythonUDF::PyUdfType ret_;
+  enum ObPythonUDF::PyUdfRetType ret_;
   common::ObString pycall_;
   int64_t schema_version_;
 };
