@@ -829,6 +829,7 @@ public:
   virtual int create_model(share::schema::ObPythonUDF &PythonUdf_info,
                            const common::ObString &ddl_stmt_str);
   virtual int drop_model(const obrpc::ObDropModelArg &drop_model_arg);
+  virtual int check_model_exist(uint64 tenant_id, const common::ObString &name, bool &is_exsit, uint64_t &model_id);
   //----End of Functions for managing udf----                        
   
   //----Functions for managing routine----

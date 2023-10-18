@@ -672,6 +672,7 @@ typedef enum {
   RLS_POLICY_SCHEMA = 36,
   RLS_GROUP_SCHEMA = 37,
   RLS_CONTEXT_SCHEMA = 38,
+  MODEL_SCHEMA = 39,
   ///<<< add schema type before this line
   OB_MAX_SCHEMA
 } ObSchemaType;
@@ -5273,6 +5274,48 @@ public:
   common::ObString udf_name_;
 };
 
+struct ObTenantModelId
+{
+  OB_UNIS_VERSION(1);
+
+public:
+  ObTenantModelId()
+      : tenant_id_(common::OB_INVALID_ID), model_name_()
+  {}
+  ObTenantModelId(const uint64_t tenant_id, const common::ObString &name)
+      : tenant_id_(tenant_id), model_name_(name)
+  {}
+  bool operator==(const ObTenantModelId &rhs) const
+  {
+    return (tenant_id_ == rhs.tenant_id_) && (model_name_ == rhs.model_name_);
+  }
+  bool operator!=(const ObTenantModelId &rhs) const
+  {
+    return !(*this == rhs);
+  }
+  bool operator<(const ObTenantModelId &rhs) const
+  {
+    bool bret = tenant_id_ < rhs.tenant_id_;
+    if (tenant_id_ == rhs.tenant_id_) {
+      bret = model_name_ < rhs.model_name_;
+    }
+    return bret;
+  }
+  inline uint64_t hash() const
+  {
+    uint64_t hash_ret = 0;
+    hash_ret = common::murmurhash(&tenant_id_, sizeof(tenant_id_), 0);
+    hash_ret = common::murmurhash(model_name_.ptr(), model_name_.length(), hash_ret);
+    return hash_ret;
+  }
+  bool is_valid() const
+  {
+    return (tenant_id_ != common::OB_INVALID_ID) && (model_name_.length() !=0);
+  }
+  TO_STRING_KV(K_(tenant_id), K_(model_name));
+  uint64_t tenant_id_;
+  common::ObString model_name_;
+};
 
 struct ObTenantSynonymId
 {

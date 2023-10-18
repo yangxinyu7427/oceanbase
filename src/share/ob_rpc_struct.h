@@ -5458,7 +5458,7 @@ struct ObDropModelArg : public ObDDLArg
 {
   OB_UNIS_VERSION(1);
 public:
-  ObDropModelArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), name_() {}
+  ObDropModelArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), name_(), if_exist_(false) {}
   virtual ~ObDropModelArg() {}
 
   bool is_valid() const {

@@ -5811,6 +5811,8 @@ int ObRootService::drop_user_defined_function(const obrpc::ObDropUserDefinedFunc
 int ObRootService::create_model(const obrpc::ObCreateModelArg &arg)
 {
   int ret = OB_SUCCESS;
+  bool exist = false;
+  uint64_t model_id = OB_INVALID_ID;
   ObPythonUDF PythonUdf_info_ = arg.python_udf_;
   if (!inited_) {
     ret = OB_NOT_INIT;
@@ -5818,8 +5820,9 @@ int ObRootService::create_model(const obrpc::ObCreateModelArg &arg)
   } else if (!arg.is_valid()) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid arg", K(arg), K(ret));
-  }  //check udf exist后续增加
-  else if (OB_FAIL(ddl_service_.create_model(PythonUdf_info_, arg.ddl_stmt_str_))) {
+  } else if (OB_FAIL(ddl_service_.check_model_exist(arg.python_udf_.get_tenant_id(), arg.python_udf_.get_name_str(), exist, model_id))) {
+    LOG_WARN("failed to check_model_exist", K(arg.python_udf_.get_tenant_id()), K(arg.python_udf_.get_name_str()), K(exist), K(ret));
+  } else if (OB_FAIL(ddl_service_.create_model(PythonUdf_info_, arg.ddl_stmt_str_))) {
     LOG_WARN("failed to create model", K(arg), K(ret));
   } else {/*do nothing*/}
 
