@@ -31,18 +31,17 @@ class ObPythonUDF : public ObSchema
 
 public:              
     //枚举计算结果后返回值类型
-    enum PyUdfType {
+    enum PyUdfRetType {
         UDF_UNINITIAL,
         STRING,
         INTEGER,
         REAL,
-        DECIMAL,
-        ROW,
+        DECIMAL
     };
 
 public:
     ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0),
-arg_names_(), arg_types_(), ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
+arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
 { reset(); };
     explicit ObPythonUDF(common::ObIAllocator *allocator);
     ObPythonUDF(const ObPythonUDF &src_schema);
@@ -57,7 +56,7 @@ arg_names_(), arg_types_(), ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_ve
     inline void set_tenant_id(const uint64_t id) { tenant_id_ = id; }
     inline void set_model_id(const uint64_t id) { model_id_ = id; }
     inline int set_name(const common::ObString &name) { return deep_copy_str(name, name_); }
-    inline void set_ret(const enum PyUdfType ret) { ret_ = PyUdfType(ret); }
+    inline void set_ret(const enum PyUdfRetType ret) { ret_ = PyUdfRetType(ret); }
     inline void set_arg_num(const int arg_num) { arg_num_ = arg_num; }
     void set_arg_names(const char* arg_name);
     void set_arg_types(const std::string type_string);
@@ -74,7 +73,7 @@ arg_names_(), arg_types_(), ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_ve
     inline const common::ObString &get_arg_names_str() const { return arg_names_; }
     inline const char *get_arg_types() const { return extract_str(arg_types_); }
     inline const common::ObString &get_arg_types_str() const { return arg_types_; }
-    inline enum PyUdfType get_ret() const { return ret_; }
+    inline enum PyUdfRetType get_ret() const { return ret_; }
     inline const char *get_pycall() const { return extract_str(pycall_); }
     inline const common::ObString &get_pycall_str() const { return pycall_; }
     inline int64_t get_schema_version() const { return schema_version_; }
@@ -82,9 +81,9 @@ arg_names_(), arg_types_(), ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_ve
     //other
     virtual void reset() override;
 
-    TO_STRING_KV(K_(tenant_id),
+    TO_STRING_KV(K_(tenant_id_),
                  K_(model_id),
-                 K_(name),
+                 K_(name_),
                  K_(arg_num),
                  K_(arg_names),
                  K_(arg_types),
@@ -96,15 +95,39 @@ private:
     uint64_t tenant_id_;
     uint64_t model_id_;
     common::ObString name_;
-    int arg_num_;        //参数数量
-    //参数名称
-    common::ObString arg_names_;
-    //参数类型
-    common::ObString arg_types_;
-    //返回值类型
-    enum PyUdfType ret_;
-    common::ObString pycall_;        //code
+    uint64_t arg_num_; //参数数量
+    common::ObString arg_names_; //参数名称
+    common::ObString arg_types_; //参数类型
+    enum PyUdfRetType ret_; //返回值类型
+    common::ObString pycall_; //code
     int64_t schema_version_; //the last modify timestamp of this version
+};
+
+/////////////////////////////////////////////
+
+class ObPythonUDFMeta
+{
+  OB_UNIS_VERSION_V(1);
+public :
+  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_() {} 
+  virtual ~ObPythonUDFMeta() = default;
+
+  void assign(const ObUDFMeta &other) {
+    ret_ = other.ret_;
+    pycall_ = other.pycall_;
+  }
+
+  ObUDFMeta &operator=(const class ObUDFMeta &other) {
+    ret_ = other.ret_;
+    pycall_ = other.pycall_;
+    return *this;
+  }
+
+  TO_STRING_KV(K_(ret_),
+               K_(pycall_));
+
+  enum PyUdfRetType ret_; //返回值类型
+  common::ObString pycall_; //code
 };
 
 }

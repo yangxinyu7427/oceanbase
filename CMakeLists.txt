@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 include(cmake/Utils.cmake)
 include(cmake/Env.cmake)
+include(cmake/PythonEnv.cmake)
 
 project("OceanBase_CE"
   VERSION 4.1.0.1

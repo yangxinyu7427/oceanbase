@@ -26,14 +26,14 @@ namespace schema
 
 ObPythonUDF::ObPythonUDF(common::ObIAllocator *allocator)
     : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+      ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();
 }
 
 ObPythonUDF::ObPythonUDF(const ObPythonUDF &src_schema)
     : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(PyUdfType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+      ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();
   *this = src_schema;
@@ -77,19 +77,19 @@ void ObPythonUDF::reset()
   arg_num_ = 0;
   arg_names_.reset();
   arg_types_.reset();
-  ret_ = PyUdfType::UDF_UNINITIAL;
+  ret_ = PyUdfRetType::UDF_UNINITIAL;
   pycall_.reset();
   ObSchema::reset();
 }
 
 OB_SERIALIZE_MEMBER(ObPythonUDF,
-					tenant_id_,
+					          tenant_id_,
                     model_id_,
                     name_,
                     arg_num_,
                     arg_names_,
                     arg_types_,
-					ret_,
+					          ret_,
                     pycall_);
 
 }// end schema

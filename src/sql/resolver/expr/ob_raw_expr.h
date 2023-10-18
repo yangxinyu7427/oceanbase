@@ -3450,6 +3450,24 @@ private:
   common::ObSEArray<common::ObString, 16> udf_attributes_;// name of input expr
 };
 
+class ObPythonUdfRawExpr : public ObSysFunRawExpr
+{
+public:
+  ObPythonUdfRawExpr(common::ObIAllocator &alloc) : ObSysFunRawExpr(alloc), udf_meta_(), udf_attributes_() {}
+  ObPythonUdfRawExpr() : ObSysFunRawExpr(), udf_meta_(), udf_attributes_() {}
+  vitrual ~ObPythonUdfRawExpr() {}
+  int assign(const ObRawExpr &other) override;
+  int inner_deep_copy(ObIRawExprCopier &copier) override;
+  int set_udf_meta(const share::schema::ObPythonUDF &udf);
+  const share::schema::ObUDFMeta &get_udf_meta() const { return udf_meta_; }
+  virtual bool inner_same_as(const ObRawExpr &expr,
+                             ObExprEqualCheckContext *check_context = NULL) const override;
+
+private:
+  //for python udf function info
+  share::schema::ObPythonUDFMeta udf_meta_;
+};
+
 class ObCollectionConstructRawExpr : public ObSysFunRawExpr
 {
 public:
