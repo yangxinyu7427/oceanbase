@@ -2826,6 +2826,38 @@ int ObMultiVersionSchemaService::check_udf_exist(const uint64_t tenant_id,
   return ret;
 }
 
+int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
+                                                   const common::ObString &name,
+                                                   bool &exist,
+                                                   uint64_t &model_id)
+{
+  int ret = OB_SUCCESS;
+  LOG_WARN("get into ObMultiVersionSchemaService::check_model_exist", K(ret));
+  exist = false;
+  model_id = OB_INVALID_ID;
+  if (!check_inner_stat()) {
+    ret = OB_INNER_STAT_ERROR;
+    LOG_WARN("inner stat error", K(ret));
+  } else {
+    SpinRLockGuard guard(schema_manager_rwlock_);
+    ObSchemaGetterGuard schema_guard;
+    if (!is_tenant_full_schema(tenant_id)) {
+      ret = OB_NOT_INIT;
+      LOG_WARN("local schema not inited", K(ret));
+    } else if (OB_FAIL(get_tenant_schema_guard(tenant_id, schema_guard))) {
+      LOG_WARN("get schema guard failed ", K(ret));
+    } else if (OB_FAIL(schema_guard.check_model_exist_with_name(
+                tenant_id,
+                name,
+                exist,
+                model_id))) {
+      LOG_WARN("failed to check udf sql exist",
+          K(tenant_id), K(name), K(ret));
+    } else {/*do nothing*/}
+  }
+  return ret;
+}
+
 int ObMultiVersionSchemaService::check_sequence_exist(const uint64_t tenant_id,
                                                       const uint64_t database_id,
                                                       const common::ObString &name,

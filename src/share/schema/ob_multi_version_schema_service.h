@@ -282,6 +282,10 @@ public:
       const common::ObString &name,
       bool &exist,
       uint64_t &udf_id);
+  int check_model_exist(const uint64_t tenant_id,
+      const common::ObString &name,
+      bool &exist,
+      uint64_t &model_id);
   int check_sequence_exist(const uint64_t tenant_id,
       const uint64_t database_id,
       const common::ObString &name,

@@ -308,7 +308,7 @@ END_P SET_VAR DELIMITER
         PERCENT_RANK PHASE PLAN PHYSICAL PLANREGRESS PLUGIN PLUGIN_DIR PLUGINS POINT POLYGON PERFORMANCE
         PROTECTION PRIORITY PL POLICY POOL PORT POSITION PREPARE PRESERVE PRETTY PRETTY_COLOR PREV PRIMARY_ZONE PRIVILEGES PROCESS
         PROCESSLIST PROFILE PROFILES PROXY PRECEDING PCTFREE P_ENTITY P_CHUNK
-        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS 
+        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS PYTHON_UDF
 
         QUARTER QUERY QUERY_RESPONSE_TIME QUEUE_TIME QUICK
 
@@ -2700,6 +2700,21 @@ MOD '(' expr ',' expr ')'
   else
   {
     malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF, 4, $3, NULL, $1, NULL);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PYTHON_UDF function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $4)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $4);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_PYTHON_UDF, 2, $2, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_PYTHON_UDF, 1, $2);
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }

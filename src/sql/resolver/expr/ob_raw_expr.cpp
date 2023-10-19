@@ -4222,29 +4222,29 @@ int ObPythonUdfRawExpr::inner_deep_copy(ObIRawExprCopier &copier)
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("inner allocator or expr factory is NULL", K(inner_alloc_), K(ret));
     // wait for python udf meta defination
-    } else if (OB_FAIL(ob_write_string(alloc, udf_meta_.pycall_, udf_meta_.pycall_))) {
-      LOG_WARN("fail to write string", K(src.pycall_), K(ret)); 
+    } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf_meta_.pycall_, udf_meta_.pycall_))) {
+      LOG_WARN("fail to write string", K(udf_meta_.pycall_), K(ret)); 
     }
   }
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta(const share::schema::ObPythonUDF &udf)
+int ObPythonUdfRawExpr::set_udf_meta(const share::schema::ObPythonUDF *&udf)
 {
   int ret = OB_SUCCESS;
-  udf_meta_.ret_ = udf.get_ret();
+  udf_meta_.ret_ = udf->get_ret();
   /* data from schame, deep copy maybe a better choices */
   if (OB_ISNULL(inner_alloc_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("inner allocator or expr factory is NULL", K(inner_alloc_), K(ret));
-  } else if (OB_FAIL(ob_write_string(alloc, udf.pycall_, udf_meta_.pycall_))) {
-    LOG_WARN("fail to write string", K(src.pycall_), K(ret));
+  } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf->get_pycall(), udf_meta_.pycall_))) {
+    LOG_WARN("fail to write string", K(udf->get_pycall()), K(ret));
   } else { /*do nothing*/ }
   return ret;
 }
 
-bool ObNormalDllUdfRawExpr::inner_same_as(const ObRawExpr &expr,
-                                          ObExprEqualCheckContext *check_context) const
+bool ObPythonUdfRawExpr::inner_same_as(const ObRawExpr &expr,
+                                       ObExprEqualCheckContext *check_context) const
 {
   UNUSED(expr);
   UNUSED(check_context);

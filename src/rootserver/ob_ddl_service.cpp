@@ -30497,15 +30497,27 @@ int ObDDLService::drop_model(const obrpc::ObDropModelArg &drop_model_arg)
 
   //check python udf exist & drop udf
   if (OB_SUCC(ret)) {
-    uint64_t udf_id = OB_INVALID_ID;
+    bool is_exist = false;
+    uint64_t model_id = OB_INVALID_ID;
     int64_t refreshed_schema_version = 0;
-    if (OB_FAIL(schema_guard.get_schema_version(tenant_id, refreshed_schema_version))) {
+    if (OB_FAIL(schema_service_->check_model_exist(tenant_id, name,
+                                                   is_exist, model_id))) {
+      LOG_WARN("check_udf_exist failed", K(tenant_id), K(name), K(ret));
+    } else if (!is_exist) {
+      if (if_exist) {
+        LOG_USER_NOTE(OB_ERR_FUNCTION_UNKNOWN, name.length(), name.ptr());
+        LOG_INFO("function not exist, no need to delete it", K(tenant_id), K(name));
+      } else {
+        ret = OB_ERR_FUNCTION_UNKNOWN;
+        LOG_WARN("function not exist, can't delete it", K(tenant_id), K(name), K(ret));
+      }
+    } else if (OB_FAIL(schema_guard.get_schema_version(tenant_id, refreshed_schema_version))) {
       LOG_WARN("failed to get tenant schema version", KR(ret), K(tenant_id));
     } else if (OB_FAIL(trans.start(sql_proxy_, tenant_id, refreshed_schema_version))) {
       LOG_WARN("start transaction failed", KR(ret), K(tenant_id));
     } else {
       ObDDLOperator ddl_operator(*schema_service_, *sql_proxy_);
-      if (OB_FAIL(ObDependencyInfo::modify_dep_obj_status(trans, tenant_id, udf_id,
+      if (OB_FAIL(ObDependencyInfo::modify_dep_obj_status(trans, tenant_id, model_id,
                                                       ddl_operator, *schema_service_))) {
         LOG_WARN("failed to modify obj status", K(ret));
       } else if (OB_FAIL(ddl_operator.drop_model(tenant_id, name, trans, &drop_model_arg.ddl_stmt_str_))) {
@@ -30530,6 +30542,15 @@ int ObDDLService::drop_model(const obrpc::ObDropModelArg &drop_model_arg)
 
   LOG_INFO("finish drop UDF", K(tenant_id), K(name), K(ret));
 
+  return ret;
+}
+
+int ObDDLService::check_model_exist(uint64 tenant_id, const common::ObString &name, bool &is_exist, uint64_t &model_id)
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(schema_service_->check_model_exist(tenant_id, name, is_exist, model_id))) {
+    LOG_WARN("failed to check if model_name exists", K(name), K(ret));
+  }
   return ret;
 }
 

@@ -949,12 +949,6 @@ int ObRawExprResolverImpl::do_recursive_resolve(const ParseNode *node, ObRawExpr
         }
         break;
       }
-      case T_FUN_SYS_PYTHON_UDF: {
-        if (OB_FAIL(process_python_udf_node(node, expr))) {
-          LOG_WARN("fail to process python user defined function node", K(ret), K(node));
-        }
-        break;
-      }
       case T_FUN_SYS_REGEXP_LIKE:
       case T_FUN_SYS: {
         if (OB_FAIL(process_fun_sys_node(node, expr))) {
@@ -994,6 +988,11 @@ int ObRawExprResolverImpl::do_recursive_resolve(const ParseNode *node, ObRawExpr
           LOG_WARN("fail to process user defined function node", K(ret), K(node));
         }
         break;
+      }
+      case T_FUN_SYS_PYTHON_UDF: {
+        if (OB_FAIL(process_python_udf_node(node, expr))) {
+          LOG_WARN("fail to process python udf node", K(ret), K(node));
+        }
       }
       case T_WINDOW_FUNCTION: {
         const int64_t orig_win_func_cnt = ctx_.win_exprs_->count();
@@ -7100,6 +7099,21 @@ int ObRawExprResolverImpl::transform_ratio_afun_to_arg_div_sum(const ParseNode *
   return ret;
 }
 
+int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF *udf_info) 
+{
+  int ret = OB_SUCCESS;
+  //resolve expr_list_node
+  ParseNode* expr_list_node = node->children_[1];
+  //resolve arg_num
+  int expr_arg_num = expr_list_node->num_child_;
+  int arg_num = udf_info->get_arg_num();
+  if (expr_arg_num > arg_num || expr_arg_num < arg_num) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(expr_list_node));
+  } 
+  return ret;
+}
+
 int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawExpr *&expr)
 {
   int ret = OB_SUCCESS;
@@ -7138,6 +7152,8 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     } else if (OB_ISNULL(udf_info)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("the udf info is null", K(ret));
+    } else if (OB_FAIL(check_udf_info(node, udf_info))) {
+      LOG_WARN("fail to pass udf info check", K(ret));
     } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_SYS_PYTHON_UDF, func_expr))) { //process 
       LOG_WARN("fail to create raw expr", K(ret));
     } else if (OB_FAIL(func_expr->set_udf_meta(udf_info))) {
