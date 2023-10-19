@@ -949,12 +949,6 @@ int ObRawExprResolverImpl::do_recursive_resolve(const ParseNode *node, ObRawExpr
         }
         break;
       }
-      case T_FUN_SYS_PYTHON_UDF: {
-        if (OB_FAIL(process_python_udf_node(node, expr))) {
-          LOG_WARN("fail to process python user defined function node", K(ret), K(node));
-        }
-        break;
-      }
       case T_FUN_SYS_REGEXP_LIKE:
       case T_FUN_SYS: {
         if (OB_FAIL(process_fun_sys_node(node, expr))) {
@@ -7105,6 +7099,21 @@ int ObRawExprResolverImpl::transform_ratio_afun_to_arg_div_sum(const ParseNode *
   return ret;
 }
 
+int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF *udf_info) 
+{
+  int ret = OB_SUCCESS;
+  //resolve expr_list_node
+  ParseNode* expr_list_node = node->children_[1];
+  //resolve arg_num
+  int expr_arg_num = expr_list_node->num_child_;
+  int arg_num = udf_info->get_arg_num();
+  if (expr_arg_num > arg_num || expr_arg_num < arg_num) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(expr_list_node));
+  } 
+  return ret;
+}
+
 int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawExpr *&expr)
 {
   int ret = OB_SUCCESS;
@@ -7143,6 +7152,8 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     } else if (OB_ISNULL(udf_info)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("the udf info is null", K(ret));
+    } else if (OB_FAIL(check_udf_info(node, udf_info))) {
+      LOG_WARN("fail to pass udf info check", K(ret));
     } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_SYS_PYTHON_UDF, func_expr))) { //process 
       LOG_WARN("fail to create raw expr", K(ret));
     } else if (OB_FAIL(func_expr->set_udf_meta(udf_info))) {
@@ -7201,70 +7212,6 @@ int ObRawExprResolverImpl::process_dll_udf_node(const ParseNode *node, ObRawExpr
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("the udf info is null", K(ret));
     } else if (!(udf_info->is_normal_udf() || udf_info->is_agg_udf())) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("the udf schame is error", K(ret), K(udf_info->get_type()));
-    } else if (udf_info->is_normal_udf()) {
-      ObSysFunRawExpr *func_expr = NULL;
-      ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name);
-      if (OB_FAIL(process_normal_udf_node(node, udf_name, *udf_info, func_expr))) {
-        LOG_WARN("failed to process normal user define function", K(ret));
-      } else {
-        expr = func_expr;
-      }
-    } else if (udf_info->is_agg_udf()) {
-      ObAggFunRawExpr *func_expr = NULL;
-      ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name);
-      if (OB_FAIL(process_agg_udf_node(node, *udf_info, func_expr))) {
-        LOG_WARN("failed to process agg user define function", K(ret));
-      } else {
-        expr = func_expr;
-      }
-    }
-  }
-  return ret;
-}
-
-int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawExpr *&expr)
-{
-  int ret = OB_SUCCESS;
-
-  const share::schema::ObPythonUDF *udf_info = nullptr;
-  bool exist = false;
-  ObString udf_name;
-  ObCollationType cs_type;
-  if (OB_ISNULL(ctx_.session_info_) || OB_ISNULL(ctx_.schema_checker_)) {
-    //PL resolver don't have schema checker and session info
-    ret = OB_ERR_FUNCTION_UNKNOWN;
-  } else if (OB_ISNULL(node)) {
-    ret = OB_INVALID_ARGUMENT;
-    LOG_WARN("invalid argument", K(ret), K(node));
-  } else if (OB_UNLIKELY(1 > node->num_child_) || OB_ISNULL(node->children_) || OB_ISNULL(node->children_[0])) {
-    ret = OB_ERR_PARSER_SYNTAX;
-    LOG_WARN("invalid node children for fun_sys node", K(ret), K(node->num_child_), "node", SJ(ObParserResultPrintWrapper(*node)));
-  } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
-    LOG_WARN("failed to get collation", K(ret));
-  } else {
-    ObString name(node->children_[0]->str_len_, node->children_[0]->str_value_);
-    if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      LOG_WARN("Malloc function name failed", K(ret));
-    } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {
-    } else if (OB_FAIL(ctx_.schema_checker_->get_python_udf_info(ctx_.session_info_->get_effective_tenant_id(),
-                                                                 udf_name,
-                                                                 udf_info,
-                                                                 exist))) {
-      LOG_WARN("failed to resolve udf", K(ret));
-    } else if (!exist) {
-      //we can not find this function in udf
-      ret = OB_ERR_FUNCTION_UNKNOWN;
-      //do not throw this error to user, just let it go.
-      //the pl function will deal with it.
-    } else if (OB_ISNULL(udf_info)) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("the udf info is null", K(ret));
-    } else if ()
-    
-    else if (!(udf_info->is_normal_udf() || udf_info->is_agg_udf())) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("the udf schame is error", K(ret), K(udf_info->get_type()));
     } else if (udf_info->is_normal_udf()) {

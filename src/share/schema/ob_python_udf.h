@@ -81,9 +81,9 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
     //other
     virtual void reset() override;
 
-    TO_STRING_KV(K_(tenant_id_),
+    TO_STRING_KV(K_(tenant_id),
                  K_(model_id),
-                 K_(name_),
+                 K_(name),
                  K_(arg_num),
                  K_(arg_names),
                  K_(arg_types),
@@ -95,7 +95,7 @@ private:
     uint64_t tenant_id_;
     uint64_t model_id_;
     common::ObString name_;
-    uint64_t arg_num_; //参数数量
+    int arg_num_; //参数数量
     common::ObString arg_names_; //参数名称
     common::ObString arg_types_; //参数类型
     enum PyUdfRetType ret_; //返回值类型
@@ -109,24 +109,24 @@ class ObPythonUDFMeta
 {
   OB_UNIS_VERSION_V(1);
 public :
-  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_() {} 
+  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(NULL) {} 
   virtual ~ObPythonUDFMeta() = default;
 
-  void assign(const ObUDFMeta &other) {
+  void assign(const ObPythonUDFMeta &other) {
     ret_ = other.ret_;
     pycall_ = other.pycall_;
   }
 
-  ObUDFMeta &operator=(const class ObUDFMeta &other) {
+  ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
     ret_ = other.ret_;
     pycall_ = other.pycall_;
     return *this;
   }
 
-  TO_STRING_KV(K_(ret_),
-               K_(pycall_));
+  TO_STRING_KV(K_(ret),
+               K_(pycall));
 
-  enum PyUdfRetType ret_; //返回值类型
+  ObPythonUDF::PyUdfRetType ret_; //返回值类型
   common::ObString pycall_; //code
 };
 

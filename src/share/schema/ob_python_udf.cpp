@@ -92,6 +92,10 @@ OB_SERIALIZE_MEMBER(ObPythonUDF,
 					          ret_,
                     pycall_);
 
+OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
+                    ret_,
+                    pycall_);
+
 }// end schema
 }// end share
 }// end oceanbase

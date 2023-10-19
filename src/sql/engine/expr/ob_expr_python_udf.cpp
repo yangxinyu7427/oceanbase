@@ -33,7 +33,8 @@ namespace oceanbase {
 using namespace common;
 namespace sql {
 
-ObExprPythonUdf::ObExprPythonUdf(ObIAllocator& alloc) : ObExprOperator(alloc, T_FUN_SYS_PYTHON_UDF, N_PYTHON_UDF, MORE_THAN_ZERO)
+ObExprPythonUdf::ObExprPythonUdf(ObIAllocator& alloc) : 
+  ObExprOperator(alloc, T_FUN_SYS_PYTHON_UDF, N_PYTHON_UDF, MORE_THAN_ZERO), allocator_(alloc), udf_meta_()
 {}
 
 ObExprPythonUdf::~ObExprPythonUdf()
@@ -47,7 +48,7 @@ int ObExprPythonUdf::calc_result_typeN(ObExprResType &type,
   int ret = OB_SUCCESS;
   UNUSED(param_num);
   UNUSED(types_array);
-  switch(udf_meta.ret_) {
+  switch(udf_meta_.ret_) {
   case share::schema::ObPythonUDF::PyUdfRetType::STRING : 
     type.set_varchar();
     break;
@@ -105,19 +106,22 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
 int ObExprPythonUdf::init_udf()
 {
   int ret = OB_SUCCESS;
-  if (OB_ISNULL(udf_meta_)) {
+  if (udf_meta_.ret_ == ObPythonUDF::PyUdfRetType::UDF_UNINITIAL) {
     LOG_WARN("udf meta data is null", K(ret));
   } else {
-    PyObject *pModule, *dic, *v, *pInitial;
-    char* pycall = new char[udf_meta_.pycall.length()];
-    strncpy(pycall, udf_meta_.pycall_.ptr(), udf_meta_.pycall.length());
+    PyObject *pModule = NULL;
+    PyObject *dic = NULL;
+    PyObject *v = NULL;
+    PyObject *pInitial = NULL;
+    char* pycall = new char[udf_meta_.pycall_.length()];
+    strncpy(pycall, udf_meta_.pycall_.ptr(), udf_meta_.pycall_.length());
 
     // prepare python code
     pModule = PyImport_AddModule("__main__"); // load main module
     if(OB_ISNULL(pModule)) {
       LOG_WARN("fail to import main module", K(ret));
       goto destruction;
-    } 
+    }
     dic = PyModule_GetDict(pModule); // get main module dic
     if(OB_ISNULL(dic)) {
       LOG_WARN("fail to get main module dic", K(ret));
@@ -384,7 +388,7 @@ int ObExprPythonUdf::eval_python_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum
   PyArray_XDECREF((PyArrayObject *)result);
 
   //删除数组指针
-  delete arrays;
+  delete[] arrays;
 
   //release GIL
   if(nStatus)
@@ -716,20 +720,23 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   _import_array(); 
 
   //运行时变量
-  PyObject* pModule, pFunc, pArgs, pResult;
-  ObDatum *argDatum = NULL;
+  PyObject *pModule = NULL;
+  PyObject *pFunc = NULL;
+  PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
+  PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
   PyObject **arrays = new PyObject*[expr.arg_cnt_];
   npy_intp elements[1] = {1};
+  ObDatum *argDatum = NULL;
 
   //获取udf实例并核验
   pModule = PyImport_AddModule("__main__");
-  if(!pModule) {
+  if(OB_ISNULL(pModule)) {
     LOG_WARN("Fail to import main module", K(ret));
     goto destruction;
   }
   pFunc = PyObject_GetAttrString(pModule, "pyfun");
-  if(!pFunc || !PyCallable_Check(pFunc)) {
+  if(OB_ISNULL(pFunc) || !PyCallable_Check(pFunc)) {
     LOG_WARN("Fail to get function handler", K(ret));
     goto destruction;
   }
@@ -854,10 +861,10 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   Py_DECREF(pResult);
 
   //释放函数参数
-  for (int i = 0; i < udfPtr->get_arg_count(); i++) {
+  for (int i = 0; i < expr.arg_cnt_; i++) {
     PyArray_XDECREF((PyArrayObject *)arrays[i]);
   }
-  delete arrays; //释放数组指针
+  delete[] arrays; //释放数组指针
 
   //release GIL
   if(nStatus)
@@ -899,5 +906,46 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
   return ret;
 }
 
+int ObPythonUdfInfo::deep_copy(common::ObIAllocator &allocator,
+                                const ObExprOperatorType type,
+                                ObIExprExtraInfo *&copied_info) const
+{
+  int ret = common::OB_SUCCESS;
+  OZ(ObExprExtraInfoFactory::alloc(allocator, type, copied_info));
+  ObPythonUdfInfo &other = *static_cast<ObPythonUdfInfo *>(copied_info);
+  OZ(ObExprPythonUdf::deep_copy_udf_meta(other.udf_meta_, allocator, udf_meta_));
+  return ret;
+}
+
+int ObPythonUdfInfo::from_raw_expr(const ObPythonUdfRawExpr &raw_expr)
+{
+  int ret = OB_SUCCESS;
+  OZ(ObExprPythonUdf::deep_copy_udf_meta(udf_meta_, allocator_, raw_expr.get_udf_meta()));
+  return ret;
+}
+
+OB_DEF_SERIALIZE(ObPythonUdfInfo)
+{
+  int ret = OB_SUCCESS;
+  LST_DO_CODE(OB_UNIS_ENCODE,
+              udf_meta_);
+  return ret;
+}
+
+OB_DEF_DESERIALIZE(ObPythonUdfInfo)
+{
+  int ret = OB_SUCCESS;
+  LST_DO_CODE(OB_UNIS_DECODE,
+              udf_meta_);
+  return ret;
+}
+
+OB_DEF_SERIALIZE_SIZE(ObPythonUdfInfo)
+{
+  int64_t len = 0;
+  LST_DO_CODE(OB_UNIS_ADD_LEN,
+              udf_meta_);
+  return len;
+}
 }  // namespace sql
 }  // namespace oceanbase

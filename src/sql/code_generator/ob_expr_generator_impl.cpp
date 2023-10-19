@@ -621,7 +621,7 @@ int ObExprGeneratorImpl::visit_simple_op(ObNonTerminalRawExpr &expr)
         }
         case T_FUN_SYS_PYTHON_UDF: {
           ObExprPythonUdf *python_udf_op = static_cast<ObExprPythonUdf*>(op);
-          ret = visit_normal_udf_expr(expr, python_udf_op);
+          ret = visit_python_udf_expr(expr, python_udf_op);
           break;
         }
         case T_FUN_PL_GET_CURSOR_ATTR: {
