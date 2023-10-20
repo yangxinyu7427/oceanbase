@@ -80,6 +80,7 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
 
     //other
     virtual void reset() override;
+   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> get_arg_types_arr();
 
     TO_STRING_KV(K_(tenant_id),
                  K_(model_id),
