@@ -12,6 +12,7 @@
 
 #define USING_LOG_PREFIX SHARE_SCHEMA
 #include "ob_python_udf.h"
+#include <sstream>
 
 namespace oceanbase
 {
@@ -69,6 +70,25 @@ void ObPythonUDF::set_arg_types(const std::string type_string) {
     result += type_string;
     deep_copy_str(common::ObString(result.length(), result.c_str()),arg_types_);
 }
+
+common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> ObPythonUDF::get_arg_types_arr() {
+    common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types;
+    char* arg_types_str = const_cast<char*>(get_arg_types());
+    std::istringstream ss(arg_types_str);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        if (token == "STRING") {
+            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::STRING);
+        } else if (token == "INTEGER") {
+            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::INTEGER);
+        } else if (token == "REAL") {
+            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::REAL);
+        } else if (token == "DECIMAL") {
+            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::DECIMAL);
+        }
+      }
+    return udf_attributes_types;
+} 
 
 void ObPythonUDF::reset()
 {

@@ -78,7 +78,7 @@ int ObCreateModelResolver::resolve(const ParseNode &parse_tree)
                     create_model_arg.python_udf_.set_arg_types("REAL");
                     break;
                 case 4:
-                    create_model_arg.python_udf_.set_arg_types("REAL");
+                    create_model_arg.python_udf_.set_arg_types("DECIMAL");
                     break;       
             }
         }
