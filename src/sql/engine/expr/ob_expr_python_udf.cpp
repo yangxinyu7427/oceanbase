@@ -121,7 +121,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("the expr is null", K(ret));
       } else {
-        switch(expr->get_result_type()) {
+        switch(expr->get_result_type().get_type()) {
         case ObCharType :
         case ObVarcharType :
         case ObTinyTextType :
@@ -157,11 +157,12 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
         default : 
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("not support param type", K(ret));
+        }
       }
     }
   }
   // check python code
-  if (OB_SUCCESS(ret)) {
+  if (ret == OB_SUCCESS) {
     PyObject *pModule = NULL;
     PyObject *dic = NULL;
     PyObject *v = NULL;
