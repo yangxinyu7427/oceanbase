@@ -98,17 +98,70 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   dst.ret_ = src.ret_;
   if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write string", K(src.pycall_), K(ret));
-  } else { }
+  } else { 
+    for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
+      dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+    }
+  }
   LOG_DEBUG("set udf meta", K(src), K(dst));
   return ret;
 }
 
-int ObExprPythonUdf::init_udf()
+int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
 {
   int ret = OB_SUCCESS;
+  // check udf param types
   if (udf_meta_.ret_ == ObPythonUDF::PyUdfRetType::UDF_UNINITIAL) {
+    ret = OB_ERR_UNEXPECTED;
     LOG_WARN("udf meta data is null", K(ret));
   } else {
+    ARRAY_FOREACH_X(param_exprs, idx, cnt, OB_SUCC(ret)) {
+      ObRawExpr *expr = param_exprs.at(idx);
+      if (OB_ISNULL(expr)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("the expr is null", K(ret));
+      } else {
+        switch(expr->get_result_type()) {
+        case ObCharType :
+        case ObVarcharType :
+        case ObTinyTextType :
+        case ObTextType :
+        case ObMediumTextType :
+        case ObLongTextType : 
+          if(udf_meta_.udf_attributes_types_.at(idx) != ObPythonUDF::STRING) {
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("the type of param is incorrect", K(ret), K(idx));
+          }
+          break;
+        case ObTinyIntType :
+        case ObSmallIntType :
+        case ObMediumIntType :
+        case ObInt32Type :
+        case ObIntType : 
+          if(udf_meta_.udf_attributes_types_.at(idx) != ObPythonUDF::INTEGER) {
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("the type of param is incorrect", K(ret), K(idx));
+          }
+          break;
+        case ObDoubleType : 
+          if(udf_meta_.udf_attributes_types_.at(idx) != ObPythonUDF::REAL) {
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("the type of param is incorrect", K(ret), K(idx));
+          }
+          break;
+        case ObNumberType : 
+            //decimal
+            ret = OB_ERR_UNEXPECTED;
+            LOG_WARN("not support decimal", K(ret), K(idx));
+            break;
+        default : 
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("not support param type", K(ret));
+      }
+    }
+  }
+  // check python code
+  if (OB_SUCCESS(ret)) {
     PyObject *pModule = NULL;
     PyObject *dic = NULL;
     PyObject *v = NULL;
