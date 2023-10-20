@@ -2747,7 +2747,7 @@ int ObRawExprDeduceType::init_python_udf_expr(ObNonTerminalRawExpr &expr, ObExpr
     /* set python udf meta, init python udf structure */
     if (OB_FAIL(python_udf_op->set_udf_meta(fun_sys.get_udf_meta()))) {
       LOG_WARN("failed to set udf to expr", K(ret));
-    } else if (OB_FAIL(python_udf_op->init_udf())) {
+    } else if (OB_FAIL(python_udf_op->init_udf(fun_sys.get_param_exprs()))) {
       LOG_WARN("failed to init udf", K(ret));
     } else {
     }
