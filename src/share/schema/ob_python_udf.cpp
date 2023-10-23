@@ -170,6 +170,11 @@ OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     ret_,
                     pycall_);
 
+OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
+                    ret_,
+                    pycall_,
+                    udf_attributes_types_);
+
 }// end schema
 }// end share
 }// end oceanbase

@@ -63,7 +63,7 @@ public:
   //the ObSimpleUDFSchema must have the same interface just like ObUDF.
   //ObSchemaRetrieveUtils's template function will use these interface.
   inline int set_name(const common::ObString &name) { return deep_copy_str(name, model_name_); }
-  inline void set_ret(const enum ObPythonUDF::PyUdfRetType ret) { ret_ = ret; }
+  inline void set_ret(const enum ObPythonUDF::PyUdfType ret) { ret_ = ObPythonUDF::PyUdfType(ret); }
   inline void set_ret(const int ret) { ret_ = ObPythonUDF::PyUdfRetType(ret); }
   inline void set_arg_num(const int arg_num) { arg_num_ = arg_num; }
   void set_arg_names(const char* arg_name);
@@ -90,7 +90,7 @@ private:
   int arg_num_;
   common::ObString arg_names_;
   common::ObString arg_types_;
-  enum ObPythonUDF::PyUdfRetType ret_;
+  enum ObPythonUDF::PyUdfType ret_;
   common::ObString pycall_;
   int64_t schema_version_;
 };
