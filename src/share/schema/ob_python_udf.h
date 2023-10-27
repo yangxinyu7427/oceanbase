@@ -85,7 +85,7 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
     
     //other
     virtual void reset() override;
-   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> get_arg_types_arr();
+    int get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const;
 
     TO_STRING_KV(K_(tenant_id),
                  K_(model_id),
@@ -97,7 +97,7 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
                  K_(pycall),
                  K_(schema_version));
 
-private:
+public:
     uint64_t tenant_id_;
     uint64_t model_id_;
     common::ObString name_;
@@ -115,28 +115,32 @@ class ObPythonUDFMeta
 {
   OB_UNIS_VERSION_V(1);
 public :
-  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), udf_attributes_types_() {} 
+  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), udf_attributes_types_(), init_(false) {} 
   virtual ~ObPythonUDFMeta() = default;
 
   void assign(const ObPythonUDFMeta &other) {
     ret_ = other.ret_;
     pycall_ = other.pycall_;
     udf_attributes_types_ = other.udf_attributes_types_;
+    init_ = other.init_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
     ret_ = other.ret_;
     pycall_ = other.pycall_;
     udf_attributes_types_ = other.udf_attributes_types_;
+    init_ = other.init_;
     return *this;
   }
 
   TO_STRING_KV(K_(ret),
-               K_(pycall));
+               K_(pycall),
+               K_(init));
 
   ObPythonUDF::PyUdfRetType ret_; //返回值类型
   common::ObString pycall_; //code
   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
+  bool init_; //是否已初始化
 };
 
 }

@@ -44,24 +44,29 @@ ObPythonUDF::~ObPythonUDF()
 {
 }
 
-common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> ObPythonUDF::get_arg_types_arr() {
-    common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types;
-    char* arg_types_str = const_cast<char*>(get_arg_types());
-    std::istringstream ss(arg_types_str);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (token == "STRING") {
-            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::STRING);
-        } else if (token == "INTEGER") {
-            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::INTEGER);
-        } else if (token == "REAL") {
-            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::REAL);
-        } else if (token == "DECIMAL") {
-            udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::DECIMAL);
-        }
-      }
-    return udf_attributes_types;
-} 
+int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const {
+  int ret = OB_SUCCESS;
+  udf_attributes_types.reuse();
+  char* arg_types_str = const_cast<char*>(get_arg_types());
+  std::istringstream ss(arg_types_str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    if (token == "STRING") {
+      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::STRING);
+    } else if (token == "INTEGER") {
+      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::INTEGER);
+    } else if (token == "REAL") {
+      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::REAL);
+    } else if (token == "DECIMAL") {
+      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::DECIMAL);
+    }
+  }
+  if(udf_attributes_types.count() != arg_num_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to resolve arg types string", K(ret));
+  }
+  return ret;
+}
 
 void ObPythonUDF::reset()
 {

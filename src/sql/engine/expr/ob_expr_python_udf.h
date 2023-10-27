@@ -47,6 +47,13 @@ public:
 
   static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
 
+  static int eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
+                                 const ObBitVector &skip, const int64_t batch_size);
+
+  static void message_error_dialog_show(char* buf);
+
+  static void process_python_exception();
+
 protected:
   common::ObIAllocator &allocator_;
   share::schema::ObPythonUDFMeta udf_meta_;

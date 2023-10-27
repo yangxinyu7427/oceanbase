@@ -415,7 +415,7 @@ int ObMultipleMerge::get_next_rows(int64_t &count, int64_t capacity)
     }
   } else {
     ret = get_next_normal_rows(count, capacity);
-    { //use buffer
+    /*{ //use buffer
       //batch_buffer_
       if(!batch_buffer_.inited_) {
         batch_buffer_.init(access_param_->output_exprs_, access_ctx_->stmt_allocator_, capacity);
@@ -432,7 +432,7 @@ int ObMultipleMerge::get_next_rows(int64_t &count, int64_t capacity)
         batch_buffer_.from_vector(vector_store);
       }
       count = batch_buffer_.to_vector(vector_store);
-    }
+    }*/
   }
   return ret;
 }

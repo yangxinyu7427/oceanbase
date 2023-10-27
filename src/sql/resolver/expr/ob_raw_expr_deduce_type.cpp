@@ -2735,8 +2735,11 @@ int ObRawExprDeduceType::init_normal_udf_expr(ObNonTerminalRawExpr &expr, ObExpr
 int ObRawExprDeduceType::init_python_udf_expr(ObNonTerminalRawExpr &expr, ObExprOperator *op)
 {
   int ret = OB_SUCCESS;
-  UNUSED(expr);
-  UNUSED(op);
+  if(expr.get_expr_type() != T_FUN_SYS_PYTHON_UDF) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_DEBUG("not python udf expr", K(ret));
+    return ret;
+  }
   ObExprPythonUdf *python_udf_op = nullptr;
   ObPythonUdfRawExpr &fun_sys = static_cast<ObPythonUdfRawExpr &>(expr);
   if (OB_ISNULL(op)) {
