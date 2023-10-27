@@ -56,10 +56,11 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
     inline void set_tenant_id(const uint64_t id) { tenant_id_ = id; }
     inline void set_model_id(const uint64_t id) { model_id_ = id; }
     inline int set_name(const common::ObString &name) { return deep_copy_str(name, name_); }
-    inline void set_ret(const enum PyUdfRetType ret) { ret_ = PyUdfRetType(ret); }
+    inline void set_ret(const enum PyUdfRetType ret) { ret_ = ret; }
+    inline void set_ret(const int ret) { ret_ = PyUdfRetType(ret); }
     inline void set_arg_num(const int arg_num) { arg_num_ = arg_num; }
-    void set_arg_names(const char* arg_name);
-    void set_arg_types(const std::string type_string);
+    inline int set_arg_names(const common::ObString arg_names) { return deep_copy_str(arg_names, arg_names_); }
+    inline int set_arg_types(const common::ObString arg_types) { return deep_copy_str(arg_types, arg_types_); }
     inline int set_pycall(const common::ObString &pycall) { return deep_copy_str(pycall, pycall_); }
     inline void set_schema_version(int64_t version) { schema_version_ = version; }
 
@@ -78,6 +79,10 @@ arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema
     inline const common::ObString &get_pycall_str() const { return pycall_; }
     inline int64_t get_schema_version() const { return schema_version_; }
 
+    //only for retrieve udf
+    inline const char *get_model_name() const { return extract_str(name_); }
+    inline common::ObString get_model_name_str() const { return name_; }
+    
     //other
     virtual void reset() override;
    common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> get_arg_types_arr();

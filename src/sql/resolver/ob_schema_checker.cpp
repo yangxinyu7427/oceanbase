@@ -30,6 +30,7 @@
 #include "share/schema/ob_sys_variable_mgr.h" // ObSimpleSysVariableSchema
 #include "sql/resolver/ob_stmt_resolver.h"
 #include "share/schema/ob_python_udf.h"
+#include "share/schema/ob_schema_service_sql_impl.h"
 
 using namespace oceanbase::sql;
 using namespace oceanbase::common;
@@ -1868,7 +1869,7 @@ int ObSchemaChecker::get_udf_info(uint64_t tenant_id,
 
 int ObSchemaChecker::get_python_udf_info(uint64_t tenant_id,
                                          const common::ObString &udf_name,
-                                         const share::schema::ObPythonUDF *&udf_info,
+                                         share::schema::ObPythonUDF &udf_info,
                                          bool &exist)
 {
   int ret = OB_SUCCESS;

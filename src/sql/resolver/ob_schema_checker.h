@@ -384,7 +384,7 @@ public:
                    bool &exist);
   int get_python_udf_info(uint64_t tenant_id,
                           const common::ObString &udf_name,
-                          const share::schema::ObPythonUDF *&udf_info,
+                          share::schema::ObPythonUDF &udf_info,
                           bool &exist);
   int check_sequence_exist_with_name(const uint64_t tenant_id,
                                      const uint64_t database_id,

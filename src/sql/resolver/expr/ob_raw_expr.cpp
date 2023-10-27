@@ -4229,7 +4229,7 @@ int ObPythonUdfRawExpr::inner_deep_copy(ObIRawExprCopier &copier)
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta(const share::schema::ObPythonUDF *&udf)
+int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF *&udf)
 {
   int ret = OB_SUCCESS;
   udf_meta_.ret_ = udf->get_ret();

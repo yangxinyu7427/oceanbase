@@ -755,7 +755,7 @@ public:
                                 uint64_t &model_id);
   int get_python_udf_info(const uint64_t tenant_id,
                           const common::ObString &name,
-                          const ObPythonUDF *&udf_info,
+                          ObPythonUDF &udf_info,
                           bool &exist);
   // udt
   int check_udt_exist(uint64_t tenant_id, uint64_t database_id,

@@ -57,6 +57,8 @@ int ObCreateModelResolver::resolve(const ParseNode &parse_tree)
         //set arg_num
         int arg_num = function_element_list_node->num_child_;
         create_model_arg.python_udf_.set_arg_num(arg_num);
+        std::string arg_names = "";
+        std::string arg_types = "";
         for (int32_t i = 0; i < arg_num; ++i) {
             //T_PARAM_DEFINITION
             ParseNode *element = function_element_list_node->children_[i];
@@ -64,24 +66,30 @@ int ObCreateModelResolver::resolve(const ParseNode &parse_tree)
             ParseNode *arg_name_node = element->children_[0];
             //get arg_name
             const char* arg_name = arg_name_node->str_value_;
-            create_model_arg.python_udf_.set_arg_names(arg_name);
-            //arg type
+            arg_names += arg_name;
+            if (i != arg_num - 1) arg_names += ",";
+            //get arg type
             ParseNode *type_node = element->children_[1];
             switch (type_node->value_) {
                 case 1:
-                    create_model_arg.python_udf_.set_arg_types("STRING");
+                    arg_types += "STRING";
                     break;
                 case 2:
-                    create_model_arg.python_udf_.set_arg_types("INTEGER");
+                    arg_types += "INTEGER";
                     break;
                 case 3:
-                    create_model_arg.python_udf_.set_arg_types("REAL");
+                    arg_types += "REAL";
                     break;
                 case 4:
-                    create_model_arg.python_udf_.set_arg_types("DECIMAL");
+                    arg_types += "DECIMAL";
                     break;       
             }
+            if (i != arg_num - 1) arg_types += ",";
         }
+        //set arg_names
+        create_model_arg.python_udf_.set_arg_names(common::ObString(arg_names.length(),arg_names.c_str()));
+        //set arg_types
+        create_model_arg.python_udf_.set_arg_types(common::ObString(arg_types.length(),arg_types.c_str()));
         //set return type
         switch (create_model_node->children_[2]->value_) {
             case 1:
