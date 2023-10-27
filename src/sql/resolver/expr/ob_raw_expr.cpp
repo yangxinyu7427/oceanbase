@@ -4229,18 +4229,18 @@ int ObPythonUdfRawExpr::inner_deep_copy(ObIRawExprCopier &copier)
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF *&udf)
+int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf)
 {
   int ret = OB_SUCCESS;
-  udf_meta_.ret_ = udf->get_ret();
+  udf_meta_.ret_ = udf.get_ret();
   /* data from schame, deep copy maybe a better choices */
   if (OB_ISNULL(inner_alloc_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("inner allocator or expr factory is NULL", K(inner_alloc_), K(ret));
-  } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf->get_pycall_str(), udf_meta_.pycall_))) {
-    LOG_WARN("fail to write pycall", K(udf->get_pycall_str()), K(ret));
-  /*} else if (OB_FAIL(udf->get_arg_types_arr(udf_meta_.udf_attributes_types_))){ 
-    LOG_WARN("fail to insert attributes types", K(udf->get_pycall_str()), K(ret));*/
+  } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf.get_pycall_str(), udf_meta_.pycall_))) {
+    LOG_WARN("fail to write pycall", K(udf.get_pycall_str()), K(ret));
+  } else if (OB_FAIL(udf.get_arg_types_arr(udf_meta_.udf_attributes_types_))){ 
+    LOG_WARN("fail to insert attributes types", K(udf.get_pycall_str()), K(ret));
   }
   return ret;
 }

@@ -68,6 +68,32 @@ int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 
   return ret;
 }
 
+ObPythonUDF& ObPythonUDF::operator= (const ObPythonUDF &other) {
+  if (this != &other) {
+    reset();
+    int ret = OB_SUCCESS;
+    error_ret_ = other.error_ret_;
+    tenant_id_ = other.tenant_id_;
+    model_id_ = other.model_id_;
+    arg_num_ = other.arg_num_;
+    schema_version_ = other.schema_version_;
+    ret_ = other.ret_;
+    if (OB_FAIL(deep_copy_str(other.name_, name_))) {
+      LOG_WARN("Fail to deep copy model name", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.arg_names_, arg_names_))) {
+      LOG_WARN("Fail to deep copy arg names", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.arg_types_, arg_types_))) {
+      LOG_WARN("Fail to deep copy arg types", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.pycall_, pycall_))) {
+      LOG_WARN("Fail to deep copy pycall", K(ret));
+    }
+    if (OB_FAIL(ret)) {
+      error_ret_ = ret;
+    }
+  }
+  return *this;
+}
+
 void ObPythonUDF::reset()
 {
   tenant_id_ = OB_INVALID_ID;
@@ -80,23 +106,20 @@ void ObPythonUDF::reset()
 }
 
 OB_SERIALIZE_MEMBER(ObPythonUDF,
-				    tenant_id_,
+				            tenant_id_,
                     model_id_,
                     name_,
                     arg_num_,
                     arg_names_,
                     arg_types_,
-				    ret_,
-                    pycall_);
-
-OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
-                    ret_,
+				            ret_,
                     pycall_);
 
 OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     ret_,
                     pycall_,
-                    udf_attributes_types_);
+                    udf_attributes_types_,
+                    init_);
 
 }// end schema
 }// end share

@@ -121,7 +121,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
     LOG_WARN("udf meta pycall is null", K(ret));
   } else {
     // check udf param types
-    /*ARRAY_FOREACH_X(param_exprs, idx, cnt, OB_SUCC(ret)) {
+    ARRAY_FOREACH_X(param_exprs, idx, cnt, OB_SUCC(ret)) {
       ObRawExpr *expr = param_exprs.at(idx);
       if (OB_ISNULL(expr)) {
         ret = OB_ERR_UNEXPECTED;
@@ -165,7 +165,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
           LOG_WARN("not support param type", K(ret));
         }
       }
-    }*/
+    }
   }
   // check python code
   if (OB_SUCC(ret)) {

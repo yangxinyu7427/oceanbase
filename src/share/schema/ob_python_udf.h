@@ -40,15 +40,15 @@ public:
     };
 
 public:
-    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0),
-arg_names_(), arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
-{ reset(); };
+    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), 
+                    arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
+                    { reset(); };
     explicit ObPythonUDF(common::ObIAllocator *allocator);
     ObPythonUDF(const ObPythonUDF &src_schema);
     virtual ~ObPythonUDF();
 
     //operators
-    ObPythonUDF &operator=(const ObPythonUDF &src_schema);
+    ObPythonUDF& operator=(const ObPythonUDF &src_schema);
     // bool operator==(const ObPythonUDF &r) const;
     // bool operator!=(const ObPythonUDF &r) const;
 

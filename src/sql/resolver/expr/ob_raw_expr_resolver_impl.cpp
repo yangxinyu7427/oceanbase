@@ -7105,7 +7105,7 @@ int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::sc
   int ret = OB_SUCCESS;
   //resolve expr_list_node
   ParseNode* expr_list_node = node->children_[1];
-  if (OB_ISNULL(expr_list_node) && udf_info->get_arg_num() > 0) {
+  if (OB_ISNULL(expr_list_node) && udf_info.get_arg_num() > 0) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("param node is null", K(ret));
   } else if (T_EXPR_LIST != expr_list_node->type_) {
@@ -7113,7 +7113,7 @@ int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::sc
     LOG_WARN("invalid paramters node", K(ret), K(node->children_[1]));
   } else {
     int expr_arg_num = expr_list_node->num_child_;
-    int arg_num = udf_info->get_arg_num();
+    int arg_num = udf_info.get_arg_num();
     if (expr_arg_num > arg_num || expr_arg_num < arg_num) {
       ret = OB_INVALID_ARGUMENT;
       LOG_WARN("invalid argument", K(ret), K(expr_list_node));
@@ -7142,7 +7142,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
   } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
     LOG_WARN("failed to get collation", K(ret));
   } else {
-    auto construct_udf_info = [](common::ObIAllocator &alloc, ObString &udf_name, const ObPythonUDF *&udf_info, bool &exist) -> int {
+    /*auto construct_udf_info = [](common::ObIAllocator &alloc, ObString &udf_name, const ObPythonUDF *&udf_info, bool &exist) -> int {
       udf_name = ObString("expedia_test");
       share::schema::ObPythonUDF *temp_info;
       temp_info = (ObPythonUDF *)alloc.alloc(sizeof(ObPythonUDF));
@@ -7158,20 +7158,6 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
 \nSTRING,STRING,STRING,STRING,STRING,STRING,STRING,\
 \nINTEGER,INTEGER,INTEGER,INTEGER,INTEGER,INTEGER,INTEGER");
       ob_write_string(alloc, arg_types, temp_info->arg_types_);
-      char test_efficiency[] = "import numpy as np\
-\nimport time\
-\ndef pyinitial():\
-\n\tpass\
-\ndef pyfun(*args):\
-\n\tstart = time.process_time()\
-\n\tm1 = np.random.randint(0,10,(100,100))\
-\n\tm2 = np.random.randint(0,10,(100,100))\
-\n\tnp.matmul(m1, m2)\
-\n\tfinish = time.process_time()\
-\n\twith open('/home/test/log/expedia/python_log', 'a') as f:\
-\n\t\tf.write('ms:{0}\\r\\n'.format(1000 * (finish - start)))\
-\n\t\tf.close()\
-\n\treturn args[0]\0";
       char expedia_onnx[] = "import numpy as np\
 \nimport pandas as pd\
 \nimport onnxruntime as ort\
@@ -7212,28 +7198,24 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
       udf_info = temp_info;
       exist = true;
       return OB_SUCCESS;
-    };
+    };*/
     ObPythonUdfRawExpr *func_expr = NULL;
     ObString name(node->children_[0]->str_len_, node->children_[0]->str_value_);
     if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
       LOG_WARN("Malloc function name failed", K(ret));
     } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {
-    /*} else if (OB_FAIL(ctx_.schema_checker_->get_python_udf_info(ctx_.session_info_->get_effective_tenant_id(),
+    } else if (OB_FAIL(ctx_.schema_checker_->get_python_udf_info(ctx_.session_info_->get_effective_tenant_id(),
                                                                  udf_name,
                                                                  udf_info,
                                                                  exist))) {
-      LOG_WARN("failed to resolve udf", K(ret));*/
-    } else if (OB_FAIL(construct_udf_info(ctx_.expr_factory_.get_allocator(), udf_name, udf_info, exist))) {
-      LOG_WARN("failed to get fake udf info", K(ret));
+      LOG_WARN("failed to resolve udf", K(ret));
+    /*} else if (OB_FAIL(construct_udf_info(ctx_.expr_factory_.get_allocator(), udf_name, udf_info, exist))) {
+      LOG_WARN("failed to get fake udf info", K(ret));*/
     } else if (!exist) {
       ret = OB_ERR_FUNCTION_UNKNOWN;
       LOG_WARN("cannot find python udf", K(ret));
     } 
-    // else if (OB_ISNULL(udf_info)) {
-    //   ret = OB_ERR_UNEXPECTED;
-    //   LOG_WARN("the udf info is null", K(ret));
-    // } 
     else if (OB_FAIL(check_udf_info(node, udf_info))) {
       LOG_WARN("fail to pass udf info check", K(ret));
     } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_SYS_PYTHON_UDF, func_expr))) { //process 
@@ -7243,7 +7225,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
       LOG_WARN("null ptr", K(ret));
     } else if (OB_FAIL(func_expr->set_udf_meta(udf_info))) {
       LOG_WARN("set python udf info failed", K(ret));
-    } else if (udf_info->get_arg_num() > 0){
+    } else if (udf_info.get_arg_num() > 0){
       //resolve params
       ObRawExpr *param_expr = NULL;
       int32_t num_child = node->children_[1]->num_child_;
