@@ -31,7 +31,7 @@ public:
                                 common::ObIAllocator &alloc,
                                 const share::schema::ObPythonUDFMeta &src);
                                 
-  int init_udf();
+  int init_udf(const common::ObIArray<ObRawExpr*> &param_exprs);
 
   static int eval_python_udf(const ObExpr &expr,
                              ObEvalCtx &ctx,

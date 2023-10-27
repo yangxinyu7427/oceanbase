@@ -204,7 +204,7 @@ public:
   GET_ALL_SCHEMA_FUNC_DECLARE(package, ObSimplePackageSchema);
   GET_ALL_SCHEMA_FUNC_DECLARE(trigger, ObSimpleTriggerSchema);
   GET_ALL_SCHEMA_FUNC_DECLARE(udf, ObSimpleUDFSchema);
-  GET_ALL_SCHEMA_FUNC_DECLARE(model, ObSimpleModelSchema);
+//   GET_ALL_SCHEMA_FUNC_DECLARE(model, ObSimpleModelSchema);
   GET_ALL_SCHEMA_FUNC_DECLARE(udt, ObSimpleUDTSchema);
   GET_ALL_SCHEMA_FUNC_DECLARE(sequence, ObSequenceSchema);
   GET_ALL_SCHEMA_FUNC_DECLARE(keystore, ObKeystoreSchema);
@@ -333,8 +333,8 @@ public:
   GET_BATCH_SCHEMAS_FUNC_DECLARE(package, ObSimplePackageSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(trigger, ObSimpleTriggerSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(udf, ObSimpleUDFSchema);
+//   GET_BATCH_SCHEMAS_FUNC_DECLARE(model, ObSimpleModelSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(udt, ObSimpleUDTSchema);
-  GET_BATCH_SCHEMAS_FUNC_DECLARE(model, ObSimpleModelSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(sequence, ObSequenceSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(sys_variable, ObSimpleSysVariableSchema);
   GET_BATCH_SCHEMAS_FUNC_DECLARE(keystore, ObKeystoreSchema);
@@ -372,7 +372,7 @@ public:
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(package, ObPackageInfo);
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(trigger, ObTriggerInfo);
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(udf, ObUDF);
-  GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(model, ObPythonUDF);
+//   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(model, ObPythonUDF);
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(udt, ObUDTTypeInfo);
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(sequence, ObSequenceSchema);
   GET_BATCH_FULL_SCHEMA_FUNC_DECLARE(keystore, ObKeystoreSchema);
@@ -471,8 +471,8 @@ public:
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(routine_param, ObRoutineInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(synonym, ObSynonymInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udf, ObUDF);
-  FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(model, ObPythonUDF);
+  FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt_attr, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt_coll, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt_object, ObUDTTypeInfo);
@@ -495,11 +495,7 @@ public:
                           common::ObArray<ObUserInfo> &user_array,
                           const uint64_t *user_keys = NULL,
                           const int64_t users_size = 0);
-
-  int fetch_model_schema(const uint64_t tenant_id,
-                         const common::ObString &udf_name,
-                         share::schema::ObPythonUDF &udf_info,
-                         bool &exist);
+                          
   int fetch_role_grantee_map_info(
       const ObRefreshSchemaStatus &schema_status,
       const int64_t schema_version,

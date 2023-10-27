@@ -5068,48 +5068,6 @@ int ObSchemaServiceSQLImpl::fetch_models(
   return ret;
 }
 
-int ObSchemaServiceSQLImpl::fetch_model_schema(const uint64_t tenant_id,
-                                               const common::ObString &udf_name,
-                                               share::schema::ObPythonUDF &udf_info,
-                                               bool &exist)
-{
-  int ret = OB_SUCCESS;
-  ObISQLClient &sql_client = *mysql_proxy_;
-  exist = false;
-  if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
-    ret = OB_INVALID_ARGUMENT;
-    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
-  } else {
-      SMART_VAR(ObMySQLProxy::MySQLResult, res) {
-      ObMySQLResult *result = NULL;
-      ObSqlString sql;
-      //普通表test_model
-      const char *const TABLE_NAME = "test_model";
-      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE tenant_id = %lu AND name = %s", TABLE_NAME, tenant_id, udf_name.ptr()))) {
-        LOG_WARN("append sql failed", K(ret));
-      } 
-      if (OB_SUCC(ret)) {
-        //DEFINE_SQL_CLIENT_RETRY_WEAK_WITH_SNAPSHOT(sql_client, snapshot_timestamp);
-        if (OB_FAIL(sql_client.read(res, tenant_id, sql.ptr()))) {
-          LOG_WARN("execute sql failed", K(ret), K(tenant_id), K(sql));
-        } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
-          ret = OB_ERR_UNEXPECTED;
-          LOG_WARN("fail to get result. ", K(ret));
-        } else {
-          while (OB_SUCCESS == ret && common::OB_SUCCESS == (ret = result->next())) {
-            exist = true;
-            bool is_deleted = false;
-            if (OB_FAIL(ObSchemaRetrieveUtils::fill_model_schema(tenant_id, *result, udf_info, is_deleted))) {
-              LOG_WARN("failed to retrieve model", K(ret));
-            }
-          }
-        }
-      }
-    }
-  }
-  return ret;
-}
-
 int ObSchemaServiceSQLImpl::fetch_rls_policys(
     ObISQLClient &sql_client,
     const ObRefreshSchemaStatus &schema_status,
@@ -7505,43 +7463,43 @@ int ObSchemaServiceSQLImpl::fetch_all_udf_info(
   return ret;
 }
 
-int ObSchemaServiceSQLImpl::get_batch_models(
-    const ObRefreshSchemaStatus &schema_status,
-    const int64_t schema_version,
-    common::ObArray<uint64_t> &tenant_udf_ids,
-    common::ObISQLClient &sql_client,
-    common::ObIArray<ObPythonUDF> &udf_info_array)
-{
-  int ret = OB_SUCCESS;
-  const uint64_t tenant_id = schema_status.tenant_id_;
-  udf_info_array.reserve(tenant_udf_ids.count());
-  LOG_DEBUG("fetch batch models begin.");
-  if (schema_version <= 0) {
-    ret = OB_INVALID_ARGUMENT;
-    LOG_WARN("invalid argument", K(schema_version), K(ret));
-  } else if (!check_inner_stat()) {
-    ret = OB_NOT_INIT;
-    LOG_WARN("check inner stat fail");
-  }
+// int ObSchemaServiceSQLImpl::get_batch_models(
+//     const ObRefreshSchemaStatus &schema_status,
+//     const int64_t schema_version,
+//     common::ObArray<uint64_t> &tenant_udf_ids,
+//     common::ObISQLClient &sql_client,
+//     common::ObIArray<ObPythonUDF> &udf_info_array)
+// {
+//   int ret = OB_SUCCESS;
+//   const uint64_t tenant_id = schema_status.tenant_id_;
+//   udf_info_array.reserve(tenant_udf_ids.count());
+//   LOG_DEBUG("fetch batch models begin.");
+//   if (schema_version <= 0) {
+//     ret = OB_INVALID_ARGUMENT;
+//     LOG_WARN("invalid argument", K(schema_version), K(ret));
+//   } else if (!check_inner_stat()) {
+//     ret = OB_NOT_INIT;
+//     LOG_WARN("check inner stat fail");
+//   }
 
-  std::sort(tenant_udf_ids.begin(), tenant_udf_ids.end());
-  // split query to tenant space && split big query
-  int64_t begin = 0;
-  int64_t end = 0;
-  while (OB_SUCCESS == ret && end < tenant_udf_ids.count()) {
-    while (OB_SUCCESS == ret && end < tenant_udf_ids.count()
-           && end - begin < MAX_IN_QUERY_PER_TIME) {
-      end++;
-    }
-    if (OB_FAIL(fetch_all_model_info(schema_status, schema_version, tenant_id, sql_client, udf_info_array,
-        &tenant_udf_ids.at(begin), end - begin))) {
-      LOG_WARN("fetch all model info failed", K(schema_version), K(ret));
-    }
-    begin = end;
-  }
-  LOG_INFO("get batch model info finish", K(schema_version), K(ret));
-  return ret;
-}
+//   std::sort(tenant_udf_ids.begin(), tenant_udf_ids.end());
+//   // split query to tenant space && split big query
+//   int64_t begin = 0;
+//   int64_t end = 0;
+//   while (OB_SUCCESS == ret && end < tenant_udf_ids.count()) {
+//     while (OB_SUCCESS == ret && end < tenant_udf_ids.count()
+//            && end - begin < MAX_IN_QUERY_PER_TIME) {
+//       end++;
+//     }
+//     if (OB_FAIL(fetch_all_model_info(schema_status, schema_version, tenant_id, sql_client, udf_info_array,
+//         &tenant_udf_ids.at(begin), end - begin))) {
+//       LOG_WARN("fetch all model info failed", K(schema_version), K(ret));
+//     }
+//     begin = end;
+//   }
+//   LOG_INFO("get batch model info finish", K(schema_version), K(ret));
+//   return ret;
+// }
 
 int ObSchemaServiceSQLImpl::fetch_all_model_info(
     const ObRefreshSchemaStatus &schema_status,
@@ -7602,7 +7560,7 @@ int ObSchemaServiceSQLImpl::fetch_all_model_info(
       } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_model_schema(tenant_id, *result, udf_array))) {
         LOG_WARN("Failed to retrieve udf infos", K(ret));
       }
-    } 
+    }
   }
   return ret;
 }
