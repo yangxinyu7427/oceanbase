@@ -91,7 +91,7 @@ int ObModelSqlService::add_python_udf(common::ObISQLClient &sql_client,
                                         exec_tenant_id, PythonUdf_info.get_model_id()), "model_id", "%lu");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, PythonUdf_info.get_name(),
                                       PythonUdf_info.get_name_str().length(), "name");
-      SQL_COL_APPEND_VALUE(sql, values, PythonUdf_info.get_arg_num(), "argNum", "%d");
+      SQL_COL_APPEND_VALUE(sql, values, PythonUdf_info.get_arg_num(), "arg_num", "%d");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, PythonUdf_info.get_arg_names(),
                                       PythonUdf_info.get_arg_names_str().length(), "arg_names");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, PythonUdf_info.get_arg_types(),
@@ -188,7 +188,7 @@ int ObModelSqlService::delete_python_udf(const uint64_t tenant_id,
 }
 
 
-int ObModelSqlService::drop_python_udf(const ObUDF &udf_info,
+int ObModelSqlService::drop_python_udf(const ObPythonUDF &udf_info,
                                        const int64_t new_schema_version,
                                        common::ObISQLClient *sql_client,
                                        const common::ObString *ddl_stmt_str)
@@ -208,6 +208,46 @@ int ObModelSqlService::drop_python_udf(const ObUDF &udf_info,
   return ret;
 }
 
+// int ObModelSqlService::get_python_udf_info(const uint64_t tenant_id,
+//                                            const common::ObString &udf_name,
+//                                            common::ObISQLClient *sql_client,
+//                                            share::schema::ObPythonUDF *&udf_info,
+//                                            bool &exist) {
+//   int ret = OB_SUCCESS;
+//   exist = false;
+//   if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
+//     ret = OB_INVALID_ARGUMENT;
+//     LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
+//   } else {
+//       SMART_VAR(ObMySQLProxy::MySQLResult, res) {
+//       common::sqlclient::ObMySQLResult *result = NULL;
+//       ObSqlString sql;
+//       //普通表test_model
+//       const char *const TABLE_NAME = "test_model";
+//       if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE tenant_id = %lu AND name = %s", TABLE_NAME, tenant_id, udf_name.ptr()))) {
+//         LOG_WARN("append sql failed", K(ret));
+//       } 
+//       if (OB_SUCC(ret)) {
+//         //DEFINE_SQL_CLIENT_RETRY_WEAK_WITH_SNAPSHOT(sql_client, snapshot_timestamp);
+//         if (OB_FAIL(sql_client.read(res, tenant_id, sql.ptr()))) {
+//           LOG_WARN("execute sql failed", K(ret), K(tenant_id), K(sql));
+//         } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
+//           ret = OB_ERR_UNEXPECTED;
+//           LOG_WARN("fail to get result. ", K(ret));
+//         } else {
+//           while (OB_SUCCESS == ret && common::OB_SUCCESS == (ret = result->next())) {
+//             exist = true;
+//             bool is_deleted = false;
+//             if (OB_FAIL(ObSchemaRetrieveUtils::fill_model_schema(tenant_id, *result, *udf_info, is_deleted))) {
+//               LOG_WARN("failed to retrieve model", K(ret));
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+//   return ret;
+// }
 
 } //end of schema
 } //end of share

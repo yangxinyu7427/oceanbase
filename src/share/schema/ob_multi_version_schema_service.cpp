@@ -2858,6 +2858,72 @@ int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
   return ret;
 }
 
+int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
+                                                     const common::ObString &udf_name,
+                                                     share::schema::ObPythonUDF &udf_info,
+                                                     bool &exist)
+{
+  int ret = OB_SUCCESS;
+  LOG_WARN("get_python_udf_info", K(ret));
+  ObISQLClient &sql_client = *sql_proxy_;
+  exist = false;
+  if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
+  } else {
+      SMART_VAR(ObMySQLProxy::MySQLResult, res) {
+      common::sqlclient::ObMySQLResult *result = NULL;
+      ObSqlString sql;
+      //普通表test_model
+      const char *const TABLE_NAME = "test_model";
+      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", TABLE_NAME, udf_name.length(), udf_name.ptr()))) {
+        LOG_WARN("append sql failed", K(ret));
+      } 
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(sql_client.read(res, tenant_id, sql.ptr()))) {
+          LOG_WARN("ObMultiVersionSchemaService execute sql failed", K(ret), K(tenant_id), K(sql));
+        } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get result. ", K(ret));
+        } else {
+          while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
+            exist = true;
+            if (OB_FAIL(fill_model_schema(tenant_id, *result, udf_info))) {
+              LOG_WARN("failed to retrieve model", K(ret));
+            }
+          }
+          if (ret != OB_ITER_END) {
+            LOG_WARN("fail to get all model schema. iter quit. ", K(ret));
+          } else {
+            ret = OB_SUCCESS;
+            LOG_WARN("retrieve model schemas succeed", K(tenant_id));
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+int ObMultiVersionSchemaService::fill_model_schema(const uint64_t tenant_id,
+                                                   common::sqlclient::ObMySQLResult &result,
+                                                   ObPythonUDF &udf_info) {
+  udf_info.reset();
+  int ret = common::OB_SUCCESS;
+  LOG_WARN("get into ObMultiVersionSchemaService::fill_model_schema ", K(ret));
+  udf_info.set_tenant_id(tenant_id);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, name, udf_info);
+  //EXTRACT_INT_FIELD_MYSQL(result, "is_deleted", is_deleted, bool);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, model_id, udf_info, tenant_id);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, arg_num, udf_info, int);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_names, udf_info);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_types, udf_info);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, ret, udf_info, int);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, pycall, udf_info);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, schema_version, udf_info, uint64_t);
+  return ret;
+  }
+
 int ObMultiVersionSchemaService::check_sequence_exist(const uint64_t tenant_id,
                                                       const uint64_t database_id,
                                                       const common::ObString &name,

@@ -115,33 +115,6 @@ ObSimpleModelSchema &ObSimpleModelSchema::operator =(const ObSimpleModelSchema &
   return *this;
 }
 
-void ObSimpleModelSchema::set_arg_names(const char* arg_name) {
-    char* arg_names_str = const_cast<char*>(get_arg_names());
-    arg_names_.reset();
-    std::string result = arg_names_str ? arg_names_str : "";
-    if (!result.empty()) {
-        //不同的参数名之间用逗号分隔
-        result += ",";
-    }
-    //添加新的arg_name
-    result += arg_name;
-    //将结果转回ObString
-    deep_copy_str(common::ObString(result.length(), result.c_str()),arg_names_);
-}
-
-void ObSimpleModelSchema::set_arg_types(const std::string type_string) {
-    char* arg_types_str = const_cast<char*>(get_arg_types());
-    arg_types_.reset();
-    std::string result = arg_types_str ? arg_types_str : "";
-    if (!result.empty()){
-        //不同的参数类型之间用逗号分隔
-        result += ",";
-    }
-    //添加新的arg_type
-    result += type_string;
-    deep_copy_str(common::ObString(result.length(), result.c_str()),arg_types_);
-}
-
 //////////////////////////////////////////////////////////////////////////
 
 

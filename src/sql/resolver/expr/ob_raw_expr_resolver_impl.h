@@ -134,7 +134,7 @@ private:
                               ObSysFunRawExpr *&expr);
   int resolve_udf_param_expr(const ParseNode *node,
                              common::ObIArray<ObRawExpr*> &param_exprs);
-  int check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF *udf_info);
+  int check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF &udf_info);
   int process_python_udf_node(const ParseNode *node, ObRawExpr *&expr);
   int process_window_function_node(const ParseNode *node, ObRawExpr *&expr);
   int process_sort_list_node(const ParseNode *node, common::ObIArray<OrderItem> &order_items);
