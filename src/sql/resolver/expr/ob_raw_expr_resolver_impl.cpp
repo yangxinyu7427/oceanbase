@@ -7142,63 +7142,6 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
   } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
     LOG_WARN("failed to get collation", K(ret));
   } else {
-    /*auto construct_udf_info = [](common::ObIAllocator &alloc, ObString &udf_name, const ObPythonUDF *&udf_info, bool &exist) -> int {
-      udf_name = ObString("expedia_test");
-      share::schema::ObPythonUDF *temp_info;
-      temp_info = (ObPythonUDF *)alloc.alloc(sizeof(ObPythonUDF));
-      temp_info->set_tenant_id(1);
-      temp_info->set_model_id(1);
-      //temp_info->set_name(udf_name);
-      ob_write_string(alloc, udf_name, temp_info->name_);
-      temp_info->set_ret(ObPythonUDF::PyUdfRetType::REAL);
-      temp_info->set_arg_num(28);
-      //temp_info->set_arg_names();
-      ObString arg_types("REAL,REAL,REAL,REAL,REAL,REAL,REAL,REAL,\
-\nSTRING,STRING,INTEGER,INTEGER,INTEGER,INTEGER,\
-\nSTRING,STRING,STRING,STRING,STRING,STRING,STRING,\
-\nINTEGER,INTEGER,INTEGER,INTEGER,INTEGER,INTEGER,INTEGER");
-      ob_write_string(alloc, arg_types, temp_info->arg_types_);
-      char expedia_onnx[] = "import numpy as np\
-\nimport pandas as pd\
-\nimport onnxruntime as ort\
-\nimport time\
-\ndef pyinitial():\
-\n\tglobal onnx_session, label, input_columns, type_map\
-\n\tonnx_path = '/home/Code/expedia_onnx/expedia.onnx'\
-\n\tortconfig = ort.SessionOptions()\
-\n\tonnx_session = ort.InferenceSession(onnx_path, sess_options=ortconfig)\
-\n\tlabel = onnx_session.get_outputs()[0]\
-\n\tnumerical_columns = ['prop_location_score1', 'prop_location_score2', 'prop_log_historical_price', 'price_usd',\
-'orig_destination_distance', 'prop_review_score', 'avg_bookings_usd', 'stdev_bookings_usd']\
-\n\tcategorical_columns = ['position', 'prop_country_id', 'prop_starrating', 'prop_brand_bool', 'count_clicks',\
-'count_bookings', 'year', 'month', 'weekofyear', 'time', 'site_id', 'visitor_location_country_id',\
-'srch_destination_id', 'srch_length_of_stay', 'srch_booking_window', 'srch_adults_count',\
-'srch_children_count', 'srch_room_count', 'srch_saturday_night_bool', 'random_bool']\
-\n\tinput_columns = numerical_columns + categorical_columns\
-\n\ttype_map = {\
-\n\t'int32': np.int64,\
-\n\t'int64': np.int64,\
-\n\t'float64': np.float32,\
-\n\t'object': str,\
-\n\t}\
-\ndef pyfun(*args):\
-\n\tinfer_batch = {\
-\n\t\telem: args[i].astype(type_map[args[i].dtype.name]).reshape((-1, 1))\
-\n\t\tfor i, elem in enumerate(input_columns)\
-\n\t}\
-\n\tstart = time.process_time()\
-\n\toutputs = onnx_session.run([label.name], infer_batch)\
-\n\tfinish = time.process_time()\
-\n\twith open('/home/test/log/expedia/python_log', 'a') as f:\
-\n\t\tf.write('ms:{0}\\r\\n'.format(1000 * (finish - start)))\
-\n\t\tf.close()\
-\n\treturn outputs[0]\0";
-      ObString pycall(expedia_onnx);
-      ob_write_string(alloc, pycall, temp_info->pycall_);
-      udf_info = temp_info;
-      exist = true;
-      return OB_SUCCESS;
-    };*/
     ObPythonUdfRawExpr *func_expr = NULL;
     ObString name(node->children_[0]->str_len_, node->children_[0]->str_value_);
     if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
@@ -7210,8 +7153,6 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
                                                                  udf_info,
                                                                  exist))) {
       LOG_WARN("failed to resolve udf", K(ret));
-    /*} else if (OB_FAIL(construct_udf_info(ctx_.expr_factory_.get_allocator(), udf_name, udf_info, exist))) {
-      LOG_WARN("failed to get fake udf info", K(ret));*/
     } else if (!exist) {
       ret = OB_ERR_FUNCTION_UNKNOWN;
       LOG_WARN("cannot find python udf", K(ret));
