@@ -95,9 +95,12 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
                                      const share::schema::ObPythonUDFMeta &src)
 {
   int ret = OB_SUCCESS;
+  dst.init_ = src.init_;
   dst.ret_ = src.ret_;
-  if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
-    LOG_WARN("fail to write string", K(src.pycall_), K(ret));
+  if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
+    LOG_WARN("fail to write name", K(src.name_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
+    LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
   } else { 
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
@@ -173,9 +176,19 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
     PyObject *dic = NULL;
     PyObject *v = NULL;
     PyObject *pInitial = NULL;
-    char* pycall = (char *)allocator_.alloc(sizeof(char) * udf_meta_.pycall_.length());
-    strncpy(pycall, udf_meta_.pycall_.ptr(), udf_meta_.pycall_.length());
 
+    //name
+    std::string name(udf_meta_.name_.ptr());
+    name = name.substr(0, udf_meta_.name_.length());
+    std::string pyinitial_handler = name + "_pyinitial";
+    std::string pyfun_handler = name + "_pyfun";
+    //pycall
+    std::string pycall(udf_meta_.pycall_.ptr());
+    pycall = pycall.substr(0, udf_meta_.pycall_.length());
+    pycall.replace(pycall.find("pyinitial"), 9, pyinitial_handler);
+    pycall.replace(pycall.find("pyfun"), 5, pyfun_handler);
+    const char* pycall_c = pycall.c_str();
+    
     //Acquire GIL
     bool nStatus = PyGILState_Check();
     PyGILState_STATE gstate;
@@ -183,7 +196,6 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
       gstate = PyGILState_Ensure();
       nStatus = true;
     }
-
     // prepare python code
     pModule = PyImport_AddModule("__main__"); // load main module
     if(OB_ISNULL(pModule)) {
@@ -197,15 +209,16 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
       LOG_WARN("fail to get main module dic", K(ret));
       goto destruction;
     } 
-    //PyDict_Clear(dic); // 清空之前的代码
-    v = PyRun_StringFlags(pycall, Py_file_input, dic, dic, NULL); // test pycall
+    v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL); // test pycall
     if(OB_ISNULL(v)) {
+      process_python_exception();
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("fail to write pycall into module", K(ret));
       goto destruction;
     }
-    pInitial = PyObject_GetAttrString(pModule, "pyinitial"); // get pyInitial()
+    pInitial = PyObject_GetAttrString(pModule, pyinitial_handler.c_str()); // get pyInitial()
     if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
+      process_python_exception();
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Fail to run initial Python code", K(ret));
       goto destruction;
@@ -942,6 +955,8 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   //release GIL
   if(nStatus)
     PyGILState_Release(gstate);
+  
+  //PyGC_Collect();
 
   return ret;
 }
@@ -949,6 +964,12 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
 int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                          const ObBitVector &skip, const int64_t batch_size) {
   int ret = OB_SUCCESS;
+  
+  //name
+  const ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
+  std::string name(info->udf_meta_.name_.ptr());
+  name = name.substr(0, info->udf_meta_.name_.length());
+  std::string pyfun_handler = name.append("_pyfun");
 
   //返回值
   ObDatum *results = expr.locate_batch_datums(ctx);
@@ -1002,7 +1023,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
-  PyObject **arrays = new PyObject*[expr.arg_cnt_];
+  PyObject **arrays = new PyObject *[expr.arg_cnt_];
+  for(int i = 0; i < expr.arg_cnt_; i++)
+    arrays[i] = NULL;
   //PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   npy_intp elements[1] = {real_param}; // column size
   ObDatum *argDatum = NULL;
@@ -1014,7 +1037,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     LOG_WARN("Fail to import main module", K(ret));
     goto destruction;
   }
-  pFunc = PyObject_GetAttrString(pModule, "pyfun");
+  
+  pFunc = PyObject_GetAttrString(pModule, pyfun_handler.c_str());
   if(OB_ISNULL(pFunc) || !PyCallable_Check(pFunc)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Fail to get function handler", K(ret));
@@ -1168,6 +1192,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   //release GIL
   if(nStatus)
     PyGILState_Release(gstate);
+
+  //PyGC_Collect();
 
   return ret;
 }

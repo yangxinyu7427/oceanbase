@@ -116,6 +116,7 @@ OB_SERIALIZE_MEMBER(ObPythonUDF,
                     pycall_);
 
 OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
+                    name_,
                     ret_,
                     pycall_,
                     udf_attributes_types_,

@@ -115,10 +115,11 @@ class ObPythonUDFMeta
 {
   OB_UNIS_VERSION_V(1);
 public :
-  ObPythonUDFMeta() : ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), udf_attributes_types_(), init_(false) {} 
+  ObPythonUDFMeta() : name_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), udf_attributes_types_(), init_(false) {} 
   virtual ~ObPythonUDFMeta() = default;
 
-  void assign(const ObPythonUDFMeta &other) {
+  void assign(const ObPythonUDFMeta &other) {\
+    name_ = other.name_;
     ret_ = other.ret_;
     pycall_ = other.pycall_;
     udf_attributes_types_ = other.udf_attributes_types_;
@@ -126,6 +127,7 @@ public :
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
+    name_ = other.name_;
     ret_ = other.ret_;
     pycall_ = other.pycall_;
     udf_attributes_types_ = other.udf_attributes_types_;
@@ -133,10 +135,12 @@ public :
     return *this;
   }
 
-  TO_STRING_KV(K_(ret),
+  TO_STRING_KV(K_(name),
+               K_(ret),
                K_(pycall),
                K_(init));
 
+  common::ObString name_; //函数名
   ObPythonUDF::PyUdfRetType ret_; //返回值类型
   common::ObString pycall_; //code
   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
