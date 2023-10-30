@@ -2747,11 +2747,9 @@ int ObRawExprDeduceType::init_python_udf_expr(ObNonTerminalRawExpr &expr, ObExpr
     LOG_WARN("invalid argument", K(ret), K(expr.get_expr_type()));
   } else {
     python_udf_op = static_cast<ObExprPythonUdf*>(op);
-    /* set python udf meta, init python udf structure */
+    /* set python udf meta, init specific python udf in code generation*/
     if (OB_FAIL(python_udf_op->set_udf_meta(fun_sys.get_udf_meta()))) {
       LOG_WARN("failed to set udf to expr", K(ret));
-    } else if (OB_FAIL(python_udf_op->init_udf(fun_sys.get_param_exprs()))) {
-      LOG_WARN("failed to init udf", K(ret));
     } else {
     }
   }

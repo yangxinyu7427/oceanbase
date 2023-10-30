@@ -1097,21 +1097,21 @@ int ObExprGeneratorImpl::visit_python_udf_expr(ObNonTerminalRawExpr &expr, ObExp
 {
   int ret = OB_SUCCESS;
   ObPythonUdfRawExpr &fun_sys = static_cast<ObPythonUdfRawExpr &>(expr);
-  //used to check the old op exist or not
+  //used to check the old python udf op exist or not
   ObExprOperator *old_op = NULL;
   if (OB_ISNULL(python_udf_op)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("enum_set_op is null", K(ret));
+    LOG_WARN("python udf op is null", K(ret));
   } else if (OB_ISNULL(old_op = expr.get_op())) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("invalid old op", K(expr), K(ret));
-  }/* else if (OB_FAIL(python_udf_op->set_udf_meta(fun_sys.get_udf_meta()))) {
+  } else if (OB_FAIL(python_udf_op->set_udf_meta(fun_sys.get_udf_meta()))) { //copy udf metadata
     LOG_WARN("failed to set udf to expr", K(ret));
-  } else if (OB_FAIL(python_udf_op->init_udf(fun_sys.get_param_exprs()))) {
+  } else if (OB_FAIL(python_udf_op->init_udf(fun_sys.get_param_exprs()))) { //init python variables
     LOG_WARN("failed to init udf", K(ret));
   } else {
     LOG_DEBUG("set udf meta to expr", K(fun_sys.get_udf_meta()));
-  }*/
+  }
   return ret;
 }
 
