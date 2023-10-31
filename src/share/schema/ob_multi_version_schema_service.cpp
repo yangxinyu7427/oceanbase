@@ -2826,34 +2826,83 @@ int ObMultiVersionSchemaService::check_udf_exist(const uint64_t tenant_id,
   return ret;
 }
 
+// int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
+//                                                    const common::ObString &name,
+//                                                    bool &exist,
+//                                                    uint64_t &model_id)
+// {
+//   int ret = OB_SUCCESS;
+//   LOG_WARN("get into ObMultiVersionSchemaService::check_model_exist", K(ret));
+//   exist = false;
+//   model_id = OB_INVALID_ID;
+//   if (!check_inner_stat()) {
+//     ret = OB_INNER_STAT_ERROR;
+//     LOG_WARN("inner stat error", K(ret));
+//   } else {
+//     SpinRLockGuard guard(schema_manager_rwlock_);
+//     ObSchemaGetterGuard schema_guard;
+//     if (!is_tenant_full_schema(tenant_id)) {
+//       ret = OB_NOT_INIT;
+//       LOG_WARN("local schema not inited", K(ret));
+//     } else if (OB_FAIL(get_tenant_schema_guard(tenant_id, schema_guard))) {
+//       LOG_WARN("get schema guard failed ", K(ret));
+//     } else if (OB_FAIL(schema_guard.check_model_exist_with_name(
+//                 tenant_id,
+//                 name,
+//                 exist,
+//                 model_id))) {
+//       LOG_WARN("failed to check udf sql exist",
+//           K(tenant_id), K(name), K(ret));
+//     } else {/*do nothing*/}
+//   }
+//   return ret;
+// }
+
 int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
                                                    const common::ObString &name,
                                                    bool &exist,
                                                    uint64_t &model_id)
 {
   int ret = OB_SUCCESS;
-  LOG_WARN("get into ObMultiVersionSchemaService::check_model_exist", K(ret));
   exist = false;
   model_id = OB_INVALID_ID;
-  if (!check_inner_stat()) {
-    ret = OB_INNER_STAT_ERROR;
-    LOG_WARN("inner stat error", K(ret));
+  ObISQLClient &sql_client = *sql_proxy_;
+  if (OB_INVALID_ID == tenant_id || name.empty()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(name));
   } else {
-    SpinRLockGuard guard(schema_manager_rwlock_);
-    ObSchemaGetterGuard schema_guard;
-    if (!is_tenant_full_schema(tenant_id)) {
-      ret = OB_NOT_INIT;
-      LOG_WARN("local schema not inited", K(ret));
-    } else if (OB_FAIL(get_tenant_schema_guard(tenant_id, schema_guard))) {
-      LOG_WARN("get schema guard failed ", K(ret));
-    } else if (OB_FAIL(schema_guard.check_model_exist_with_name(
-                tenant_id,
-                name,
-                exist,
-                model_id))) {
-      LOG_WARN("failed to check udf sql exist",
-          K(tenant_id), K(name), K(ret));
-    } else {/*do nothing*/}
+      SMART_VAR(ObMySQLProxy::MySQLResult, res) {
+      common::sqlclient::ObMySQLResult *result = NULL;
+      ObSqlString sql;
+      //普通表test_model
+      const char *const TABLE_NAME = "test_model";
+      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", TABLE_NAME, name.length(), name.ptr()))) {
+        LOG_WARN("append sql failed", K(ret));
+      } 
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(sql_client.read(res, tenant_id, sql.ptr()))) {
+          LOG_WARN("ObMultiVersionSchemaService execute sql failed", K(ret), K(tenant_id), K(sql));
+        } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get result. ", K(ret));
+        } else {
+          while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
+            exist = true;
+            share::schema::ObPythonUDF udf_info;
+            if (OB_FAIL(fill_model_schema(tenant_id, *result, udf_info))) {
+              LOG_WARN("failed to retrieve model", K(ret));
+            }
+            model_id = udf_info.get_model_id();
+          }
+          if (ret != OB_ITER_END) {
+            LOG_WARN("fail to get all model schema. iter quit. ", K(ret));
+          } else {
+            ret = OB_SUCCESS;
+            LOG_WARN("retrieve model schemas succeed", K(tenant_id));
+          }
+        }
+      }
+    }
   }
   return ret;
 }
