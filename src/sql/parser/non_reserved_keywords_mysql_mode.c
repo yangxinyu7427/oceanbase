@@ -603,6 +603,7 @@ static const NonReservedKeyword Mysql_none_reserved_keywords[] =
   {"port", PORT},
   {"position", POSITION},
   {"precision", PRECISION},
+  {"predict", PREDICT},
   {"prepare", PREPARE},
   {"preserve", PRESERVE},
   {"prev", PREV},

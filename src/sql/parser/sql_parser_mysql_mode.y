@@ -308,7 +308,7 @@ END_P SET_VAR DELIMITER
         PERCENT_RANK PHASE PLAN PHYSICAL PLANREGRESS PLUGIN PLUGIN_DIR PLUGINS POINT POLYGON PERFORMANCE
         PROTECTION PRIORITY PL POLICY POOL PORT POSITION PREPARE PRESERVE PRETTY PRETTY_COLOR PREV PRIMARY_ZONE PRIVILEGES PROCESS
         PROCESSLIST PROFILE PROFILES PROXY PRECEDING PCTFREE P_ENTITY P_CHUNK
-        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS PYTHON_UDF
+        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS PREDICT PYTHON_UDF
 
         QUARTER QUERY QUERY_RESPONSE_TIME QUEUE_TIME QUICK
 
@@ -2703,7 +2703,7 @@ MOD '(' expr ',' expr ')'
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }
-| PYTHON_UDF function_name '(' opt_expr_as_list ')'
+| PREDICT function_name '(' opt_expr_as_list ')'
 {
   if (NULL != $4)
   {
@@ -4413,7 +4413,7 @@ NUMERIC
 ;
 
 create_model_stmt:
-CREATE MODEL NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_VALUE '}'
+CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_VALUE '}'
 {
   ParseNode *function_elements = NULL;
   merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $5);
@@ -4426,7 +4426,7 @@ CREATE MODEL NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_V
 ;
 
 drop_model_stmt:
-DROP MODEL opt_if_exists NAME_OB
+DROP PYTHON_UDF opt_if_exists NAME_OB
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_MODEL, 2, $3, $4);
 }
