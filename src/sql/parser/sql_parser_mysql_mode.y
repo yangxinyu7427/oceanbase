@@ -497,7 +497,7 @@ END_P SET_VAR DELIMITER
 %type <node> switchover_tenant_stmt switchover_clause
 %type <node> recover_tenant_stmt recover_point_clause
 /*新增*/ 
-%type <node> create_model_stmt drop_model_stmt
+%type <node> create_python_udf_stmt drop_python_udf_stmt
 %type <node> function_element_list function_element param_name param_type
 %start sql_stmt
 %%
@@ -554,8 +554,8 @@ stmt:
     }
   }
   | create_function_stmt    { $$ = $1; check_question_mark($$, result); }
-  | create_model_stmt       { $$ = $1; check_question_mark($$, result); }
-  | drop_model_stmt         { $$ = $1; check_question_mark($$, result); }
+  | create_python_udf_stmt  { $$ = $1; check_question_mark($$, result); }
+  | drop_python_udf_stmt    { $$ = $1; check_question_mark($$, result); }
   | drop_function_stmt      { $$ = $1; check_question_mark($$, result); }
   | create_table_like_stmt  { $$ = $1; check_question_mark($$, result); }
   | create_database_stmt    { $$ = $1; check_question_mark($$, result); }
@@ -4412,23 +4412,23 @@ NUMERIC
 }
 ;
 
-create_model_stmt:
+create_python_udf_stmt:
 CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_VALUE '}'
 {
   ParseNode *function_elements = NULL;
   merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $5);
-  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_MODEL, 4, 
-                           $3,                             /* model name */
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_PYTHON_UDF, 4, 
+                           $3,                             /* udf name */
                            function_elements,              /* function parameter */
                            $8,                             /* return type */
-                           $10);                           /* python model code */
+                           $10);                           /* python code */
 }
 ;
 
-drop_model_stmt:
+drop_python_udf_stmt:
 DROP PYTHON_UDF opt_if_exists NAME_OB
 {
-  malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_MODEL, 2, $3, $4);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_PYTHON_UDF, 2, $3, $4);
 }
 ;
 

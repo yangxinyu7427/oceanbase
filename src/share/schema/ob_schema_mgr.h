@@ -679,10 +679,10 @@ public:
       const uint64_t udf_id,
       const ObSimpleUDFSchema *&udf_schema) const;
   
-  int get_model_schema(
+  int get_python_udf_schema(
       const uint64_t tenant_id,
-      const uint64_t model_id,
-      const ObSimpleModelSchema *&model_schema) const;
+      const uint64_t udf_id,
+      const ObSimplePythonUdfSchema *&python_udf_schema) const;
 
   int get_udt_schema(
       const uint64_t tenant_id,

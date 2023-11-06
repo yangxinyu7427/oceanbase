@@ -2858,14 +2858,14 @@ int ObMultiVersionSchemaService::check_udf_exist(const uint64_t tenant_id,
 //   return ret;
 // }
 
-int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
-                                                   const common::ObString &name,
-                                                   bool &exist,
-                                                   uint64_t &model_id)
+int ObMultiVersionSchemaService::check_python_udf_exist(const uint64_t tenant_id,
+                                                        const common::ObString &name,
+                                                        bool &exist,
+                                                        uint64_t &udf_id)
 {
   int ret = OB_SUCCESS;
   exist = false;
-  model_id = OB_INVALID_ID;
+  udf_id = OB_INVALID_ID;
   ObISQLClient &sql_client = *sql_proxy_;
   if (OB_INVALID_ID == tenant_id || name.empty()) {
     ret = OB_INVALID_ARGUMENT;
@@ -2889,16 +2889,16 @@ int ObMultiVersionSchemaService::check_model_exist(const uint64_t tenant_id,
           while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
             exist = true;
             share::schema::ObPythonUDF udf_info;
-            if (OB_FAIL(fill_model_schema(tenant_id, *result, udf_info))) {
-              LOG_WARN("failed to retrieve model", K(ret));
+            if (OB_FAIL(fill_python_udf_schema(tenant_id, *result, udf_info))) {
+              LOG_WARN("failed to retrieve python udf", K(ret));
             }
-            model_id = udf_info.get_model_id();
+            udf_id = udf_info.get_udf_id();
           }
           if (ret != OB_ITER_END) {
-            LOG_WARN("fail to get all model schema. iter quit. ", K(ret));
+            LOG_WARN("fail to get all python udf schema. iter quit. ", K(ret));
           } else {
             ret = OB_SUCCESS;
-            LOG_WARN("retrieve model schemas succeed", K(tenant_id));
+            LOG_WARN("retrieve python udf schemas succeed", K(tenant_id));
           }
         }
       }
@@ -2937,7 +2937,7 @@ int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
         } else {
           while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
             exist = true;
-            if (OB_FAIL(fill_model_schema(tenant_id, *result, udf_info))) {
+            if (OB_FAIL(fill_python_udf_schema(tenant_id, *result, udf_info))) {
               LOG_WARN("failed to retrieve model", K(ret));
             }
           }
@@ -2954,16 +2954,15 @@ int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
   return ret;
 }
 
-int ObMultiVersionSchemaService::fill_model_schema(const uint64_t tenant_id,
+int ObMultiVersionSchemaService::fill_python_udf_schema(const uint64_t tenant_id,
                                                    common::sqlclient::ObMySQLResult &result,
                                                    ObPythonUDF &udf_info) {
   udf_info.reset();
   int ret = common::OB_SUCCESS;
-  LOG_WARN("get into ObMultiVersionSchemaService::fill_model_schema ", K(ret));
   udf_info.set_tenant_id(tenant_id);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, name, udf_info);
   //EXTRACT_INT_FIELD_MYSQL(result, "is_deleted", is_deleted, bool);
-  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, model_id, udf_info, tenant_id);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, udf_id, udf_info, tenant_id);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, arg_num, udf_info, int);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_names, udf_info);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_types, udf_info);

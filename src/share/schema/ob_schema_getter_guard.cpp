@@ -7688,16 +7688,15 @@ int ObSchemaGetterGuard::get_udf_info(const uint64_t tenant_id,
   return ret;
 }
 
-int ObSchemaGetterGuard::check_model_exist_with_name(const uint64_t tenant_id,
+int ObSchemaGetterGuard::check_python_udf_exist_with_name(const uint64_t tenant_id,
                                                      const common::ObString &name,
                                                      bool &exist,
-                                                     uint64_t &model_id)
+                                                     uint64_t &udf_id)
 {
   int ret = OB_SUCCESS;
-  LOG_WARN("get into ObSchemaGetterGuard::check_model_exist_with_name", KR(ret));
   const ObSchemaMgr *mgr = NULL;
   exist = false;
-  model_id = OB_INVALID_ID;
+  udf_id = OB_INVALID_ID;
   if (!check_inner_stat()) {
     ret = OB_INNER_STAT_ERROR;
     LOG_WARN("inner stat error", KR(ret));
@@ -7710,17 +7709,15 @@ int ObSchemaGetterGuard::check_model_exist_with_name(const uint64_t tenant_id,
   } else if (OB_FAIL(check_lazy_guard(tenant_id, mgr))) {
     LOG_WARN("fail to check lazy guard", KR(ret), K(tenant_id));
   } else {
-    const ObSimpleModelSchema *schema = NULL;
-    if (OB_FAIL(mgr->python_udf_mgr_.get_model_schema_with_name(tenant_id,
-                                                                name,
-                                                                schema))) {
-      LOG_WARN("get model schema failed", KR(ret),
+    const ObSimplePythonUdfSchema *schema = NULL;
+    if (OB_FAIL(mgr->python_udf_mgr_.get_python_udf_schema_with_name(tenant_id,
+                                                                     name,
+                                                                     schema))) {
+      LOG_WARN("get python udf schema failed", KR(ret),
                K(tenant_id), K(name));
     } else if (OB_NOT_NULL(schema)) {
       exist = true;
-      model_id = schema->get_model_id();
-      LOG_WARN("ObSchemaGetterGuard::check_model_exist_with_name schema not null", KR(ret),
-      K(tenant_id), K(exist));
+      udf_id = schema->get_udf_id();
     }
   }
   return ret;

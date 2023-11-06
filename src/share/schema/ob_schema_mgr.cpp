@@ -1382,17 +1382,17 @@ int ObSchemaMgr::get_udf_schema(
   }
   return ret;
 }
-int ObSchemaMgr::get_model_schema(
+int ObSchemaMgr::get_python_udf_schema(
     const uint64_t tenant_id,
-    const uint64_t model_id,
-    const ObSimpleModelSchema *&model_schema) const
+    const uint64_t udf_id,
+    const ObSimplePythonUdfSchema *&python_udf_schema) const
 {
   int ret = OB_SUCCESS;
   if (tenant_id_ != tenant_id) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("tenant_id not matched", K(ret), K(tenant_id), K_(tenant_id));
   } else {
-    ret = python_udf_mgr_.get_model_schema(model_id, model_schema);
+    ret = python_udf_mgr_.get_python_udf_schema(udf_id, python_udf_schema);
   }
   return ret;
 }
@@ -4212,7 +4212,7 @@ int ObSchemaMgr::get_schema_count(int64_t &schema_count) const
       LOG_WARN("get_trigger_mgr_count failed", K(ret));
     } else if (OB_FAIL(udf_mgr_.get_udf_schema_count(udf_schema_count))) {
       LOG_WARN("get_udf_mgr_count failed", K(ret));
-    } else if (OB_FAIL(python_udf_mgr_.get_model_schema_count(python_udf_schema_count))) {
+    } else if (OB_FAIL(python_udf_mgr_.get_python_udf_schema_count(python_udf_schema_count))) {
       LOG_WARN("get_python_udf_mgr_count failed", K(ret));
     } else if (OB_FAIL(udt_mgr_.get_udt_schema_count(udt_schema_count))) {
       LOG_WARN("get_udt_mgr_count failed", K(ret));

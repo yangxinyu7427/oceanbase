@@ -255,7 +255,7 @@ ObSchemaServiceSQLImpl::ObSchemaServiceSQLImpl()
       tablespace_service_(*this),
       profile_service_(*this),
       audit_service_(*this),
-      model_service_(*this),
+      python_udf_service_(*this),
       rw_lock_(common::ObLatchIds::SCHEMA_REFRESH_INFO_LOCK),
       last_operation_tenant_id_(OB_INVALID_TENANT_ID),
       sequence_id_(OB_INVALID_ID),
@@ -2340,7 +2340,7 @@ int ObSchemaServiceSQLImpl::fetch_all_tenant_info(
     ret;                                                                \
   })
 
-#define SQL_APPEND_MODEL_ID(schema_keys, exec_tenant_id, schema_key_size, sql) \
+#define SQL_APPEND_PYTHON_UDF_ID(schema_keys, exec_tenant_id, schema_key_size, sql) \
   ({                                                                    \
     int ret = OB_SUCCESS;                                               \
     UNUSED(exec_tenant_id);                                                  \
@@ -2349,8 +2349,8 @@ int ObSchemaServiceSQLImpl::fetch_all_tenant_info(
     } else {                                                            \
       for (int64_t i = 0; OB_SUCC(ret) && i < schema_key_size; ++i) {   \
         if (OB_FAIL(sql.append_fmt("%s('%.*s')", 0 == i ? "" : ", ",    \
-                                   schema_keys[i].model_name_.length(),   \
-                                   schema_keys[i].model_name_.ptr()))) {  \
+                                   schema_keys[i].python_udf_name_.length(),   \
+                                   schema_keys[i].python_udf_name_.ptr()))) {  \
           LOG_WARN("append sql failed", K(ret));                        \
         }                                                               \
       }                                                                 \
@@ -2652,7 +2652,7 @@ FETCH_NEW_SCHEMA_ID(SYS_PL_OBJECT, sys_pl_object);
 FETCH_NEW_SCHEMA_ID(RLS_POLICY, rls_policy);
 FETCH_NEW_SCHEMA_ID(RLS_GROUP, rls_group);
 FETCH_NEW_SCHEMA_ID(RLS_CONTEXT, rls_context);
-FETCH_NEW_SCHEMA_ID(MODEL, model);
+FETCH_NEW_SCHEMA_ID(PYTHON_UDF, python_udf);
 
 #undef FETCH_NEW_SCHEMA_ID
 
@@ -5018,12 +5018,12 @@ int ObSchemaServiceSQLImpl::fetch_udfs(
   return ret;
 }
 
-int ObSchemaServiceSQLImpl::fetch_models(
+int ObSchemaServiceSQLImpl::fetch_python_udfs(
     ObISQLClient &sql_client,
     const ObRefreshSchemaStatus &schema_status,
     const int64_t schema_version,
     const uint64_t tenant_id,
-    ObIArray<ObSimpleModelSchema> &schema_array,
+    ObIArray<ObSimplePythonUdfSchema> &schema_array,
     const SchemaKey *schema_keys,
     const int64_t schema_key_size)
 {
@@ -5044,7 +5044,7 @@ int ObSchemaServiceSQLImpl::fetch_models(
     } else if (NULL != schema_keys && schema_key_size > 0) {
       if (OB_FAIL(sql.append_fmt(" AND (name) in"))) {
         LOG_WARN("append failed", K(ret));
-      } else if (OB_FAIL(SQL_APPEND_MODEL_ID(schema_keys, exec_tenant_id, schema_key_size, sql))) {
+      } else if (OB_FAIL(SQL_APPEND_PYTHON_UDF_ID(schema_keys, exec_tenant_id, schema_key_size, sql))) {
         LOG_WARN("sql append model name failed", K(ret));
       }
     }
@@ -5058,7 +5058,7 @@ int ObSchemaServiceSQLImpl::fetch_models(
       } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("fail to get result. ", K(ret));
-      } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_model_schema(tenant_id, *result, schema_array))) {
+      } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_python_udf_schema(tenant_id, *result, schema_array))) {
         LOG_WARN("failed to retrieve model", K(ret));
       }
     }
@@ -7499,7 +7499,7 @@ int ObSchemaServiceSQLImpl::fetch_all_udf_info(
 //   return ret;
 // }
 
-int ObSchemaServiceSQLImpl::fetch_all_model_info(
+int ObSchemaServiceSQLImpl::fetch_all_python_udf_info(
     const ObRefreshSchemaStatus &schema_status,
     const int64_t schema_version,
     const uint64_t tenant_id,
@@ -7555,7 +7555,7 @@ int ObSchemaServiceSQLImpl::fetch_all_model_info(
       } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Fail to get result", K(ret));
-      } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_model_schema(tenant_id, *result, udf_array))) {
+      } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_python_udf_schema(tenant_id, *result, udf_array))) {
         LOG_WARN("Failed to retrieve udf infos", K(ret));
       }
     }
