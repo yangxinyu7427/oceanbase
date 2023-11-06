@@ -42,7 +42,7 @@
 #include "share/schema/ob_directory_sql_service.h"
 #include "share/schema/ob_context_sql_service.h"
 #include "share/schema/ob_rls_sql_service.h"
-#include "share/schema/ob_model_sql_service.h"
+#include "share/schema/ob_python_udf_sql_service.h"
 #include "sql/dblink/ob_dblink_utils.h"
 #include "lib/string/ob_string.h"
 
@@ -130,7 +130,7 @@ public:
   GET_DDL_SQL_SERVICE_FUNC(Directory, directory)
   GET_DDL_SQL_SERVICE_FUNC(Context, context)
   GET_DDL_SQL_SERVICE_FUNC(Rls, rls)
-  GET_DDL_SQL_SERVICE_FUNC(Model, model)
+  GET_DDL_SQL_SERVICE_FUNC(PythonUdf, python_udf)
 
   /* sequence_id related */
   virtual int init_sequence_id(const int64_t rootservice_epoch);
@@ -298,7 +298,7 @@ public:
   virtual int fetch_new_rls_policy_id(const uint64_t tenant_id, uint64_t &new_rls_policy_id);
   virtual int fetch_new_rls_group_id(const uint64_t tenant_id, uint64_t &new_rls_group_id);
   virtual int fetch_new_rls_context_id(const uint64_t tenant_id, uint64_t &new_rls_context_id);
-  virtual int fetch_new_model_id(const uint64_t tenant_id, uint64_t &new_model_id);
+  virtual int fetch_new_python_udf_id(const uint64_t tenant_id, uint64_t &new_python_udf_id);
 
 //  virtual int insert_sys_param(const ObSysParam &sys_param,
 //                               common::ObISQLClient *sql_client);
@@ -416,7 +416,7 @@ public:
   FETCH_SCHEMAS_FUNC_DECLARE(package, ObSimplePackageSchema);
   FETCH_SCHEMAS_FUNC_DECLARE(trigger, ObSimpleTriggerSchema);
   FETCH_SCHEMAS_FUNC_DECLARE(udf, ObSimpleUDFSchema);
-  FETCH_SCHEMAS_FUNC_DECLARE(model, ObSimpleModelSchema);
+  FETCH_SCHEMAS_FUNC_DECLARE(python_udf, ObSimplePythonUdfSchema);
   FETCH_SCHEMAS_FUNC_DECLARE(udt, ObSimpleUDTSchema);
   FETCH_SCHEMAS_FUNC_DECLARE(sequence, ObSequenceSchema);
   FETCH_SCHEMAS_FUNC_DECLARE(dblink, ObDbLinkSchema);
@@ -471,7 +471,7 @@ public:
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(routine_param, ObRoutineInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(synonym, ObSynonymInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udf, ObUDF);
-  FETCH_FULL_SCHEMAS_FUNC_DECLARE(model, ObPythonUDF);
+  FETCH_FULL_SCHEMAS_FUNC_DECLARE(python_udf, ObPythonUDF);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt_attr, ObUDTTypeInfo);
   FETCH_FULL_SCHEMAS_FUNC_DECLARE(udt_coll, ObUDTTypeInfo);
@@ -495,7 +495,7 @@ public:
                           common::ObArray<ObUserInfo> &user_array,
                           const uint64_t *user_keys = NULL,
                           const int64_t users_size = 0);
-                          
+
   int fetch_role_grantee_map_info(
       const ObRefreshSchemaStatus &schema_status,
       const int64_t schema_version,
@@ -1009,7 +1009,7 @@ private:
   ObTablespaceSqlService tablespace_service_;;
   ObProfileSqlService profile_service_;
   ObAuditSqlService audit_service_;
-  ObModelSqlService model_service_;
+  ObPythonUdfSqlService python_udf_service_;
 
   common::SpinRWLock rw_lock_;
   uint64_t last_operation_tenant_id_;

@@ -749,10 +749,10 @@ public:
                    bool &exist);
 
   //about python user define function
-  int check_model_exist_with_name(const uint64_t tenant_id,
-                                const common::ObString &name,
-                                bool &exist,
-                                uint64_t &model_id);
+  int check_python_udf_exist_with_name(const uint64_t tenant_id,
+                                       const common::ObString &name,
+                                       bool &exist,
+                                       uint64_t &udf_id);
   int get_python_udf_info(const uint64_t tenant_id,
                           const common::ObString &name,
                           ObPythonUDF &udf_info,

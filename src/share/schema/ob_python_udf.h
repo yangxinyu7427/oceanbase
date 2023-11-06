@@ -16,6 +16,7 @@
 #include "lib/string/ob_string.h"
 #include "lib/container/ob_array.h"
 #include "ob_schema_struct.h"
+// #include <Python.h>
 
 namespace oceanbase
 {
@@ -40,7 +41,7 @@ public:
     };
 
 public:
-    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), 
+    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), 
                     arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
                     { reset(); };
     explicit ObPythonUDF(common::ObIAllocator *allocator);
@@ -54,7 +55,7 @@ public:
 
     //set methods
     inline void set_tenant_id(const uint64_t id) { tenant_id_ = id; }
-    inline void set_model_id(const uint64_t id) { model_id_ = id; }
+    inline void set_udf_id(const uint64_t id) { udf_id_ = id; }
     inline int set_name(const common::ObString &name) { return deep_copy_str(name, name_); }
     inline void set_ret(const enum PyUdfRetType ret) { ret_ = ret; }
     inline void set_ret(const int ret) { ret_ = PyUdfRetType(ret); }
@@ -66,7 +67,7 @@ public:
 
     //get methods
     inline uint64_t get_tenant_id() const { return tenant_id_; }
-    inline uint64_t get_model_id() const { return model_id_; }
+    inline uint64_t get_udf_id() const { return udf_id_; }
     inline const char *get_name() const { return extract_str(name_); }
     inline const common::ObString &get_name_str() const { return name_; }
     inline int get_arg_num() const { return arg_num_; }
@@ -80,15 +81,16 @@ public:
     inline int64_t get_schema_version() const { return schema_version_; }
 
     //only for retrieve udf
-    inline const char *get_model_name() const { return extract_str(name_); }
-    inline common::ObString get_model_name_str() const { return name_; }
+    inline const char *get_udf_name() const { return extract_str(name_); }
+    inline common::ObString get_udf_name_str() const { return name_; }
     
     //other
     virtual void reset() override;
     int get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const;
+    // int check_pycall(std::string &err_message);
 
     TO_STRING_KV(K_(tenant_id),
-                 K_(model_id),
+                 K_(udf_id),
                  K_(name),
                  K_(arg_num),
                  K_(arg_names),
@@ -99,7 +101,7 @@ public:
 
 public:
     uint64_t tenant_id_;
-    uint64_t model_id_;
+    uint64_t udf_id_;
     common::ObString name_;
     int arg_num_; //参数数量
     common::ObString arg_names_; //参数名称

@@ -5274,30 +5274,30 @@ public:
   common::ObString udf_name_;
 };
 
-struct ObTenantModelId
+struct ObTenantPythonUdfId
 {
   OB_UNIS_VERSION(1);
 
 public:
-  ObTenantModelId()
-      : tenant_id_(common::OB_INVALID_ID), model_name_()
+  ObTenantPythonUdfId()
+      : tenant_id_(common::OB_INVALID_ID), udf_name_()
   {}
-  ObTenantModelId(const uint64_t tenant_id, const common::ObString &name)
-      : tenant_id_(tenant_id), model_name_(name)
+  ObTenantPythonUdfId(const uint64_t tenant_id, const common::ObString &name)
+      : tenant_id_(tenant_id), udf_name_(name)
   {}
-  bool operator==(const ObTenantModelId &rhs) const
+  bool operator==(const ObTenantPythonUdfId &rhs) const
   {
-    return (tenant_id_ == rhs.tenant_id_) && (model_name_ == rhs.model_name_);
+    return (tenant_id_ == rhs.tenant_id_) && (udf_name_ == rhs.udf_name_);
   }
-  bool operator!=(const ObTenantModelId &rhs) const
+  bool operator!=(const ObTenantPythonUdfId &rhs) const
   {
     return !(*this == rhs);
   }
-  bool operator<(const ObTenantModelId &rhs) const
+  bool operator<(const ObTenantPythonUdfId &rhs) const
   {
     bool bret = tenant_id_ < rhs.tenant_id_;
     if (tenant_id_ == rhs.tenant_id_) {
-      bret = model_name_ < rhs.model_name_;
+      bret = udf_name_ < rhs.udf_name_;
     }
     return bret;
   }
@@ -5305,16 +5305,16 @@ public:
   {
     uint64_t hash_ret = 0;
     hash_ret = common::murmurhash(&tenant_id_, sizeof(tenant_id_), 0);
-    hash_ret = common::murmurhash(model_name_.ptr(), model_name_.length(), hash_ret);
+    hash_ret = common::murmurhash(udf_name_.ptr(), udf_name_.length(), hash_ret);
     return hash_ret;
   }
   bool is_valid() const
   {
-    return (tenant_id_ != common::OB_INVALID_ID) && (model_name_.length() !=0);
+    return (tenant_id_ != common::OB_INVALID_ID) && (udf_name_.length() !=0);
   }
-  TO_STRING_KV(K_(tenant_id), K_(model_name));
+  TO_STRING_KV(K_(tenant_id), K_(udf_name));
   uint64_t tenant_id_;
-  common::ObString model_name_;
+  common::ObString udf_name_;
 };
 
 struct ObTenantSynonymId

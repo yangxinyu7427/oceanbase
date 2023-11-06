@@ -1957,7 +1957,7 @@ int ObSchemaRetrieveUtils::fill_udf_schema(
 }
 
 template<typename T>
-int ObSchemaRetrieveUtils::fill_model_schema(
+int ObSchemaRetrieveUtils::fill_python_udf_schema(
     const uint64_t tenant_id,
     T &result,
     ObPythonUDF &udf_info,
@@ -1968,7 +1968,7 @@ int ObSchemaRetrieveUtils::fill_model_schema(
   udf_info.set_tenant_id(tenant_id);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, name, udf_info);
   //EXTRACT_INT_FIELD_MYSQL(result, "is_deleted", is_deleted, bool);
-  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, model_id, udf_info, tenant_id);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, udf_id, udf_info, tenant_id);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, arg_num, udf_info, int);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_names, udf_info);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_types, udf_info);
@@ -1979,10 +1979,10 @@ int ObSchemaRetrieveUtils::fill_model_schema(
 }
 
 template<typename T>
-int ObSchemaRetrieveUtils::fill_model_schema(
+int ObSchemaRetrieveUtils::fill_python_udf_schema(
     const uint64_t tenant_id,
     T &result,
-    ObSimpleModelSchema &udf_schema,
+    ObSimplePythonUdfSchema &udf_schema,
     bool &is_deleted)
 {
   udf_schema.reset();
@@ -1990,7 +1990,7 @@ int ObSchemaRetrieveUtils::fill_model_schema(
   udf_schema.set_tenant_id(tenant_id);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, name, udf_schema);
   //EXTRACT_INT_FIELD_MYSQL(result, "is_deleted", is_deleted, bool);
-  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, model_id, udf_schema, tenant_id);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, udf_id, udf_schema, tenant_id);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, arg_num, udf_schema, int);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_names, udf_schema);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_types, udf_schema);
@@ -3113,35 +3113,35 @@ int ObSchemaRetrieveUtils::retrieve_udf_schema(
 }
 
 template<typename T, typename S>
-int ObSchemaRetrieveUtils::retrieve_model_schema(
+int ObSchemaRetrieveUtils::retrieve_python_udf_schema(
     const uint64_t tenant_id,
     T &result,
     ObIArray<S> &schema_array)
 {
     int ret = common::OB_SUCCESS;
-    common::ObString model_name;
+    common::ObString udf_name;
     S schema;
     while (OB_SUCCESS == ret && common::OB_SUCCESS == (ret = result.next())) {
       schema.reset();
       bool is_deleted = false;
-      if (OB_FAIL(fill_model_schema(tenant_id, result, schema, is_deleted))) {
-        SHARE_SCHEMA_LOG(WARN, "fail to fill model schema", K(ret));
-      } else if (schema.get_model_name_str() == model_name) {
-        SHARE_SCHEMA_LOG(DEBUG, "debug ignore", K(schema.get_model_name_str()), "version", schema.get_schema_version());
+      if (OB_FAIL(fill_python_udf_schema(tenant_id, result, schema, is_deleted))) {
+        SHARE_SCHEMA_LOG(WARN, "fail to fill python udf schema", K(ret));
+      } else if (schema.get_udf_name_str() == udf_name) {
+        SHARE_SCHEMA_LOG(DEBUG, "debug ignore", K(schema.get_udf_name_str()), "version", schema.get_schema_version());
       } else if (is_deleted) {
-        SHARE_SCHEMA_LOG(INFO, "model is is_deleted, don't add", K(schema.get_model_name_str()));
+        SHARE_SCHEMA_LOG(INFO, "udf is is_deleted, don't add", K(schema.get_udf_name_str()));
       } else if (OB_FAIL(schema_array.push_back(schema))) {
         SHARE_SCHEMA_LOG(WARN, "failed to push back", K(ret));
       } else {
-        SHARE_SCHEMA_LOG(INFO, "retrieve model schema succeed", K(schema));
+        SHARE_SCHEMA_LOG(INFO, "retrieve python udf schema succeed", K(schema));
       }
-      model_name = schema.get_model_name_str();
+      udf_name = schema.get_udf_name_str();
     }
     if (ret != common::OB_ITER_END) {
-      SHARE_SCHEMA_LOG(WARN, "fail to get all model schema. iter quit. ", K(ret));
+      SHARE_SCHEMA_LOG(WARN, "fail to get all python udf schema. iter quit. ", K(ret));
     } else {
       ret = common::OB_SUCCESS;
-      SHARE_SCHEMA_LOG(INFO, "retrieve model schemas succeed", K(tenant_id));
+      SHARE_SCHEMA_LOG(INFO, "retrieve python udf schemas succeed", K(tenant_id));
     }
     return ret;
 }
