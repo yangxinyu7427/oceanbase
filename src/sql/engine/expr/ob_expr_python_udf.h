@@ -33,6 +33,8 @@ public:
                                 
   int init_udf(const common::ObIArray<ObRawExpr*> &param_exprs);
 
+  static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
+
   static int eval_python_udf(const ObExpr &expr,
                              ObEvalCtx &ctx,
                              ObDatum &res);
