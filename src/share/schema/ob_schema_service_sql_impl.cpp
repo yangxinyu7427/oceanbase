@@ -5034,8 +5034,8 @@ int ObSchemaServiceSQLImpl::fetch_python_udfs(
     ObSqlString sql;
     const int64_t snapshot_timestamp = schema_status.snapshot_timestamp_;
     const uint64_t exec_tenant_id = fill_exec_tenant_id(schema_status);
-    //普通表test_model
-    const char *const TABLE_NAME = "test_model";
+    //系统表test_model
+    const char *const TABLE_NAME = "__all_python_udf";
     if (OB_FAIL(sql.append_fmt(COMMON_SQL_WITH_TENANT, TABLE_NAME,
                                fill_extract_tenant_id(schema_status, tenant_id)))) {
       LOG_WARN("append sql failed", K(ret));
@@ -7516,8 +7516,8 @@ int ObSchemaServiceSQLImpl::fetch_all_python_udf_info(
     const uint64_t exec_tenant_id = fill_exec_tenant_id(schema_status);
     DEFINE_SQL_CLIENT_RETRY_WEAK_WITH_SNAPSHOT(sql_client, snapshot_timestamp);
 
-    //暂时用普通表尝试
-    const char *const TABLE_NAME = "test_model";
+    //系统表__all_python_udf
+    const char *const TABLE_NAME = "__all_python_udf";
 
     if (OB_FAIL(sql.append_fmt(COMMON_SQL_WITH_TENANT, TABLE_NAME,
                                fill_extract_tenant_id(schema_status, tenant_id)))) {

@@ -7136,7 +7136,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(node));
   } else if (OB_UNLIKELY(1 > node->num_child_) || OB_ISNULL(node->children_) || 
-    OB_ISNULL(node->children_[0]) || OB_UNLIKELY(T_EXPR_LIST != node->children_[1]->type_)) {
+    OB_ISNULL(node->children_[0]) || OB_ISNULL(node->children_[1]) || OB_UNLIKELY(T_EXPR_LIST != node->children_[1]->type_)) {
     ret = OB_ERR_PARSER_SYNTAX;
     LOG_WARN("invalid node children for python udf node", K(ret), K(node->num_child_), "node", SJ(ObParserResultPrintWrapper(*node)));
   } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
