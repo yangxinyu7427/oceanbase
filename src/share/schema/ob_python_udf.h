@@ -87,7 +87,7 @@ public:
     //other
     virtual void reset() override;
     int get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const;
-    // int check_pycall(std::string &err_message);
+    int check_pycall() const;
 
     TO_STRING_KV(K_(tenant_id),
                  K_(udf_id),

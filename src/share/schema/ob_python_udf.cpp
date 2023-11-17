@@ -68,23 +68,24 @@ int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 
   return ret;
 }
 
-// int ObPythonUDF::check_pycall(std::string &err_message) {
-//   int ret = OB_SUCCESS;
-//   const char* python_code = get_pycall();
-//   Py_Initialize();
-//   if (PyRun_SimpleString(python_code) != 0) {
-//     ret = OB_ERR_UNEXPECTED;
-//     err_message = "python code exeception";
-//     LOG_WARN("python code raise an exception", K(ret));
-//   }
-//   if (strstr(python_code, "py_initial") == nullptr) {
-//     err_message = "pycall lack py_initial";
-//   } else if (strstr(python_code, "py_func") == nullptr) {
-//     err_message = "pycall lack py_func";
-//   }
-//   Py_FinalizeEx();
-//   return ret;
-// }
+int ObPythonUDF::check_pycall() const {
+  int ret = OB_SUCCESS;
+  const char* python_code = get_pycall();
+  // Py_Initialize();
+  // if (PyRun_SimpleString(python_code) != 0) {
+  //   ret = OB_INVALID_ARGUMENT;
+  //   LOG_WARN("python code raise an exception", K(ret));
+  // }
+  if (strstr(python_code, "py_initial") == nullptr) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("pycall lack py_initial", K(ret));
+  } else if (strstr(python_code, "py_func") == nullptr) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("pycall lack py_func", K(ret));
+  }
+  // Py_FinalizeEx();
+  return ret;
+}
 
 ObPythonUDF& ObPythonUDF::operator= (const ObPythonUDF &other) {
   if (this != &other) {
