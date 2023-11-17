@@ -997,7 +997,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   int ret = OB_SUCCESS;
   
   //extract pyfun handler
-  const ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
+  ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   std::string pyfun_handler = name.append("_pyfun");
@@ -1057,8 +1057,17 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
-  npy_intp elements[1] = {real_param}; // column size
+  npy_intp elements[1] = {real_param}; // row size
   ObDatum *argDatum = NULL;
+
+  /*if(info->udf_meta_.init_) {
+  } else if (OB_FAIL(import_udf(info->udf_meta_))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import udf", K(ret));
+    goto destruction;
+  } else {
+    info->udf_meta_.init_ = true;
+  }*/
 
   //获取udf实例并核验
   pModule = PyImport_AddModule("__main__");
