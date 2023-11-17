@@ -99,7 +99,7 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
                                                    ctx_->src_qb_name_,
                                                    ctx_->src_hash_val_))) {
     LOG_WARN("failed to adjust statement id", K(ret));
-  } else if (OB_FAIL(extract_python_udf_exprs(sub_stmt, condition_exprs))) {
+  } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(sub_stmt->get_condition_exprs(), condition_exprs))) {
     LOG_WARN("failed to remove python udf condition.", K(ret));
   } else {
     sub_stmt->get_select_items().reset();
@@ -169,7 +169,7 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
       LOG_WARN("failed to update column items rel id.", K(ret));
     } else if (OB_FAIL(select_stmt->formalize_stmt(ctx_->session_info_))) {
       LOG_WARN("failed to formalized stmt.", K(ret));
-    } else if (OB_FAIL(extract_python_udf_exprs(select_stmt, condition_exprs))) {
+    } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(select_stmt->get_condition_exprs(), condition_exprs))) {
       LOG_WARN("failed to extract python udf filters.", K(ret));
     } else {
       select_stmt->get_condition_exprs().reset();
@@ -198,54 +198,6 @@ int ObTransformPullUpFilter::construct_column_items_from_exprs(
   return ret;
 }
 
-//may add to ObTransfromUtils
-int ObTransformPullUpFilter::extract_python_udf_exprs(
-    ObSelectStmt *&stmt,
-    ObIArray<ObRawExpr *> &target_exprs) 
-{
-  int ret = OB_SUCCESS;
-  //extract predicates
-  ObIArray<ObRawExpr *> &predicates = stmt->get_condition_exprs();
-  ObRawExpr *expr = NULL;
-  int32_t i = 0;
-  while (OB_SUCC(ret) && i < predicates.count()) {
-    expr = predicates.at(i);
-    if(expr_contain_type(expr, T_FUN_SYS_PYTHON_UDF)) {
-      target_exprs.push_back(expr);
-      predicates.remove(i);
-    } else {
-      ++i;
-    }
-  }
-  //extract join conditions
-
-
-  //do check exprs
-  if(target_exprs.empty()) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("exprs have not python udf", K(ret));
-  }
-  return ret;
-}
-
-//simple recusive find python_udf, may add into visitor?
-bool ObTransformPullUpFilter::expr_contain_type(
-    ObRawExpr *expr,
-    ObExprOperatorType type)
-{
-  if(OB_ISNULL(expr)) {
-    return false;
-  } else if(expr->get_expr_type() == type) {
-    return true;
-  } else {
-    for(int32_t i = 0; i < expr->get_param_count(); i++) {
-      if(expr_contain_type(expr->get_param_expr(i), type))
-        return true;
-    }
-    return false;
-  }
-}
-
 int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLStmt> &parent_stmts,
   const int64_t current_level,
   const ObDMLStmt &stmt,
@@ -261,7 +213,7 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
     LOG_WARN("exist child stmts.", K(ret));
   } else {
     for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
-      if(expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) {
+      if(ObTransformUtils::expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) {
         need_trans = true;
         break;
       }

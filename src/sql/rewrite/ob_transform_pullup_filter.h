@@ -39,14 +39,6 @@ public:
     const ObIArray<ObRawExpr*> &column_exprs,
     ObIArray<ColumnItem> &column_items);
 
-  static int extract_python_udf_exprs(
-    ObSelectStmt *&select_stmt,
-    ObIArray<ObRawExpr *> &target_exprs);
-
-  static bool expr_contain_type(
-    ObRawExpr *expr,
-    ObExprOperatorType type);
-
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,
