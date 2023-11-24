@@ -79,7 +79,7 @@ int ObPythonUDF::check_pycall() const {
   if (strstr(python_code, "pyinitial") == nullptr) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("pycall lack pyinitial", K(ret));
-  } else if (strstr(python_code, "pyfunc") == nullptr) {
+  } else if (strstr(python_code, "pyfun") == nullptr) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("pycall lack pyfunc", K(ret));
   }
