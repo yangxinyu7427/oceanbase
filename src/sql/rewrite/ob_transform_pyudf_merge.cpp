@@ -36,7 +36,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   trans_happened = false;
   ObSelectStmt *select_stmt = NULL;
   int pyudf_count=0;
-  ObSEArray<int32_t, 20> pyudf_expr_index;
+  ObSEArray<int64_t, 4> pyudf_expr_index;
 
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
@@ -63,14 +63,17 @@ int ObTransformPyUDFMerge::transform_one_stmt(
 
 }
 
+
 int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
-  ObIArray<int32_t> &idx_list,
+  ObIArray<int64_t> &idx_list,
   ObIArray<ObRawExpr *> &src_exprs)
 {
   int ret = OB_SUCCESS;
   // test code
+  int count=0;
   for (int i=1;i<idx_list.count();i++){
-    src_exprs.remove(i);
+    src_exprs.remove((idx_list.at(i)-count));
+    count++;
   }
   return ret;
 }
@@ -90,8 +93,10 @@ int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt
     if(ObTransformUtils::expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) 
       pyudf_count++;
 
-  if(pyudf_count>1) need_trans=true;
-
+  if(pyudf_count>1) {
+    need_trans=true;
+    LOG_TRACE("need transform of ObTransformPyUDFMerge.", K(pyudf_count),K(ret));
+  }
   return ret;
 }
 

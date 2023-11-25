@@ -1732,7 +1732,7 @@ public:
   static bool expr_contain_type(ObRawExpr *expr,
                                ObExprOperatorType type);   
 
-  static int extract_python_udf_exprs_idx_in_condition(ObIArray<int> &idx_list,
+  static int extract_python_udf_exprs_idx_in_condition(ObIArray<int64_t> &idx_list,
                                          ObIArray<ObRawExpr *> &src_exprs);                    
 private:
   static int inner_get_lazy_left_join(ObDMLStmt *stmt,

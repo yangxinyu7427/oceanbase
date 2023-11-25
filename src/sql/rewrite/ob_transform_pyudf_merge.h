@@ -27,8 +27,9 @@ public:
     bool &trans_happened) override;
 
   virtual int merge_python_udf_expr_in_condition(
-    ObIArray<int32_t> &idx_list,
+    ObIArray<int64_t> &idx_list,
     ObIArray<ObRawExpr *> &src_exprs);  
+
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

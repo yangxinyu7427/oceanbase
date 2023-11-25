@@ -12315,19 +12315,18 @@ bool ObTransformUtils::expr_contain_type(
 
 // find python udf index, and save them in array
 int ObTransformUtils::extract_python_udf_exprs_idx_in_condition(
-    ObIArray<int32_t> &idx_list,
+    ObIArray<int64_t> &idx_list,
     ObIArray<ObRawExpr *> &src_exprs)
 {
   int ret = OB_SUCCESS;
   ObRawExpr *expr = NULL;
-  int32_t i = 0;
+  int64_t i = 0;
   while (OB_SUCC(ret) && i < src_exprs.count()) {
     expr = src_exprs.at(i);
     if(expr_contain_type(expr, T_FUN_SYS_PYTHON_UDF)) {
       idx_list.push_back(i);
-    } else {
-      ++i;
     }
+    i++;
   }
   return ret;
 }
