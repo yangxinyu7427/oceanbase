@@ -12331,5 +12331,32 @@ int ObTransformUtils::extract_python_udf_exprs_idx_in_condition(
   return ret;
 }
 
+// extract python udf expr in exprs
+int ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObRawExpr *src_expr)
+{
+  int ret = OB_SUCCESS;
+  if(OB_ISNULL(src_expr)) {
+    return false;
+  }
+  ObPythonUdfRawExpr *python_udf_expr=NULL;
+  if(src_expr->get_expr_type() == T_FUN_SYS_PYTHON_UDF){
+
+    if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
+      // 进行expr转换
+      LOG_WARN("convert expr to ObPythonUdfRawExpr fail", K(ret));
+    } else {
+      python_udf_expr_list.push_back(python_udf_expr);
+    }
+  }
+  
+  for(int32_t i = 0; i < src_expr->get_param_count(); i++) {
+    extract_all_python_udf_raw_expr_in_raw_expr(python_udf_expr_list,src_expr->get_param_expr(i));
+  }
+      
+  return ret; 
+}  
+
 } // namespace sql
 } // namespace oceanbase

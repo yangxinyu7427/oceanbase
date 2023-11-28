@@ -30,6 +30,13 @@ public:
     ObIArray<int64_t> &idx_list,
     ObIArray<ObRawExpr *> &src_exprs);  
 
+  virtual int extract_python_udf_expr_in_condition(
+    ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+    ObIArray<ObRawExpr *> &src_exprs);
+
+  virtual int get_python_udf_info_from_raw_expr(
+    ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+    ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list);
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

@@ -37,7 +37,9 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   ObSelectStmt *select_stmt = NULL;
   int pyudf_count=0;
   ObSEArray<int64_t, 4> pyudf_expr_index;
-
+  ObSEArray<ObPythonUdfRawExpr *,4> python_udf_expr_list;
+  ObSEArray<oceanbase::share::schema::ObPythonUDFMeta,4> python_udf_meta_list;
+  // SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -51,6 +53,8 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (select_stmt->get_condition_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
+  } else if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list,select_stmt->get_condition_exprs()))){
+    LOG_WARN("extract python_udf_expr in condition fail", K(ret));
   } else if(OB_FAIL(ObTransformUtils::extract_python_udf_exprs_idx_in_condition(pyudf_expr_index, select_stmt->get_condition_exprs()))){
     LOG_WARN("extract python_udf_exprs index fail", K(ret));
   } else if(OB_FAIL(merge_python_udf_expr_in_condition(pyudf_expr_index, select_stmt->get_condition_exprs()))){
@@ -59,10 +63,38 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     trans_happened = true;
     stmt = select_stmt;
   }
+  if(OB_FAIL(get_python_udf_info_from_raw_expr(python_udf_expr_list,python_udf_meta_list))){
+    LOG_WARN("get_python_udf_info_from_raw_expr fail", K(ret));
+  }
+  for(int i=0;i<python_udf_meta_list.count();i++){
+    LOG_DEBUG("this is python udf",K(python_udf_meta_list.at(i).name_));
+  }
   return ret;  
 
 }
 
+int ObTransformPyUDFMerge::get_python_udf_info_from_raw_expr(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list){
+    int ret = OB_SUCCESS;
+    for(int i=0;i<python_udf_expr_list.count();i++){
+      python_udf_meta_list.push_back(python_udf_expr_list.at(i)->get_udf_meta());
+    }
+    return ret;
+}
+
+int ObTransformPyUDFMerge::extract_python_udf_expr_in_condition(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObIArray<ObRawExpr *> &src_exprs)
+{
+  int ret = OB_SUCCESS;
+  for(int i=0;i<src_exprs.count();i++){
+    if(OB_FAIL(ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(python_udf_expr_list,src_exprs.at(i)))){
+      LOG_WARN("extract_all_python_udf_raw_expr_in_raw_expr fail", K(ret));
+    }
+  }
+  return ret;
+}
 
 int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
   ObIArray<int64_t> &idx_list,
