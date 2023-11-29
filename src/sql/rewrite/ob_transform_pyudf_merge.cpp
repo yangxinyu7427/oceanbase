@@ -11,6 +11,7 @@
 #include "sql/rewrite/ob_predicate_deduce.h"
 #include "share/schema/ob_table_schema.h"
 #include "common/ob_smart_call.h"
+#include "sql/engine/expr/ob_expr_python_udf.h"
 
 #include "objit/include/objit/expr/ob_iraw_expr.h"
 #include "sql/resolver/expr/ob_raw_expr.h"
@@ -53,7 +54,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (select_stmt->get_condition_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
-  } else if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list,select_stmt->get_condition_exprs()))){
+  } else if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list,select_stmt->get_condition_exprs(),python_udf_meta_list))){
     LOG_WARN("extract python_udf_expr in condition fail", K(ret));
   } else if(OB_FAIL(ObTransformUtils::extract_python_udf_exprs_idx_in_condition(pyudf_expr_index, select_stmt->get_condition_exprs()))){
     LOG_WARN("extract python_udf_exprs index fail", K(ret));
@@ -63,35 +64,118 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     trans_happened = true;
     stmt = select_stmt;
   }
-  if(OB_FAIL(get_python_udf_info_from_raw_expr(python_udf_expr_list,python_udf_meta_list))){
-    LOG_WARN("get_python_udf_info_from_raw_expr fail", K(ret));
+  ObString onnx_model_path;
+  if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path,python_udf_meta_list.at(0)))){
+    LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
   }
-  for(int i=0;i<python_udf_meta_list.count();i++){
-    LOG_DEBUG("this is python udf",K(python_udf_meta_list.at(i).name_));
-  }
+  // LOG_DEBUG("this is python udf count",K(python_udf_meta_list.count()));
+  // for(int i=0;i<python_udf_meta_list.count();i++){
+  //   LOG_DEBUG("this is python udf",K(python_udf_meta_list.at(i).pycall_));
+  // }
   return ret;  
 
 }
 
-int ObTransformPyUDFMerge::get_python_udf_info_from_raw_expr(
-  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list){
-    int ret = OB_SUCCESS;
-    for(int i=0;i<python_udf_expr_list.count();i++){
-      python_udf_meta_list.push_back(python_udf_expr_list.at(i)->get_udf_meta());
-    }
-    return ret;
+
+int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
+  int ret =OB_SUCCESS;
+  //pycall
+  std::string pycall(python_udf_meta.pycall_.ptr());
+  std::string pGetModelPath="\ndef pygetmodelpath():\
+  \n\treturn onnx_path\0";
+  pycall.append(pGetModelPath);
+  std::string onnx_model;
+  //runtime variables
+  PyObject *pModule = NULL;
+  PyObject *dic = NULL;
+  PyObject *v = NULL;
+  PyObject *pInitial = NULL;
+  PyObject *pGetModel = NULL;
+  PyObject *pResult = NULL;
+  const char* pycall_c = pycall.c_str();
+  //Acquire GIL
+  bool nStatus = PyGILState_Check();
+  PyGILState_STATE gstate;
+  if(!nStatus) {
+    gstate = PyGILState_Ensure();
+    nStatus = true;
+  }
+  // prepare and import python code
+  pModule = PyImport_AddModule("__main__"); // load main module
+  if(OB_ISNULL(pModule)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to import main module", K(ret));
+    goto destruction;
+  }
+  dic = PyModule_GetDict(pModule); // get main module dic
+  if(OB_ISNULL(dic)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to get main module dic", K(ret));
+    goto destruction;
+  } 
+  v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL); // test pycall
+  if(OB_ISNULL(v)) {
+    ObExprPythonUdf::process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to write pycall into module", K(ret));
+    goto destruction;
+  }
+  pInitial = PyObject_GetAttrString(pModule, "pyinitial"); // get pyInitial()
+  if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
+    ObExprPythonUdf::process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import pyinitial", K(ret));
+    goto destruction;
+  } else if (OB_ISNULL(PyObject_CallObject(pInitial, NULL))){
+    ObExprPythonUdf::process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to run pyinitial", K(ret));
+    goto destruction;
+  } else {
+    LOG_DEBUG("Import python udf pyinitial", K(ret));
+  }
+
+  pGetModel = PyObject_GetAttrString(pModule, "pygetmodelpath"); // get pygetmodelpath
+  if(OB_ISNULL(pGetModel) || !PyCallable_Check(pGetModel)) {
+    ObExprPythonUdf::process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import pGetModel", K(ret));
+    goto destruction;
+  } else if (OB_ISNULL(PyObject_CallObject(pGetModel, NULL))){
+    ObExprPythonUdf::process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to run pGetModel", K(ret));
+    goto destruction;
+  } else {
+    LOG_DEBUG("Import python udf pGetModel", K(ret));
+  }
+  pResult=PyObject_CallObject(pGetModel, NULL);
+  // there is a bug!!!!!!!
+  // onnx_model = PyBytes_AsString(pResult);
+  
+  destruction: 
+  //release GIL
+  if(nStatus)
+    PyGILState_Release(gstate);
+  // ObString model(onnx_model.c_str());
+  // LOG_DEBUG("get model", K(model));
+  return ret;
 }
 
 int ObTransformPyUDFMerge::extract_python_udf_expr_in_condition(
   ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<ObRawExpr *> &src_exprs)
+  ObIArray<ObRawExpr *> &src_exprs,
+  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list)
 {
   int ret = OB_SUCCESS;
   for(int i=0;i<src_exprs.count();i++){
     if(OB_FAIL(ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(python_udf_expr_list,src_exprs.at(i)))){
       LOG_WARN("extract_all_python_udf_raw_expr_in_raw_expr fail", K(ret));
     }
+  }
+
+  for(int i=0;i<python_udf_expr_list.count();i++){
+    python_udf_meta_list.push_back(python_udf_expr_list.at(i)->get_udf_meta());
   }
   return ret;
 }

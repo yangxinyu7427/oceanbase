@@ -32,11 +32,12 @@ public:
 
   virtual int extract_python_udf_expr_in_condition(
     ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-    ObIArray<ObRawExpr *> &src_exprs);
-
-  virtual int get_python_udf_info_from_raw_expr(
-    ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+    ObIArray<ObRawExpr *> &src_exprs,
     ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list);
+
+  virtual int get_onnx_model_path_from_python_udf_meta(
+    ObString &onnx_model_path, 
+    oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta);
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,
