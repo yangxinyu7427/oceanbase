@@ -3,6 +3,8 @@
  * find redundancy of python udf and then remove them
  */
 #define USING_LOG_PREFIX SQL_REWRITE
+#include <regex>
+#include <string>
 #include "sql/rewrite/ob_transform_pyudf_merge.h"
 #include "sql/rewrite/ob_stmt_comparer.h"
 #include "sql/rewrite/ob_transform_utils.h"
@@ -11,7 +13,7 @@
 #include "sql/rewrite/ob_predicate_deduce.h"
 #include "share/schema/ob_table_schema.h"
 #include "common/ob_smart_call.h"
-#include "sql/engine/expr/ob_expr_python_udf.h"
+// #include "sql/engine/expr/ob_expr_python_udf.h"
 
 #include "objit/include/objit/expr/ob_iraw_expr.h"
 #include "sql/resolver/expr/ob_raw_expr.h"
@@ -79,86 +81,129 @@ int ObTransformPyUDFMerge::transform_one_stmt(
 
 int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
   int ret =OB_SUCCESS;
-  //pycall
-  std::string pycall(python_udf_meta.pycall_.ptr());
-  std::string pGetModelPath="\ndef pygetmodelpath():\
-  \n\treturn onnx_path\0";
-  pycall.append(pGetModelPath);
-  std::string onnx_model;
-  //runtime variables
-  PyObject *pModule = NULL;
-  PyObject *dic = NULL;
-  PyObject *v = NULL;
-  PyObject *pInitial = NULL;
-  PyObject *pGetModel = NULL;
-  PyObject *pResult = NULL;
-  const char* pycall_c = pycall.c_str();
-  //Acquire GIL
-  bool nStatus = PyGILState_Check();
-  PyGILState_STATE gstate;
-  if(!nStatus) {
-    gstate = PyGILState_Ensure();
-    nStatus = true;
-  }
-  // prepare and import python code
-  pModule = PyImport_AddModule("__main__"); // load main module
-  if(OB_ISNULL(pModule)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to import main module", K(ret));
-    goto destruction;
-  }
-  dic = PyModule_GetDict(pModule); // get main module dic
-  if(OB_ISNULL(dic)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to get main module dic", K(ret));
-    goto destruction;
-  } 
-  v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL); // test pycall
-  if(OB_ISNULL(v)) {
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to write pycall into module", K(ret));
-    goto destruction;
-  }
-  pInitial = PyObject_GetAttrString(pModule, "pyinitial"); // get pyInitial()
-  if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to import pyinitial", K(ret));
-    goto destruction;
-  } else if (OB_ISNULL(PyObject_CallObject(pInitial, NULL))){
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to run pyinitial", K(ret));
-    goto destruction;
-  } else {
-    LOG_DEBUG("Import python udf pyinitial", K(ret));
-  }
+  // there is bug
+  // //pycall
+  // std::string pycall(python_udf_meta.pycall_.ptr());
+  // std::string pGetModelPath="\ndef pygetmodelpath():\
+  // \n\treturn onnx_path\0";
+  // pycall.append(pGetModelPath);
 
-  pGetModel = PyObject_GetAttrString(pModule, "pygetmodelpath"); // get pygetmodelpath
-  if(OB_ISNULL(pGetModel) || !PyCallable_Check(pGetModel)) {
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to import pGetModel", K(ret));
-    goto destruction;
-  } else if (OB_ISNULL(PyObject_CallObject(pGetModel, NULL))){
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to run pGetModel", K(ret));
-    goto destruction;
-  } else {
-    LOG_DEBUG("Import python udf pGetModel", K(ret));
-  }
-  pResult=PyObject_CallObject(pGetModel, NULL);
-  // there is a bug!!!!!!!
-  // onnx_model = PyBytes_AsString(pResult);
+  // //runtime variables
+  // const char* bytes=NULL;
+  // PyObject *pModule = NULL;
+  // PyObject *dic = NULL;
+  // PyObject *v = NULL;
+  // PyObject *pInitial = NULL;
+  // PyObject *pGetModel = NULL;
+  // PyObject *pResult = NULL;
+  // PyObject* unicode = NULL;
+  // const char* pycall_c = pycall.c_str();
+
+  // // // 初始化 Python 解释器
+  // // Py_Initialize();
+  // //Acquire GIL
+  // bool nStatus = PyGILState_Check();
+  // PyGILState_STATE gstate;
+  // if(!nStatus) {
+  //   gstate = PyGILState_Ensure();
+  //   nStatus = true;
+  // }
+
+  // // prepare and import python code
+  // pModule = PyImport_AddModule("__main__"); // load main module
+  // if(OB_ISNULL(pModule)) {
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("fail to import main module", K(ret));
+  //   goto destruction;
+  // }
+  // dic = PyModule_GetDict(pModule); // get main module dic
+  // if(OB_ISNULL(dic)) {
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("fail to get main module dic", K(ret));
+  //   goto destruction;
+  // } 
+  // v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL); // test pycall
+  // if(OB_ISNULL(v)) {
+  //   ObExprPythonUdf::process_python_exception();
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("fail to write pycall into module", K(ret));
+  //   goto destruction;
+  // }
+  // pInitial = PyObject_GetAttrString(pModule, "pyinitial"); // get pyInitial()
+  // if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
+  //   ObExprPythonUdf::process_python_exception();
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("Fail to import pyinitial", K(ret));
+  //   goto destruction;
+  // } else if (OB_ISNULL(PyObject_CallObject(pInitial, NULL))){
+  //   ObExprPythonUdf::process_python_exception();
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("Fail to run pyinitial", K(ret));
+  //   goto destruction;
+  // } else {
+  //   LOG_DEBUG("Import python udf pyinitial", K(ret));
+  // }
+
+  // pGetModel = PyObject_GetAttrString(pModule, "pygetmodelpath"); // get pygetmodelpath()
+  // if(OB_ISNULL(pGetModel) || !PyCallable_Check(pGetModel)) {
+  //   ObExprPythonUdf::process_python_exception();
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("Fail to import pGetModel", K(ret));
+  //   goto destruction;
+  // } else if (OB_ISNULL(PyObject_CallObject(pGetModel, NULL))){
+  //   ObExprPythonUdf::process_python_exception();
+  //   ret = OB_ERR_UNEXPECTED;
+  //   LOG_WARN("Fail to run pGetModel", K(ret));
+  //   goto destruction;
+  // } else {
+  //   LOG_DEBUG("Import python udf pGetModel", K(ret));
+  // }
+  // pResult=PyObject_CallObject(pGetModel, NULL);
+  // if (pResult != NULL) {
+  //       if (PyUnicode_Check(pResult)) { // 检查返回值是否是 Python 字符串
+  //           unicode = PyUnicode_AsUTF8String(pResult); // 将 Python 字符串对象转换为 UTF-8 编码的字节对象
+  //           if (unicode != NULL) {
+  //               bytes = PyBytes_AsString(unicode); // 将字节对象转换为 C 字符串
+  //               if (bytes != NULL) {
+  //                   onnx_model_path = ObString(bytes); // 将 C 字符串转换为 C++ 字符串
+  //               }
+  //           }
+  //       } else {
+  //           LOG_WARN("Fail to get unicode", K(ret)); // 处理非字符串对象
+  //       }
+  //   } else {
+  //       LOG_WARN("Fail to get pResult", K(ret)); // 处理函数调用失败
+  //   }
   
-  destruction: 
-  //release GIL
-  if(nStatus)
-    PyGILState_Release(gstate);
-  // ObString model(onnx_model.c_str());
-  // LOG_DEBUG("get model", K(model));
+  // destruction: 
+  // // 释放 Python 对象
+  // Py_XDECREF(dic);
+  // Py_XDECREF(pModule);
+  // Py_XDECREF(v);
+  // Py_XDECREF(pInitial);
+  // Py_XDECREF(pGetModel);
+  // Py_XDECREF(pResult);
+  // Py_XDECREF(unicode);
+  // //release GIL
+  // if(nStatus)
+  //   PyGILState_Release(gstate);
+  // LOG_DEBUG("get model path", K(onnx_model_path));
+  // // // 关闭 Python 解释器
+  // // Py_FinalizeEx();
+  string pycall(python_udf_meta.pycall_.ptr());
+  std::regex pattern("onnx_path='(.*?)'");
+  std::smatch match;
+  if (std::regex_search(pycall, match, pattern)) {
+        if (match.size() > 1) {
+          onnx_model_path=ObString(match[1].str().c_str());
+          LOG_DEBUG("get model path", K(onnx_model_path));
+        } else {
+          onnx_model_path=ObString(match[0].str().c_str());
+          LOG_DEBUG("get model path", K(onnx_model_path));
+        }
+    } else {
+        LOG_DEBUG("get no model path");
+    }
   return ret;
 }
 
