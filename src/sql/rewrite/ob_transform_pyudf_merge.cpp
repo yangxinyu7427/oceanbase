@@ -13,7 +13,7 @@
 #include "sql/rewrite/ob_predicate_deduce.h"
 #include "share/schema/ob_table_schema.h"
 #include "common/ob_smart_call.h"
-#include "sql/rewrite/onnx_optimizer_C/onnxoptimizer/optimize_c_api/optimize_c_api.h"
+#include "sql/rewrite/onnx_optimizer/onnxoptimizer/optimize_c_api/optimize_c_api.h"
 // #include "sql/engine/expr/ob_expr_python_udf.h"
 
 #include "objit/include/objit/expr/ob_iraw_expr.h"
