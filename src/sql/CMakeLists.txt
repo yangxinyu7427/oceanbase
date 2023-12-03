@@ -1204,7 +1204,7 @@ target_link_libraries(ob_sql PUBLIC python_lib)
 target_link_libraries(ob_sql PUBLIC ob_base)
 target_compile_definitions(ob_sql PUBLIC SQL_COMPILATION)
 
-add_subdirectory(rewrite/onnx_optimizer_C)
+add_subdirectory(rewrite/onnx_optimizer)
 target_link_libraries(ob_sql PUBLIC optimize_c_api)
 
 add_library(ob_sql_static
