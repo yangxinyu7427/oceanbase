@@ -38,6 +38,12 @@ public:
   virtual int get_onnx_model_path_from_python_udf_meta(
     ObString &onnx_model_path, 
     oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta);
+  virtual int get_onnx_model_path_list_from_python_udf_meta_list(
+    ObIArray<ObString> &onnx_model_path_list,
+    ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list);
+  virtual int merge_onnx_model_with_path_list(
+    ObIArray<ObString> &onnx_model_path_list,
+    string out_path);   
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

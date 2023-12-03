@@ -13,6 +13,7 @@
 #include "sql/rewrite/ob_predicate_deduce.h"
 #include "share/schema/ob_table_schema.h"
 #include "common/ob_smart_call.h"
+#include "sql/rewrite/onnx_optimizer_C/onnxoptimizer/optimize_c_api/optimize_c_api.h"
 // #include "sql/engine/expr/ob_expr_python_udf.h"
 
 #include "objit/include/objit/expr/ob_iraw_expr.h"
@@ -66,10 +67,27 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     trans_happened = true;
     stmt = select_stmt;
   }
-  ObString onnx_model_path;
-  if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path,python_udf_meta_list.at(0)))){
-    LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+  // test code
+  ObSEArray<ObString, 4> onnx_model_path_list;
+  string out_path="/root/onnx_output/model_opted.onnx";
+  // ObString onnx_model_path;
+  // if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path,python_udf_meta_list.at(0)))){
+  //   LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+  // }
+  if(OB_FAIL(get_onnx_model_path_list_from_python_udf_meta_list(onnx_model_path_list, python_udf_meta_list))){
+    LOG_WARN("get_onnx_model_path_list_from_python_udf_meta_list fail", K(ret));
+  } else if(OB_FAIL(merge_onnx_model_with_path_list(onnx_model_path_list, out_path))){
+    LOG_WARN("merge_onnx_model_with_path_list fail", K(ret));
+  } else{
+    LOG_DEBUG("merge onnx model success, the output model path is ",K(ObString(out_path.c_str())));
   }
+
+  // string path1="/root/onnx_input/model_lr.onnx";
+  // string path2="/root/onnx_input/model_linear.onnx";
+  // string pre1="model_lr";
+  // string pre2="model_linear";
+  // string out_path="/root/onnx_output/model_opted.onnx";
+  // optimize_with_model_path(path1,path2,pre1,pre2,out_path);
   // LOG_DEBUG("this is python udf count",K(python_udf_meta_list.count()));
   // for(int i=0;i<python_udf_meta_list.count();i++){
   //   LOG_DEBUG("this is python udf",K(python_udf_meta_list.at(i).pycall_));
@@ -78,6 +96,37 @@ int ObTransformPyUDFMerge::transform_one_stmt(
 
 }
 
+int ObTransformPyUDFMerge::merge_onnx_model_with_path_list(
+  ObIArray<ObString> &onnx_model_path_list,
+  string out_path){
+    int ret = OB_SUCCESS;
+    string path1(onnx_model_path_list.at(0).ptr());
+    string path2(onnx_model_path_list.at(1).ptr());
+    string pre1="1";
+    string pre2="2";
+    try{
+      optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+    } catch(...){
+      LOG_WARN("optimize_with_model_path fail");
+      ret=OB_ERROR;
+    }
+    return ret;
+}
+
+int ObTransformPyUDFMerge::get_onnx_model_path_list_from_python_udf_meta_list(
+  ObIArray<ObString> &onnx_model_path_list,
+  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list){
+  int ret = OB_SUCCESS;
+  for(int i=0;i<python_udf_meta_list.count();i++){
+    ObString onnx_model_path;
+    if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path, python_udf_meta_list.at(i)))){
+      LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+    } else{
+      onnx_model_path_list.push_back(onnx_model_path);
+    }
+  }
+  return ret;
+}
 
 int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
   int ret =OB_SUCCESS;
