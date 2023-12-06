@@ -4929,10 +4929,14 @@ int ObStaticEngineCG::generate_spec(
     ObLogPythonUDF &op, ObPythonUDFSpec &spec, const bool in_root_job)
 {
   int ret = OB_SUCCESS;
-  //for subplan scan
-  ret = generate_spec(static_cast<ObLogSubPlanScan&>(op), static_cast<ObSubPlanScanSpec&>(spec), in_root_job);
-  //for python udf
-
+  //generate subplan scan spec
+  OZ(generate_spec(static_cast<ObLogSubPlanScan&>(op), static_cast<ObSubPlanScanSpec&>(spec), in_root_job));
+  //extra predict buffer exprs
+  int input_size = op.get_access_exprs().count();
+  OZ(spec.col_exprs_.init(input_size));
+  for(int i = 1; i < spec.projector_.count(); i = i + 2) {
+    spec.col_exprs_.push_back(spec.projector_.at(i));
+  }
   return ret;
 }
 
