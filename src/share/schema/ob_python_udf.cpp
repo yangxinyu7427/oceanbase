@@ -44,6 +44,22 @@ ObPythonUDF::~ObPythonUDF()
 {
 }
 
+int ObPythonUDF::get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_names) const {
+  int ret = OB_SUCCESS;
+  udf_attributes_names.reuse();
+  char* arg_names_str = const_cast<char*>(get_arg_names());
+  std::istringstream ss(arg_names_str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+      udf_attributes_names.push_back(common::ObString(token.length(),token.c_str()));
+  }
+  if(udf_attributes_names.count() != arg_num_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to resolve arg names string", K(ret));
+  }
+  return ret;
+}
+
 int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const {
   int ret = OB_SUCCESS;
   udf_attributes_types.reuse();
@@ -81,7 +97,7 @@ int ObPythonUDF::check_pycall() const {
     LOG_WARN("pycall lack pyinitial", K(ret));
   } else if (strstr(python_code, "pyfun") == nullptr) {
     ret = OB_INVALID_ARGUMENT;
-    LOG_WARN("pycall lack pyfunc", K(ret));
+    LOG_WARN("pycall lack pyfun", K(ret));
   }
   // Py_FinalizeEx();
   return ret;
@@ -138,6 +154,7 @@ OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     name_,
                     ret_,
                     pycall_,
+                    udf_attributes_names_,
                     udf_attributes_types_,
                     init_);
 
