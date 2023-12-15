@@ -40,6 +40,7 @@ int ObTransformPullUpFilter::transform_one_stmt(
   ObSelectStmt *select_stmt = NULL;
   ObSelectStmt *sub_stmt = NULL;
   ObSEArray<ObRawExpr *, 4> target_exprs;
+  bool allowed = false;
 
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -47,6 +48,12 @@ int ObTransformPullUpFilter::transform_one_stmt(
   } else if (!stmt->is_select_stmt()) {
     // do nothing
     OPT_TRACE("not select stmt, can not transform");
+  } else if (OB_FAIL(check_hint_allowed(*stmt, allowed))) {
+    // 检查query hint异常
+    LOG_WARN("failed to check hint", K(ret));
+  } else if (!allowed) {
+    // do nothing
+    OPT_TRACE("hint reject transform");
   } else if (FALSE_IT(select_stmt = static_cast<ObSelectStmt*>(stmt))) {
     //准备进行改写
     LOG_WARN("select stmt is NULL", K(ret));
@@ -102,7 +109,13 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
   } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(sub_stmt->get_condition_exprs(), condition_exprs))) {
     LOG_WARN("failed to remove python udf condition.", K(ret));
   } else {
+    //remove select items
     sub_stmt->get_select_items().reset();
+    //remove limit exprs
+    sub_stmt->set_limit_offset(NULL, NULL);
+    ObRawExpr *limit_percent_expr = sub_stmt->get_limit_percent_expr();
+    if(OB_NOT_NULL(limit_percent_expr))
+      limit_percent_expr->reset(); 
   }
   //add columnItem exprs into selectItem
   for (int64_t j = 0; OB_SUCC(ret) && j < sub_stmt->get_column_size(); ++j) {
@@ -217,6 +230,34 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
         need_trans = true;
         break;
       }
+    }
+  }
+  return ret;
+}
+
+int ObTransformPullUpFilter::check_hint_allowed(const ObDMLStmt &stmt,
+                                                bool &allowed)
+{
+  int ret = OB_SUCCESS;
+  allowed = true;
+  const ObQueryHint *query_hint = NULL;
+  const ObHint *myhint = get_hint(stmt.get_stmt_hint());
+  bool is_disable = (NULL != myhint) && myhint->is_disable_hint();
+  const ObHint *no_rewrite = stmt.get_stmt_hint().get_no_rewrite_hint();
+  if (OB_ISNULL(ctx_) || OB_ISNULL(query_hint = stmt.get_stmt_hint().query_hint_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("unexpected null", K(ret), K(ctx_), K(query_hint));
+  } else if (query_hint->has_outline_data()) {
+    // outline data allowed unnest
+    allowed = query_hint->is_valid_outline_transform(ctx_->trans_list_loc_, myhint);
+  } else if (NULL != myhint && myhint->is_enable_hint()) {
+    allowed = true;
+  } else if (is_disable || NULL != no_rewrite) {
+    allowed = false;
+    if (OB_FAIL(ctx_->add_used_trans_hint(no_rewrite))) {
+      LOG_WARN("failed to add used trans hint", K(ret));
+    } else if (is_disable && OB_FAIL(ctx_->add_used_trans_hint(myhint))) {
+      LOG_WARN("failed to add used trans hint", K(ret));
     }
   }
   return ret;
