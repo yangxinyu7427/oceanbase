@@ -997,7 +997,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   int ret = OB_SUCCESS;
   
   //extract pyfun handler
-  const ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
+  ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   std::string pyfun_handler = name.append("_pyfun");
@@ -1052,13 +1052,23 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject *pModule = NULL;
   PyObject *pFunc = NULL;
   PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
+  PyObject *pKwargs = PyDict_New();
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
   PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
-  npy_intp elements[1] = {real_param}; // column size
+  npy_intp elements[1] = {real_param}; // row size
   ObDatum *argDatum = NULL;
+
+  /*if(info->udf_meta_.init_) {
+  } else if (OB_FAIL(import_udf(info->udf_meta_))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import udf", K(ret));
+    goto destruction;
+  } else {
+    info->udf_meta_.init_ = true;
+  }*/
 
   //获取udf实例并核验
   pModule = PyImport_AddModule("__main__");
@@ -1218,6 +1228,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   destruction:
   //释放运行时变量
   Py_XDECREF(pArgs);
+  Py_XDECREF(pKwargs);
   //释放函数参数
   for (int i = 0; i < expr.arg_cnt_; i++) {
     if(OB_ISNULL(arrays[i]))
@@ -1269,6 +1280,103 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
   if(is_batch) {
     rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
   }
+  } else {
+    rt_expr.extra_buf_.buf_flag_ = false;
+  }
+  //绑定eval
+  rt_expr.eval_func_ = ObExprPythonUdf::eval_test_udf;
+  //绑定向量化eval
+  bool is_batch = true;
+  for(int i = 0; i < rt_expr.arg_cnt_; i++){
+    if(!rt_expr.args_[i]->is_batch_result()) {
+      is_batch = false;
+      break;
+    }
+  }
+  if(is_batch) {
+    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
+  }
+  return ret;
+}
+
+//异常输出
+void ObExprPythonUdf::message_error_dialog_show(char* buf) {
+  std::ofstream ofile;
+  if(ofile) {
+      ofile.open("/home/test/log/expedia/log", std::ios::out);
+      ofile << buf;
+      ofile.close();
+  }
+  return;
+}
+//异常处理
+void ObExprPythonUdf::process_python_exception() {
+  char buf[65536], *buf_p = buf;
+  PyObject *type_obj, *value_obj, *traceback_obj;
+  PyErr_Fetch(&type_obj, &value_obj, &traceback_obj);
+  if (value_obj == NULL)
+      return;
+  PyObject *pstr = PyObject_Str(value_obj);
+  const char* value = PyUnicode_AsUTF8(pstr);
+  size_t szbuf = sizeof(buf);
+  int l;
+  PyCodeObject *codeobj;
+  l = snprintf(buf_p, szbuf, ("Error Message:\n%s"), value);
+  buf_p += l;
+  szbuf -= l;
+  if (traceback_obj != NULL) {
+      l = snprintf(buf_p, szbuf, ("\n\nTraceback:\n"));
+      buf_p += l;
+      szbuf -= l;
+      PyTracebackObject *traceback = (PyTracebackObject *)traceback_obj;
+      for (; traceback && szbuf > 0; traceback = traceback->tb_next) {
+          //codeobj = traceback->tb_frame->f_code;
+          codeobj = PyFrame_GetCode(traceback->tb_frame);
+          l = snprintf(buf_p, szbuf, "%s: %s(# %d)\n",
+              PyUnicode_AsUTF8(PyObject_Str(codeobj->co_name)),
+              PyUnicode_AsUTF8(PyObject_Str(codeobj->co_filename)),
+              traceback->tb_lineno);
+          buf_p += l;
+          szbuf -= l;
+      }
+  }
+  message_error_dialog_show(buf);
+  //Py_XDECREF(type_obj);
+  //Py_XDECREF(value_obj);
+  //Py_XDECREF(traceback_obj);
+}
+
+int ObPythonUdfInfo::deep_copy(common::ObIAllocator &allocator,
+                                const ObExprOperatorType type,
+                                ObIExprExtraInfo *&copied_info) const
+{
+  int ret = common::OB_SUCCESS;
+  OZ(ObExprExtraInfoFactory::alloc(allocator, type, copied_info));
+  ObPythonUdfInfo &other = *static_cast<ObPythonUdfInfo *>(copied_info);
+  OZ(ObExprPythonUdf::deep_copy_udf_meta(other.udf_meta_, allocator, udf_meta_));
+  return ret;
+}
+
+int ObPythonUdfInfo::from_raw_expr(const ObPythonUdfRawExpr &raw_expr)
+{
+  int ret = OB_SUCCESS;
+  OZ(ObExprPythonUdf::deep_copy_udf_meta(udf_meta_, allocator_, raw_expr.get_udf_meta()));
+  return ret;
+}
+
+OB_DEF_SERIALIZE(ObPythonUdfInfo)
+{
+  int ret = OB_SUCCESS;
+  LST_DO_CODE(OB_UNIS_ENCODE,
+              udf_meta_);
+  return ret;
+}
+
+OB_DEF_DESERIALIZE(ObPythonUdfInfo)
+{
+  int ret = OB_SUCCESS;
+  LST_DO_CODE(OB_UNIS_DECODE,
+              udf_meta_);
   return ret;
 }
 

@@ -672,7 +672,7 @@ typedef enum {
   RLS_POLICY_SCHEMA = 36,
   RLS_GROUP_SCHEMA = 37,
   RLS_CONTEXT_SCHEMA = 38,
-  MODEL_SCHEMA = 39,
+  PYTHON_UDF_SCHEMA = 39,
   ///<<< add schema type before this line
   OB_MAX_SCHEMA
 } ObSchemaType;

@@ -2874,8 +2874,8 @@ int ObMultiVersionSchemaService::check_python_udf_exist(const uint64_t tenant_id
       SMART_VAR(ObMySQLProxy::MySQLResult, res) {
       common::sqlclient::ObMySQLResult *result = NULL;
       ObSqlString sql;
-      //普通表test_model
-      const char *const TABLE_NAME = "test_model";
+      //系统表__all_python_udf
+      const char *const TABLE_NAME = "__all_python_udf";
       if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", TABLE_NAME, name.length(), name.ptr()))) {
         LOG_WARN("append sql failed", K(ret));
       } 
@@ -2923,8 +2923,8 @@ int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
       SMART_VAR(ObMySQLProxy::MySQLResult, res) {
       common::sqlclient::ObMySQLResult *result = NULL;
       ObSqlString sql;
-      //普通表test_model
-      const char *const TABLE_NAME = "test_model";
+      //系统表__all_python_udf
+      const char *const TABLE_NAME = "__all_python_udf";
       if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", TABLE_NAME, udf_name.length(), udf_name.ptr()))) {
         LOG_WARN("append sql failed", K(ret));
       } 

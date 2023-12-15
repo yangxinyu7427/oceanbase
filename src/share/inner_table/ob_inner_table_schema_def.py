@@ -5451,6 +5451,30 @@ def_table_schema(
       ('extra_info', 'varchar:MAX_CLUSTER_EVENT_VALUE_LENGTH', 'false', '')
     ],
 )
+
+def_table_schema(
+    owner = 'xujiahe.xjh',
+    table_name    = '__all_python_udf',
+    table_id      = '446',
+    table_type = 'SYSTEM_TABLE',
+    gm_columns = ['gmt_create', 'gmt_modified'],
+    rowkey_columns = [
+        ('tenant_id', 'int'),
+        ('name', 'varchar:OB_MAX_UDF_NAME_LENGTH', 'false'),
+    ],
+    in_tenant_space = True,
+
+    normal_columns = [
+      ('udf_id', 'int'),
+      ('ret', 'int'),
+      ('arg_num', 'int'),
+      ('arg_names', 'varchar:OB_MAX_SYS_PARAM_INFO_LENGTH', 'false'),
+      ('arg_types', 'varchar:OB_MAX_SYS_PARAM_INFO_LENGTH', 'false'),
+      ('pycall', 'varchar:OB_MAX_PART_FUNC_EXPR_LENGTH', 'false'),
+      ('schema_version', 'int'),
+    ],
+)
+
 # 446 : __all_ls_transfer_member_list_lock_info
 # 447 : __all_ls_log_restore_stat
 # 448 : __all_backup_transferring_tablets
