@@ -73,10 +73,8 @@ int ObPythonUdfSqlService::add_python_udf(common::ObISQLClient &sql_client,
   UNUSED(PythonUdf_info);
   ObSqlString sql;
   ObSqlString values;
-  //系统表需要新建
   //const char *tname[] = {OB_ALL_FUNC_TNAME, OB_ALL_FUNC_HISTORY_TNAME};
-  //暂时先用新建的用户表测试功能，TEST_MODEL以CREATE TABLE的方式创建
-  std::string table_name = "test_model";
+  std::string table_name = "__all_python_udf";
   ObArenaAllocator allocator(ObModIds::OB_SCHEMA);
   const uint64_t tenant_id = PythonUdf_info.get_tenant_id();
   const uint64_t exec_tenant_id = ObSchemaUtils::get_exec_tenant_id(tenant_id);
@@ -106,6 +104,8 @@ int ObPythonUdfSqlService::add_python_udf(common::ObISQLClient &sql_client,
                                    static_cast<int32_t>(values.length()),
                                    values.ptr()))) {
           LOG_WARN("append sql failed, ", K(ret));
+        } else if (OB_FAIL(PythonUdf_info.check_pycall())) {
+          LOG_WARN("unexpected pycall", K(ret));
         } else if (OB_FAIL(sql_client.write(exec_tenant_id, sql.ptr(), affected_rows))) {
           LOG_WARN("fail to execute sql", K(sql), K(ret));
         } else {
@@ -152,8 +152,8 @@ int ObPythonUdfSqlService::delete_python_udf(const uint64_t tenant_id,
     //   LOG_WARN("no row has inserted", K(ret));
     // } else {/*do nothing*/}
 
-    // delete from __all_func
-    std::string table_name = "test_model";
+    // delete from __all_python_udf
+    std::string table_name = "__all_python_udf";
     if (FAILEDx(sql.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND name='%s'",
                                table_name.c_str(),
                                ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
