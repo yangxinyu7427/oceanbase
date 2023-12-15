@@ -1052,6 +1052,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject *pModule = NULL;
   PyObject *pFunc = NULL;
   PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
+  PyObject *pKwargs = PyDict_New();
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
   PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
@@ -1227,6 +1228,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   destruction:
   //释放运行时变量
   Py_XDECREF(pArgs);
+  Py_XDECREF(pKwargs);
   //释放函数参数
   for (int i = 0; i < expr.arg_cnt_; i++) {
     if(OB_ISNULL(arrays[i]))
@@ -1277,6 +1279,9 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
   }
   if(is_batch) {
     rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
+  }
+  } else {
+    rt_expr.extra_buf_.buf_flag_ = false;
   }
   return ret;
 }

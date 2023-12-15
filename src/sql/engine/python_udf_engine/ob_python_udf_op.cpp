@@ -21,31 +21,33 @@ ObPythonUDFOp::ObPythonUDFOp(
 {
   int ret = OB_SUCCESS;
   brs_skip_size_ = spec.max_batch_size_;
+  predict_size_ = 4096;
+  use_buf_ = false;
 
-  // init input / output buffer
-  int storage_size = MY_SPEC.max_batch_size_ * 3;
-  int compute_size = MY_SPEC.max_batch_size_ * 2;
-  input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, storage_size);
-  output_buffer_.init(MY_SPEC.output_, exec_ctx, storage_size);
-  
-  //extra buf_exprs_
-  result_width_ = MY_SPEC.col_exprs_.count() + MY_SPEC.calc_exprs_.count() + MY_SPEC.output_.count();
-  OZ(buf_exprs_.init(result_width_));
-  FOREACH_CNT_X(e, MY_SPEC.col_exprs_, OB_SUCC(ret)) 
-    OZ(buf_exprs_.push_back((*e)));
-  FOREACH_CNT_X(e, MY_SPEC.calc_exprs_, OB_SUCC(ret)) 
-    OZ(buf_exprs_.push_back((*e)));
-  FOREACH_CNT_X(e, MY_SPEC.output_, OB_SUCC(ret)) 
-    OZ(buf_exprs_.push_back((*e)));
-  
-  // construct predict buffers
-  buf_results_ = static_cast<ObDatum **>(exec_ctx.get_allocator().alloc(sizeof(ObDatum *) * result_width_));
-  for(int i = 0; i < result_width_; i++) {
-    ObExpr *e = buf_exprs_.at(i);
-    OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], compute_size));
-  }
-  if(!OB_SUCC(ret)) {
-    LOG_WARN("Fail to init Predict Operator", K(ret));
+  if(use_buf_) {  
+    // init input / output buffer
+    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, predict_size_);
+    output_buffer_.init(MY_SPEC.output_, exec_ctx, predict_size_ * 2);
+
+    //extra buf_exprs_
+    result_width_ = MY_SPEC.col_exprs_.count() + MY_SPEC.calc_exprs_.count() + MY_SPEC.output_.count();
+    OZ(buf_exprs_.init(result_width_));
+    FOREACH_CNT_X(e, MY_SPEC.col_exprs_, OB_SUCC(ret)) 
+      OZ(buf_exprs_.push_back((*e)));
+    FOREACH_CNT_X(e, MY_SPEC.calc_exprs_, OB_SUCC(ret)) 
+      OZ(buf_exprs_.push_back((*e)));
+    FOREACH_CNT_X(e, MY_SPEC.output_, OB_SUCC(ret)) 
+      OZ(buf_exprs_.push_back((*e)));
+
+    // construct predict buffers
+    buf_results_ = static_cast<ObDatum **>(exec_ctx.get_allocator().alloc(sizeof(ObDatum *) * result_width_));
+    for(int i = 0; i < result_width_; i++) {
+      ObExpr *e = buf_exprs_.at(i);
+      OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], predict_size_));
+    }
+    if(!OB_SUCC(ret)) {
+      LOG_WARN("Fail to init Predict Operator", K(ret));
+    }
   }
 }
 
@@ -73,18 +75,20 @@ int ObPythonUDFOp::alloc_predict_buffer(ObIAllocator &alloc, ObExpr &expr, ObDat
 int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
-  int compute_size = MY_SPEC.max_batch_size_ * 2;
-  while (OB_SUCC(ret) && (input_buffer_.get_size() <= input_buffer_.get_max_size() / 2) && !brs_.end_) {
-    if (OB_FAIL(ObSubPlanScanOp::inner_get_next_batch(max_row_cnt))) {
-      LOG_WARN("fail to inner get next batch", K(ret));
-    } else if (OB_FAIL(input_buffer_.save(eval_ctx_, brs_))){
-      LOG_WARN("fail to save input batchrows", K(ret));
+  if (use_buf_) {
+    while (OB_SUCC(ret) && (input_buffer_.get_size() <= input_buffer_.get_max_size() - MY_SPEC.max_batch_size_) && !brs_.end_) {
+      if (OB_FAIL(ObSubPlanScanOp::inner_get_next_batch(max_row_cnt))) {
+        LOG_WARN("fail to inner get next batch", K(ret));
+      } else if (OB_FAIL(input_buffer_.save(eval_ctx_, brs_))){
+        LOG_WARN("fail to save input batchrows", K(ret));
+      }
     }
+    if (OB_FAIL(input_buffer_.load(eval_ctx_, brs_, brs_skip_size_, predict_size_))) {
+      LOG_WARN("fail to load input batchrows", K(ret));
+    }
+  } else {
+    ret = ObSubPlanScanOp::inner_get_next_batch(max_row_cnt);
   }
-  if (OB_FAIL(input_buffer_.load(eval_ctx_, brs_, brs_skip_size_, compute_size))) {
-    LOG_WARN("fail to load input batchrows", K(ret));
-  }
-  //ret = ObSubPlanScanOp::inner_get_next_batch(max_row_cnt);
   return ret;
 }
 
@@ -92,22 +96,23 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *&batch_rows) 
 {
   int ret = OB_SUCCESS;
-  int output_size = MY_SPEC.max_batch_size_;
-  while (OB_SUCC(ret) && (output_buffer_.get_size() <= output_buffer_.get_max_size() / 2) && !brs_.end_) {
-    if (OB_FAIL(ObOperator::get_next_batch(max_row_cnt, batch_rows))) {
-      LOG_WARN("fail to inner get next batch", K(ret));
-    } else if (OB_FAIL(output_buffer_.save(eval_ctx_, brs_))){
-      LOG_WARN("fail to save input batchrows", K(ret));
+  if (use_buf_) {
+    while (OB_SUCC(ret) && (output_buffer_.get_size() <= output_buffer_.get_max_size() / 2) && !brs_.end_) {
+      if (OB_FAIL(ObOperator::get_next_batch(max_row_cnt, batch_rows))) {
+        LOG_WARN("fail to inner get next batch", K(ret));
+      } else if (OB_FAIL(output_buffer_.save(eval_ctx_, brs_))){
+        LOG_WARN("fail to save input batchrows", K(ret));
+      }
     }
+    if (!output_buffer_.is_saved()) {
+      // do nothing
+    } else if (OB_FAIL(output_buffer_.load(eval_ctx_, brs_, brs_skip_size_, predict_size_))) {
+      LOG_WARN("fail to load input batchrows", K(ret));
+    }
+    batch_rows = &brs_;
+  } else {
+    ret = ObOperator::get_next_batch(max_row_cnt, batch_rows);
   }
-  if (!output_buffer_.is_saved()) {
-    // do nothing
-  } else if (OB_FAIL(output_buffer_.load(eval_ctx_, brs_, brs_skip_size_, output_size))) {
-    LOG_WARN("fail to load input batchrows", K(ret));
-  }
-  batch_rows = &brs_;
-  //ret = ObOperator::get_next_batch(max_row_cnt, batch_rows);
-  return ret;
 }
 
 /* ------------------------------------ buffer for python_udf ----------------------------------- */

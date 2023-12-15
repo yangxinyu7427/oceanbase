@@ -65,6 +65,8 @@ private:
   ObVectorBuffer input_buffer_;
   ObVectorBuffer output_buffer_;
   ObDatum **buf_results_;
+  int predict_size_;
+  bool use_buf_;
 };
 
 } // end namespace sql
