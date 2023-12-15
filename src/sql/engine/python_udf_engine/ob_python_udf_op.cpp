@@ -113,6 +113,7 @@ int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *
   } else {
     ret = ObOperator::get_next_batch(max_row_cnt, batch_rows);
   }
+  return ret;
 }
 
 /* ------------------------------------ buffer for python_udf ----------------------------------- */

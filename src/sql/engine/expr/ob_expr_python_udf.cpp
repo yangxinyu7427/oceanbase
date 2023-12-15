@@ -1279,7 +1279,6 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
   }
   if(is_batch) {
     rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
-  }
   } else {
     rt_expr.extra_buf_.buf_flag_ = false;
   }
