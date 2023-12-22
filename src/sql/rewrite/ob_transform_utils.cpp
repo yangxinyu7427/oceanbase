@@ -12313,6 +12313,22 @@ bool ObTransformUtils::expr_contain_type(
   }
 }
 
+// count num of python udf in one expr tree
+int ObTransformUtils::count_python_udf_num(ObRawExpr *expr)
+{
+  int count=0;
+  if(OB_ISNULL(expr)){
+    return 0;
+  } 
+  if(expr->get_expr_type()==T_FUN_SYS_PYTHON_UDF){
+    count++;
+  } 
+  for(int i=0;i<expr->get_param_count();i++){
+    count=count+count_python_udf_num(expr->get_param_expr(i));
+  }
+  return count;
+}
+
 // find python udf index, and save them in array
 int ObTransformUtils::extract_python_udf_exprs_idx_in_condition(
     ObIArray<int64_t> &idx_list,
@@ -12338,7 +12354,7 @@ int ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(
 {
   int ret = OB_SUCCESS;
   if(OB_ISNULL(src_expr)) {
-    return false;
+    return 0;
   }
   ObPythonUdfRawExpr *python_udf_expr=NULL;
   if(src_expr->get_expr_type() == T_FUN_SYS_PYTHON_UDF){

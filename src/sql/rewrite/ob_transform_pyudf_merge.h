@@ -27,23 +27,17 @@ public:
     bool &trans_happened) override;
 
   virtual int merge_python_udf_expr_in_condition(
-    ObIArray<int64_t> &idx_list,
-    ObIArray<ObRawExpr *> &src_exprs);  
+    ObIArray<ObRawExpr *> &src_exprs,string& out_path);  
 
   virtual int extract_python_udf_expr_in_condition(
     ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-    ObIArray<ObRawExpr *> &src_exprs,
-    ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list);
-
+    ObIArray<ObRawExpr *> &src_exprs);
+  virtual int merge_onnx_model_from_python_udf_expr_list(
+    string& out_path, 
+    ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list);
   virtual int get_onnx_model_path_from_python_udf_meta(
-    ObString &onnx_model_path, 
+    string &onnx_model_path, 
     oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta);
-  virtual int get_onnx_model_path_list_from_python_udf_meta_list(
-    ObIArray<ObString> &onnx_model_path_list,
-    ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list);
-  virtual int merge_onnx_model_with_path_list(
-    ObIArray<ObString> &onnx_model_path_list,
-    string out_path);   
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

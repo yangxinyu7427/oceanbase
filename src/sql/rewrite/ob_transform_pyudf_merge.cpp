@@ -5,6 +5,7 @@
 #define USING_LOG_PREFIX SQL_REWRITE
 #include <regex>
 #include <string>
+#include <map>
 #include "sql/rewrite/ob_transform_pyudf_merge.h"
 #include "sql/rewrite/ob_stmt_comparer.h"
 #include "sql/rewrite/ob_transform_utils.h"
@@ -38,13 +39,10 @@ int ObTransformPyUDFMerge::transform_one_stmt(
 {
   int ret = OB_SUCCESS;
   trans_happened = false;
-  ObSelectStmt *select_stmt = NULL;
-  int pyudf_count=0;
-  ObSEArray<int64_t, 4> pyudf_expr_index;
-  ObSEArray<ObPythonUdfRawExpr *,4> python_udf_expr_list;
-  ObSEArray<oceanbase::share::schema::ObPythonUDFMeta,4> python_udf_meta_list;
-  // SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
+  SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
+  ObSelectStmt *select_stmt = NULL;
+  string onnx_model_opted_path;
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("stmt is null", K(ret), K(stmt), K(ctx_));
@@ -57,80 +55,19 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (select_stmt->get_condition_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
-  } else if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list,select_stmt->get_condition_exprs(),python_udf_meta_list))){
-    LOG_WARN("extract python_udf_expr in condition fail", K(ret));
-  } else if(OB_FAIL(ObTransformUtils::extract_python_udf_exprs_idx_in_condition(pyudf_expr_index, select_stmt->get_condition_exprs()))){
-    LOG_WARN("extract python_udf_exprs index fail", K(ret));
-  } else if(OB_FAIL(merge_python_udf_expr_in_condition(pyudf_expr_index, select_stmt->get_condition_exprs()))){
-    LOG_WARN("merge python_udf_exprs fail", K(ret));
+  } else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(),onnx_model_opted_path))){
+    LOG_WARN("merge python udf in condition fail", K(ret));
   } else{
     trans_happened = true;
     stmt = select_stmt;
   }
-  // test code
-  ObSEArray<ObString, 4> onnx_model_path_list;
-  string out_path="/root/onnx_output/model_opted.onnx";
-  // ObString onnx_model_path;
-  // if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path,python_udf_meta_list.at(0)))){
-  //   LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
-  // }
-  if(OB_FAIL(get_onnx_model_path_list_from_python_udf_meta_list(onnx_model_path_list, python_udf_meta_list))){
-    LOG_WARN("get_onnx_model_path_list_from_python_udf_meta_list fail", K(ret));
-  } else if(OB_FAIL(merge_onnx_model_with_path_list(onnx_model_path_list, out_path))){
-    LOG_WARN("merge_onnx_model_with_path_list fail", K(ret));
-  } else{
-    LOG_DEBUG("merge onnx model success, the output model path is ",K(ObString(out_path.c_str())));
-  }
-
-  // string path1="/root/onnx_input/model_lr.onnx";
-  // string path2="/root/onnx_input/model_linear.onnx";
-  // string pre1="model_lr";
-  // string pre2="model_linear";
-  // string out_path="/root/onnx_output/model_opted.onnx";
-  // optimize_with_model_path(path1,path2,pre1,pre2,out_path);
-  // LOG_DEBUG("this is python udf count",K(python_udf_meta_list.count()));
-  // for(int i=0;i<python_udf_meta_list.count();i++){
-  //   LOG_DEBUG("this is python udf",K(python_udf_meta_list.at(i).pycall_));
-  // }
   return ret;  
 
 }
 
-int ObTransformPyUDFMerge::merge_onnx_model_with_path_list(
-  ObIArray<ObString> &onnx_model_path_list,
-  string out_path){
-    int ret = OB_SUCCESS;
-    string path1(onnx_model_path_list.at(0).ptr());
-    string path2(onnx_model_path_list.at(1).ptr());
-    string pre1="1";
-    string pre2="2";
-    try{
-      optimize_with_model_path(path1,path2,pre1,pre2,out_path);
-    } catch(...){
-      LOG_WARN("optimize_with_model_path fail");
-      ret=OB_ERROR;
-    }
-    return ret;
-}
-
-int ObTransformPyUDFMerge::get_onnx_model_path_list_from_python_udf_meta_list(
-  ObIArray<ObString> &onnx_model_path_list,
-  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list){
-  int ret = OB_SUCCESS;
-  for(int i=0;i<python_udf_meta_list.count();i++){
-    ObString onnx_model_path;
-    if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(onnx_model_path, python_udf_meta_list.at(i)))){
-      LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
-    } else{
-      onnx_model_path_list.push_back(onnx_model_path);
-    }
-  }
-  return ret;
-}
-
-int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
+int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(string &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
   int ret =OB_SUCCESS;
-  // there is bug
+  // there is a bug in python
   // //pycall
   // std::string pycall(python_udf_meta.pycall_.ptr());
   // std::string pGetModelPath="\ndef pygetmodelpath():\
@@ -244,11 +181,11 @@ int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &on
   std::smatch match;
   if (std::regex_search(pycall, match, pattern)) {
         if (match.size() > 1) {
-          onnx_model_path=ObString(match[1].str().c_str());
-          LOG_DEBUG("get model path", K(onnx_model_path));
+          onnx_model_path=match[1].str();
+          LOG_DEBUG("get model path", K(ObString(onnx_model_path.c_str())));
         } else {
-          onnx_model_path=ObString(match[0].str().c_str());
-          LOG_DEBUG("get model path", K(onnx_model_path));
+          onnx_model_path=match[0].str();
+          LOG_DEBUG("get model path", K(ObString(onnx_model_path.c_str())));
         }
     } else {
         LOG_DEBUG("get no model path");
@@ -258,8 +195,7 @@ int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(ObString &on
 
 int ObTransformPyUDFMerge::extract_python_udf_expr_in_condition(
   ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<ObRawExpr *> &src_exprs,
-  ObIArray<oceanbase::share::schema::ObPythonUDFMeta > &python_udf_meta_list)
+  ObIArray<ObRawExpr *> &src_exprs)
 {
   int ret = OB_SUCCESS;
   for(int i=0;i<src_exprs.count();i++){
@@ -267,27 +203,92 @@ int ObTransformPyUDFMerge::extract_python_udf_expr_in_condition(
       LOG_WARN("extract_all_python_udf_raw_expr_in_raw_expr fail", K(ret));
     }
   }
-
-  for(int i=0;i<python_udf_expr_list.count();i++){
-    python_udf_meta_list.push_back(python_udf_expr_list.at(i)->get_udf_meta());
-  }
   return ret;
 }
 
 int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
-  ObIArray<int64_t> &idx_list,
-  ObIArray<ObRawExpr *> &src_exprs)
+  ObIArray<ObRawExpr *> &src_exprs,
+  string& out_path)
 {
   int ret = OB_SUCCESS;
-  // test code
-  int count=0;
-  for (int i=1;i<idx_list.count();i++){
-    src_exprs.remove((idx_list.at(i)-count));
-    count++;
+  ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
+  out_path="/root/onnx_output/model_opted.onnx";
+  if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list, src_exprs))){
+    LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
+  } else if(OB_FAIL(merge_onnx_model_from_python_udf_expr_list(out_path, python_udf_expr_list))){
+    LOG_WARN("merge_onnx_model_from_python_udf_expr_list fail", K(ret));
   }
   return ret;
 }
 
+int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
+  string& out_path, 
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list){
+
+  int ret = OB_SUCCESS;
+  int count=1;
+  std::map<string,int> countMap;
+  std::vector<string> prefix_list;
+  std::vector<string> model_path_list;
+
+  for(int i=0;i<python_udf_expr_list.count();i++){
+    oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
+    LOG_TRACE("onnx udf name is ", K(meta.name_));
+    ObString name=meta.name_;
+    string udfname(name.ptr());
+    // 确定model前缀 “udfname_num_”
+    std::map<string,int>::iterator it=countMap.find(udfname);
+    if(it==countMap.end()){
+      countMap[udfname]=1;
+    }else{
+      int value=countMap[udfname];
+      countMap[udfname]=value+1;
+    }
+    string num=std::to_string(countMap[udfname]);
+    string prefix=udfname+"_"+num+"_";
+    prefix_list.push_back(prefix);
+
+    
+    LOG_TRACE("onnx model prefix is ", K(ObString(prefix.c_str())));
+    // 获取model path
+    string model_path;
+    if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(model_path,meta))){
+      LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+    }
+    model_path_list.push_back(model_path);
+  }
+
+  // 模型融合
+  for(int i=0;i<model_path_list.size();i++){
+    if(count==1){
+      // 第一次取前两个model
+      string path1=model_path_list.at(i);
+      string pre1=prefix_list.at(i);
+      i++;
+      string path2=model_path_list.at(i);
+      string pre2=prefix_list.at(i);
+      count++;
+      try{
+        optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+      } catch(...){
+        LOG_WARN("optimize_with_model_path fail");
+        ret=OB_ERROR;
+      }
+    }else{
+      string path1=out_path;
+      string pre1="";
+      string path2=model_path_list.at(i);
+      string pre2=prefix_list.at(i);
+      try{
+        optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+      } catch(...){
+        LOG_WARN("optimize_with_model_path fail");
+        ret=OB_ERROR;
+      }
+    }
+  }
+  return ret;
+}
 
 int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt> &parent_stmts,
   const int64_t current_level,
@@ -297,15 +298,16 @@ int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt
   int ret = OB_SUCCESS;
   LOG_TRACE("Check need transform of ObTransformPyUDFMerge.", K(ret));
   need_trans = false;
-  int pyudf_count=0;
+  ObSEArray<ObSelectStmt*, 16> child_stmts;
+  int python_udf_count=0;
 
-  for(int32_t i = 0; i < stmt.get_condition_size(); i++) 
-    if(ObTransformUtils::expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) 
-      pyudf_count++;
+  for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
+    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)));
+  }
 
-  if(pyudf_count>1) {
-    need_trans=true;
-    LOG_TRACE("need transform of ObTransformPyUDFMerge.", K(pyudf_count),K(ret));
+  if(python_udf_count>1){
+    need_trans = true;
+    LOG_DEBUG("this query need transform of ObTransformPyUDFMerge ,udf count is ",K(python_udf_count));
   }
   return ret;
 }
