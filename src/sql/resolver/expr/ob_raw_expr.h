@@ -3234,6 +3234,7 @@ public:
 
   //set udf meta to this expr
   int set_udf_meta(const share::schema::ObUDF &udf);
+  int set_udf_meta(share::schema::ObPythonUDFMeta &src);
   const share::schema::ObUDFMeta get_udf_meta() { return udf_meta_; }
 
   int get_name_internal(char *buf, const int64_t buf_len, int64_t &pos, ExplainType type) const;
@@ -3460,6 +3461,7 @@ public:
   int assign(const ObRawExpr &other) override;
   int inner_deep_copy(ObIRawExprCopier &copier) override;
   int set_udf_meta(share::schema::ObPythonUDF &udf);
+  int set_udf_meta(share::schema::ObPythonUDFMeta &src);
   const share::schema::ObPythonUDFMeta &get_udf_meta() const { return udf_meta_; }
   virtual bool inner_same_as(const ObRawExpr &expr,
                              ObExprEqualCheckContext *check_context = NULL) const override;

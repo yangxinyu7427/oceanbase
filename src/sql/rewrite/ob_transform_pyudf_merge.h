@@ -26,6 +26,19 @@ public:
     ObDMLStmt *&stmt,
     bool &trans_happened) override;
 
+  virtual int push_predicate_down(
+    string& prefix, 
+    ObRawExpr * src_expr, 
+    string& out_path, 
+    std::map<string,int>& countMap, 
+    ObRawExpr* expr_opted, 
+    int& udf_input_count, 
+    int& level_count);
+
+  virtual int push_predicate_into_onnx_model(
+    ObIArray<ObRawExpr *> &src_exprs,
+    string& out_path);
+
   virtual int merge_python_udf_expr_in_condition(
     ObIArray<ObRawExpr *> &src_exprs,string& out_path);  
 
