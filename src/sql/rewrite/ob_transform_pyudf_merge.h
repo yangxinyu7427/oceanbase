@@ -31,7 +31,7 @@ public:
     ObRawExpr * src_expr, 
     string& out_path, 
     std::map<string,int>& countMap, 
-    ObRawExpr* expr_opted, 
+    ObRawExpr*& expr_opted, 
     int& udf_input_count, 
     int& level_count);
 

@@ -61,7 +61,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   int ret = OB_SUCCESS;
   trans_happened = false;
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
-  SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
+  //SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
   ObSelectStmt *select_stmt = NULL;
   string onnx_model_opted_path;
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
@@ -80,12 +80,14 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if (OB_FAIL(select_stmt->formalize_stmt(ctx_->session_info_))) {
-    LOG_WARN("failed to formalize stmt.", K(ret));
-  } else{
+  } 
+  // else if (OB_FAIL(select_stmt->formalize_stmt(ctx_->session_info_))) {
+  //   LOG_WARN("failed to formalize stmt.", K(ret));
+  // } 
+  else{
     trans_happened = true;
     stmt = select_stmt;
-    SQL_LOG(DEBUG, "this is stmt after ObTransformPyUDFMerge", "query", SJ(*stmt));
+    //SQL_LOG(DEBUG, "this is stmt after ObTransformPyUDFMerge", "query", SJ(*stmt));
   }
   return ret;  
 
@@ -115,7 +117,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
 
   // 对每个包含python udf的表达式树的根节点进行修改
   int udf_input_count;
-  ObSEArray<string, 4> prefix_list;
+  std::vector<string> prefix_list;
   ObSEArray<ObRawExpr *, 4> expr_opted_list;
   for(int i=0; i<exprs_contain_python_udf_list.count(); i++){
     ObRawExpr * expr=exprs_contain_python_udf_list.at(i);
@@ -124,7 +126,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
       LOG_WARN("child_count is not two");
       return OB_ERROR;
     }else{
-      ObRawExpr* expr_opted;
+      ObRawExpr* expr_opted=nullptr;
       int level_count;
       string prefix;
       if (OB_FAIL(ObTransformPyUDFMerge::push_predicate_down(prefix, expr, out_path, countMap, expr_opted, udf_input_count, level_count))) {
@@ -154,8 +156,8 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted_r=python_udf_expr_opted_r->get_udf_meta();
     // 生成新的prefix
     string prefix=prefix_l+"_"+prefix_r;
-    prefix_list.remove(0);
-    prefix_list.remove(0);
+    prefix_list.erase(prefix_list.begin());
+    prefix_list.erase(prefix_list.begin());
     prefix_list.push_back(prefix);
     // 生成新的udf_meta
     oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
@@ -190,12 +192,26 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
       expr_opted_list.push_back(expr_opted);
     }
   }
-
-  src_exprs.push_back(expr_opted_list.at(0));
+  ObRawExpr* expr=expr_opted_list.at(0);
+  if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
+        LOG_WARN("failed to formalize", K(ret));
+      }
+  src_exprs.push_back(expr);
+  ObPythonUdfRawExpr* py_expr=static_cast<ObPythonUdfRawExpr*>(expr);
+  // LOG_ERROR("expr pycall_ is",K(py_expr->get_udf_meta().pycall_));
+  // LOG_ERROR("py_expr param_count is",K(py_expr->get_param_count()));
+  // for(int i=0;i<py_expr->get_param_count();i++){
+  //   ObRawExpr *expr = py_expr->get_param_exprs().at(i);
+  //   LOG_ERROR("py_expr->get_param_exprs at",K(i),K(expr->get_result_type().get_type()));
+  // }
+  // LOG_ERROR("py_expr->get_udf_meta udf_attributes_types_.count is",K(py_expr->get_udf_meta().udf_attributes_types_.count()));
+  // for(int i=0;i<py_expr->get_udf_meta().udf_attributes_types_.count();i++){
+  //   LOG_ERROR("py_expr->udf_attributes_types_ at",K(i),K(py_expr->get_udf_meta().udf_attributes_types_.at(i)));
+  // }
   return ret;
 }
 
-int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_expr, string& out_path, std::map<string,int>& countMap, ObRawExpr* expr_opted, int& udf_input_count, int& level_count){
+int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_expr, string& out_path, std::map<string,int>& countMap, ObRawExpr*& expr_opted, int& udf_input_count, int& level_count){
   int ret = OB_SUCCESS;
   // 终止条件
   if(src_expr->get_expr_type() == T_FUN_SYS_PYTHON_UDF){
@@ -209,7 +225,8 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       ObString pycall_ob=udf_meta.pycall_;
       string pycall(pycall_ob.ptr());
       std::regex pattern("onnx_path='(.*?)'");
-      string result = std::regex_replace(pycall, pattern, out_path);
+      string exchanged_onnx_path="onnx_path='"+out_path+"'";
+      string result = std::regex_replace(pycall, pattern, exchanged_onnx_path);
       udf_meta_opted.pycall_=ObString(result.c_str());
       LOG_TRACE("change model path in pycall sucess", K(ret));
 
@@ -256,8 +273,8 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
   if(count_l>0&&count_r>0){
     string prefix_l="";
     string prefix_r="";
-    ObRawExpr* expr_opted_l;
-    ObRawExpr* expr_opted_r;
+    ObRawExpr* expr_opted_l=nullptr;
+    ObRawExpr* expr_opted_r=nullptr;
     int udf_input_count_l=0;
     int udf_input_count_r=0;
     // 遍历左子树
@@ -318,7 +335,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
   // 左子树有，右子树没有
   else if(count_l>0&&count_r==0){
     string prefix_l="";
-    ObRawExpr* expr_opted_l;
+    ObRawExpr* expr_opted_l=nullptr;
     int udf_input_count_l=0;
     // 遍历左子树
     if(OB_FAIL(push_predicate_down(prefix_l, expr_l, out_path, countMap, expr_opted_l, udf_input_count_l, level_count))){
@@ -381,6 +398,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+      udf_meta_opted.udf_attributes_types_=udf_meta_opted_l.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
       // 构造新的python_udf_expr
       if (OB_ISNULL(ctx_)) {
@@ -404,7 +422,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
   // 右子树有，左子树没有
   else if(count_l==0&&count_r>0){
     string prefix_r="";
-    ObRawExpr* expr_opted_r;
+    ObRawExpr* expr_opted_r=nullptr;
     int udf_input_count_r=0;
     // 遍历右子树
     if(OB_FAIL(push_predicate_down(prefix_r, expr_r, out_path, countMap, expr_opted_r, udf_input_count_r, level_count))){
@@ -467,6 +485,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+      udf_meta_opted.udf_attributes_types_=udf_meta_opted_r.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
       // 构造新的python_udf_expr
       if (OB_ISNULL(ctx_)) {

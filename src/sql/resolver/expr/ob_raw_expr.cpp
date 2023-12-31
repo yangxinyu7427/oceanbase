@@ -4257,6 +4257,7 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDFMeta &src){
   } else if (OB_FAIL(ob_write_string(*inner_alloc_, src.pycall_, udf_meta_.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
   } else { 
+    udf_meta_.udf_attributes_types_.reset();
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       udf_meta_.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
     }
