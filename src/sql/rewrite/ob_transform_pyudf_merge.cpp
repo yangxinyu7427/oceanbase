@@ -98,11 +98,6 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   int ret = OB_SUCCESS;
   // 辅助获取model前缀
   std::map<string,int> countMap;
-  // 生成 python_udf_opted = true 的表达式树
-  ObRawExpr *bool_expr = NULL;
-  if (OB_FAIL(ObRawExprUtils::build_const_bool_expr(ctx_->expr_factory_, bool_expr, true))) {
-    LOG_WARN("failed to build const bool expr", K(ret));
-  }
 
   // 遍历表达式树，找到所有包含python udf的表达式树的根节点(maybe只有and连接的情况)
   ObSEArray<ObRawExpr *, 4> exprs_contain_python_udf_list;
@@ -194,8 +189,20 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   ObRawExpr* expr=expr_opted_list.at(0);
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
-      }
-  src_exprs.push_back(expr);
+  }
+  // 构建bool expr
+  ObRawExpr *bool_expr = NULL;
+  ObRawExpr *equal_expr = NULL;
+  if (OB_FAIL(ObRawExprUtils::build_const_bool_expr(ctx_->expr_factory_, bool_expr, true))) {
+          LOG_WARN("failed to build const bool expr", K(ret));
+  }else if (OB_FAIL(ObRawExprUtils::create_equal_expr(*(ctx_->expr_factory_),
+                                                        ctx_->session_info_,
+                                                        expr,
+                                                        bool_expr,
+                                                        equal_expr))) {
+      LOG_WARN("Creation of equal expr for expr_opted fails", K(ret));
+  }
+  src_exprs.push_back(equal_expr);
   //ObPythonUdfRawExpr* py_expr=static_cast<ObPythonUdfRawExpr*>(expr);
   // LOG_ERROR("expr pycall_ is",K(py_expr->get_udf_meta().pycall_));
   // LOG_ERROR("py_expr param_count is",K(py_expr->get_param_count()));
