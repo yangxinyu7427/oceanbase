@@ -76,14 +76,12 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (select_stmt->get_condition_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
-  } else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
+  } 
+  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } 
-  // else if (OB_FAIL(select_stmt->formalize_stmt(ctx_->session_info_))) {
-  //   LOG_WARN("failed to formalize stmt.", K(ret));
-  // } 
   else{
     trans_happened = true;
     stmt = select_stmt;
@@ -112,6 +110,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     if(ObTransformUtils::expr_contain_type(src_exprs.at(i), T_FUN_SYS_PYTHON_UDF)) {
         exprs_contain_python_udf_list.push_back(src_exprs.at(i));
         src_exprs.remove(i);
+        i--;
       }
   }
 
@@ -197,7 +196,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
         LOG_WARN("failed to formalize", K(ret));
       }
   src_exprs.push_back(expr);
-  ObPythonUdfRawExpr* py_expr=static_cast<ObPythonUdfRawExpr*>(expr);
+  //ObPythonUdfRawExpr* py_expr=static_cast<ObPythonUdfRawExpr*>(expr);
   // LOG_ERROR("expr pycall_ is",K(py_expr->get_udf_meta().pycall_));
   // LOG_ERROR("py_expr param_count is",K(py_expr->get_param_count()));
   // for(int i=0;i<py_expr->get_param_count();i++){
@@ -223,7 +222,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       // 替换model地址
       oceanbase::share::schema::ObPythonUDFMeta udf_meta=python_udf_expr->get_udf_meta();
       ObString pycall_ob=udf_meta.pycall_;
-      string pycall(pycall_ob.ptr());
+      string pycall(pycall_ob.ptr(),pycall_ob.length());
       std::regex pattern("onnx_path='(.*?)'");
       string exchanged_onnx_path="onnx_path='"+out_path+"'";
       string result = std::regex_replace(pycall, pattern, exchanged_onnx_path);
@@ -232,7 +231,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
 
       // 获取udf前缀名
       ObString name=udf_meta.name_;
-      string udfname(name.ptr());
+      string udfname(name.ptr(),name.length());
       std::map<string,int>::iterator it=countMap.find(udfname);
       if(it==countMap.end()){
         countMap[udfname]=1;
@@ -550,7 +549,7 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
     oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
     LOG_TRACE("onnx udf name is ", K(meta.name_));
     ObString name=meta.name_;
-    string udfname(name.ptr());
+    string udfname(name.ptr(),name.length());
     // 确定model前缀 “udfname_num_”
     std::map<string,int>::iterator it=countMap.find(udfname);
     if(it==countMap.end()){
