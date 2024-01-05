@@ -22,13 +22,23 @@ ObPythonUDFOp::ObPythonUDFOp(
   int ret = OB_SUCCESS;
   brs_skip_size_ = spec.max_batch_size_;
   predict_size_ = 4096;
-  use_buf_ = false;
+  
+  use_input_buf_ = true;
+  use_output_buf_ = true;
+  if (predict_size_ > MY_SPEC.max_batch_size_)
+    use_fake_frame_ = true;
+  else
+    predict_size_ += MY_SPEC.max_batch_size_;
 
-  if(use_buf_) {  
-    // init input / output buffer
-    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, predict_size_);
-    output_buffer_.init(MY_SPEC.output_, exec_ctx, predict_size_ * 2);
-
+  if (use_input_buf_) {  
+    // init input buffer
+    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, 2 * predict_size_);
+  }
+  if (use_output_buf_) {
+    // init output buffer
+    output_buffer_.init(MY_SPEC.output_, exec_ctx, 2 * predict_size_);
+  }
+  if (use_fake_frame_) {
     //extra buf_exprs_
     result_width_ = MY_SPEC.col_exprs_.count() + MY_SPEC.calc_exprs_.count() + MY_SPEC.output_.count();
     OZ(buf_exprs_.init(result_width_));
@@ -75,7 +85,7 @@ int ObPythonUDFOp::alloc_predict_buffer(ObIAllocator &alloc, ObExpr &expr, ObDat
 int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
-  if (use_buf_) {
+  if (use_input_buf_) {
     while (OB_SUCC(ret) && (input_buffer_.get_size() <= input_buffer_.get_max_size() - MY_SPEC.max_batch_size_) && !brs_.end_) {
       if (OB_FAIL(ObSubPlanScanOp::inner_get_next_batch(max_row_cnt))) {
         LOG_WARN("fail to inner get next batch", K(ret));
@@ -96,7 +106,7 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *&batch_rows) 
 {
   int ret = OB_SUCCESS;
-  if (use_buf_) {
+  if (use_output_buf_) {
     while (OB_SUCC(ret) && (output_buffer_.get_size() <= output_buffer_.get_max_size() / 2) && !brs_.end_) {
       if (OB_FAIL(ObOperator::get_next_batch(max_row_cnt, batch_rows))) {
         LOG_WARN("fail to inner get next batch", K(ret));
@@ -106,7 +116,7 @@ int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *
     }
     if (!output_buffer_.is_saved()) {
       // do nothing
-    } else if (OB_FAIL(output_buffer_.load(eval_ctx_, brs_, brs_skip_size_, predict_size_))) {
+    } else if (OB_FAIL(output_buffer_.load(eval_ctx_, brs_, brs_skip_size_, MY_SPEC.max_batch_size_))) {
       LOG_WARN("fail to load input batchrows", K(ret));
     }
     batch_rows = &brs_;
