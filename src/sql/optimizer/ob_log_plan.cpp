@@ -5468,9 +5468,19 @@ int ObLogPlan::create_plan_tree_from_path(Path *path,
     } else if (path->is_subquery_path()) {
       SubQueryPath *subquery_path = static_cast<SubQueryPath *>(path);
       bool contain_python_udf = false;
+      // find python udf in condition exprs
       for (int i = 0; i < subquery_path->filter_.count(); ++i) {
         if (ObTransformUtils::expr_contain_type(subquery_path->filter_.at(i), T_FUN_SYS_PYTHON_UDF))
           contain_python_udf = true;
+      }
+      // find python udf in projection exprs
+      if (get_stmt()->is_select_stmt()) {
+        ObSEArray<ObRawExpr *, 4> select_exprs;
+        static_cast<const ObSelectStmt *>(get_stmt())->get_select_exprs(select_exprs);
+        for (int i = 0; i < select_exprs.count();++i) {
+          if (ObTransformUtils::expr_contain_type(select_exprs.at(i), T_FUN_SYS_PYTHON_UDF))
+            contain_python_udf = true;
+        }
       }
       if(contain_python_udf) {
         if (OB_FAIL(allocate_pyudf_subquery_path(subquery_path, op))) {

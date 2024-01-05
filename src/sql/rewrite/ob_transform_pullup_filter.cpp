@@ -57,9 +57,6 @@ int ObTransformPullUpFilter::transform_one_stmt(
   } else if (FALSE_IT(select_stmt = static_cast<ObSelectStmt*>(stmt))) {
     //准备进行改写
     LOG_WARN("select stmt is NULL", K(ret));
-  } else if (select_stmt->get_condition_exprs().empty()) {
-    //没有改写空间
-    LOG_WARN("input preds is empty", K(ret));
   } else if (OB_FAIL(generate_child_level_stmt(select_stmt, 
                                                sub_stmt))) {
     LOG_WARN("failed to generate child level sub stmt", K(ret));
@@ -89,7 +86,8 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
     ObSelectStmt *&sub_stmt)
 {
   int ret = OB_SUCCESS;
-  ObSEArray<ObRawExpr *, 4> condition_exprs;
+  ObSEArray<ObRawExpr *, 4> python_udf_exprs; // for remove
+  ObSEArray<ObRawExpr *, 4> select_exprs;
   //deep copy stmt as subplan
   if (OB_ISNULL(ctx_) || OB_ISNULL(ctx_->stmt_factory_) || OB_ISNULL(ctx_->expr_factory_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -106,8 +104,12 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
                                                    ctx_->src_qb_name_,
                                                    ctx_->src_hash_val_))) {
     LOG_WARN("failed to adjust statement id", K(ret));
-  } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(sub_stmt->get_condition_exprs(), condition_exprs))) {
-    LOG_WARN("failed to remove python udf condition.", K(ret));
+  } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(sub_stmt->get_condition_exprs(), python_udf_exprs))) {
+    LOG_WARN("failed to remove python udf condition exprs.", K(ret));
+  } else if (OB_FAIL(sub_stmt->get_select_exprs(select_exprs))) {
+    LOG_WARN("failed to get select exprs of child stmt.", K(ret));
+  } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(select_exprs, python_udf_exprs))) {
+    LOG_WARN("failed to remove python udf projection exprs.", K(ret));
   } else {
     //remove select items
     sub_stmt->get_select_items().reset();
@@ -115,7 +117,7 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
     sub_stmt->set_limit_offset(NULL, NULL);
     ObRawExpr *limit_percent_expr = sub_stmt->get_limit_percent_expr();
     if(OB_NOT_NULL(limit_percent_expr))
-      limit_percent_expr->reset(); 
+      limit_percent_expr->reset();
   }
   //add columnItem exprs into selectItem
   for (int64_t j = 0; OB_SUCC(ret) && j < sub_stmt->get_column_size(); ++j) {
@@ -145,7 +147,7 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
     LOG_WARN("old exprs is null", K(ret));
   }
   else {
-    //clear select stmt, keep conditions
+    //clear select stmt, keep conditions and projections
     select_stmt->get_table_items().reset();
     select_stmt->get_joined_tables().reset();
     select_stmt->get_from_items().reset();
@@ -185,6 +187,7 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
     } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(select_stmt->get_condition_exprs(), condition_exprs))) {
       LOG_WARN("failed to extract python udf filters.", K(ret));
     } else {
+      // reset parent stmt conditons
       select_stmt->get_condition_exprs().reset();
       append(select_stmt->get_condition_exprs(), condition_exprs);
     }
@@ -220,13 +223,29 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
   LOG_TRACE("Check need transform of ObTransformPullUpFilter.", K(ret));
   need_trans = false;
   ObSEArray<ObSelectStmt*, 16> child_stmts;
-  if (OB_FAIL(stmt.get_child_stmts(child_stmts))) {
+  ObSEArray<ObRawExpr *, 4> select_exprs;
+  if (!stmt.is_select_stmt()) {
+    // do nothing
+    OPT_TRACE("not select stmt, can not transform");
+  } else if (OB_FAIL(stmt.get_child_stmts(child_stmts))) {
     LOG_WARN("get child stmt failed.", K(ret));
   } else if (!child_stmts.empty()) {
     LOG_WARN("exist child stmts.", K(ret));
+  } else if (OB_FAIL(static_cast<const ObSelectStmt &>(stmt).get_select_exprs(select_exprs))) {
+    LOG_WARN("get select exprs failed.", K(ret));
+  } else if (select_exprs.empty()) {
+    LOG_WARN("get none select exprs.", K(ret));
   } else {
+    // check stmt condition exprs
     for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
       if(ObTransformUtils::expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) {
+        need_trans = true;
+        break;
+      }
+    }
+    // check stmt projection exprs
+    for(int32_t i = 0; i < select_exprs.count(); i++) {
+      if(ObTransformUtils::expr_contain_type(select_exprs.at(i), T_FUN_SYS_PYTHON_UDF)) {
         need_trans = true;
         break;
       }
