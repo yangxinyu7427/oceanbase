@@ -197,8 +197,8 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
           LOG_WARN("failed to build const bool expr", K(ret));
   }else if (OB_FAIL(ObRawExprUtils::create_equal_expr(*(ctx_->expr_factory_),
                                                         ctx_->session_info_,
-                                                        expr,
                                                         bool_expr,
+                                                        expr,
                                                         equal_expr))) {
       LOG_WARN("Creation of equal expr for expr_opted fails", K(ret));
   }
@@ -235,6 +235,13 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       string result = std::regex_replace(pycall, pattern, exchanged_onnx_path);
       udf_meta_opted.pycall_=ObString(result.c_str());
       LOG_TRACE("change model path in pycall sucess", K(ret));
+
+      // // todo 能否从修改onnx model角度确定output
+      // // 替换output形状 outputs[0]->outputs[0][0]
+      // std::regex pattern_output("output[0]");
+      // string exchanged_output="output[0][0]";
+      // result = std::regex_replace(pycall, pattern_output, exchanged_output);
+      // udf_meta_opted.pycall_=ObString(result.c_str());
 
       // 获取udf前缀名
       ObString name=udf_meta.name_;
