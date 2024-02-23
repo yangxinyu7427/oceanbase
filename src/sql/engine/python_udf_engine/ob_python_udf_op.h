@@ -3,7 +3,8 @@
 
 #include "sql/engine/ob_operator.h"
 #include "sql/engine/subquery/ob_subplan_scan_op.h"
-#include <Python.h>
+#include "sql/engine/expr/ob_expr_python_udf.h"
+//#include <Python.h>
 
 namespace oceanbase
 {
@@ -53,6 +54,8 @@ public:
   ~ObPythonUDFOp();
 
   static int alloc_predict_buffer(ObIAllocator &alloc, ObExpr &expr, ObDatum *&buf_result, int buffer_size);
+
+  static int find_predict_size(ObExpr *expr, int32_t &predict_size);
 
   virtual int inner_get_next_batch(const int64_t max_row_cnt) override;
 

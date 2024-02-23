@@ -17,8 +17,10 @@ int ObLogPythonUDF::get_plan_item_info(PlanText &plan_text,
   } else if (metas.empty()) {
     // collect python udf metadata
     const ObIArray<ObRawExpr *> &filter = get_filter_exprs();
-    //const ObIArray<ObRawExpr*> &output = get_output_exprs();
+    const ObIArray<ObRawExpr*> &output = get_output_exprs();
     FOREACH_CNT_X(e, filter, OB_SUCC(ret)) 
+      OZ(collect_expr_metadata((*e), metas));
+    FOREACH_CNT_X(e, output, OB_SUCC(ret)) 
       OZ(collect_expr_metadata((*e), metas)); 
   }
   // print python udf metadata
