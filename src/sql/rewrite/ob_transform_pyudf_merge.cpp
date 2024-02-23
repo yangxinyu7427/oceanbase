@@ -61,7 +61,6 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   int ret = OB_SUCCESS;
   trans_happened = false;
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
-  //SQL_LOG(DEBUG, "this is stmt before ObTransformPyUDFMerge", "query", SJ(*stmt));
   ObSelectStmt *select_stmt = NULL;
   string onnx_model_opted_path;
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
@@ -85,7 +84,6 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   else{
     trans_happened = true;
     stmt = select_stmt;
-    //SQL_LOG(DEBUG, "this is stmt after ObTransformPyUDFMerge", "query", SJ(*stmt));
   }
   return ret;  
 
@@ -203,17 +201,6 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
       LOG_WARN("Creation of equal expr for expr_opted fails", K(ret));
   }
   src_exprs.push_back(equal_expr);
-  //ObPythonUdfRawExpr* py_expr=static_cast<ObPythonUdfRawExpr*>(expr);
-  // LOG_ERROR("expr pycall_ is",K(py_expr->get_udf_meta().pycall_));
-  // LOG_ERROR("py_expr param_count is",K(py_expr->get_param_count()));
-  // for(int i=0;i<py_expr->get_param_count();i++){
-  //   ObRawExpr *expr = py_expr->get_param_exprs().at(i);
-  //   LOG_ERROR("py_expr->get_param_exprs at",K(i),K(expr->get_result_type().get_type()));
-  // }
-  // LOG_ERROR("py_expr->get_udf_meta udf_attributes_types_.count is",K(py_expr->get_udf_meta().udf_attributes_types_.count()));
-  // for(int i=0;i<py_expr->get_udf_meta().udf_attributes_types_.count();i++){
-  //   LOG_ERROR("py_expr->udf_attributes_types_ at",K(i),K(py_expr->get_udf_meta().udf_attributes_types_.at(i)));
-  // }
   return ret;
 }
 
@@ -235,13 +222,6 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       string result = std::regex_replace(pycall, pattern, exchanged_onnx_path);
       udf_meta_opted.pycall_=ObString(result.c_str());
       LOG_TRACE("change model path in pycall sucess", K(ret));
-
-      // // todo 能否从修改onnx model角度确定output
-      // // 替换output形状 outputs[0]->outputs[0][0]
-      // std::regex pattern_output("output[0]");
-      // string exchanged_output="output[0][0]";
-      // result = std::regex_replace(pycall, pattern_output, exchanged_output);
-      // udf_meta_opted.pycall_=ObString(result.c_str());
 
       // 获取udf前缀名
       ObString name=udf_meta.name_;
