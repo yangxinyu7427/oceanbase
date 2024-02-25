@@ -1,8 +1,18 @@
 #ifndef _OB_EXPR_PYTHON_UDF_
 #define _OB_EXPR_PYTHON_UDF_
-
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "sql/engine/expr/ob_expr_operator.h"
-#include "sql/engine/python_udf_engine/python_udf_engine.h"
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <numpy/npy_common.h>
+#include <map>
+#include <string>
+#include <exception>
+#include <sys/time.h>
+#include <frameobject.h>
+#include <fstream>
+#include <sys/syscall.h>
+#include "share/datum/ob_datum_util.h"
 
 namespace  oceanbase {
 namespace  sql {
@@ -35,18 +45,6 @@ public:
 
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
-  static int eval_python_udf(const ObExpr &expr,
-                             ObEvalCtx &ctx,
-                             ObDatum &res);
-
-  static int eval_python_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
-                                   const ObBitVector &skip, const int64_t batch_size);
-
-  static int eval_python_udf_batch_buffer(const ObExpr &expr, ObEvalCtx &ctx,
-                                          const ObBitVector &skip, const int64_t batch_size);
-
-  static int get_python_udf(pythonUdf* &pyudf, const ObExpr& expr);
-
   static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
 
   static int eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
@@ -77,6 +75,8 @@ public:
 
   common::ObIAllocator &allocator_;
   share::schema::ObPythonUDFMeta udf_meta_;
+  int predict_size;
+  double best_effi;
 };
 } /* namespace sql */
 } /* namespace oceanbase */
