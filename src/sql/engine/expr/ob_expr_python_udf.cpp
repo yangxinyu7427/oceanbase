@@ -545,7 +545,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     //转换得到numpy array --> 单一元素
     int j = 0, zero = 0;
     int *index;
-    if (expr.args_[i]->is_const_expr()) 
+    if (!expr.args_[i]->is_const_expr()) 
       index = &j;
     else 
       index = &zero;
@@ -576,7 +576,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObInt32Type:
       case ObIntType: {
         numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
-        for (int j = 0; j < batch_size; j++) {
+        for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           //put integer into numpy array
@@ -593,7 +593,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       }
       case ObDoubleType: {
         numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT32, 0);
-        for (int j = 0; j < batch_size; j++) {
+        for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else

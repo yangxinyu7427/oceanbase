@@ -21,7 +21,7 @@ ObPythonUDFOp::ObPythonUDFOp(
 {
   int ret = OB_SUCCESS;
   brs_skip_size_ = spec.max_batch_size_;
-  predict_size_ = 256;
+  predict_size_ = 32;
   
   use_input_buf_ = true;
   use_output_buf_ = true;
@@ -32,11 +32,11 @@ ObPythonUDFOp::ObPythonUDFOp(
     predict_size_ += MY_SPEC.max_batch_size_;
   if (use_input_buf_) {  
     // init input buffer
-    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, 2 * 4096);
+    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, 2 * 256);
   }
   if (use_output_buf_) {
     // init output buffer
-    output_buffer_.init(MY_SPEC.output_, exec_ctx, 2 * 4096);
+    output_buffer_.init(MY_SPEC.output_, exec_ctx, 2 * 256);
   }
   if (use_fake_frame_) {
     //extra buf_exprs_
@@ -53,7 +53,7 @@ ObPythonUDFOp::ObPythonUDFOp(
     buf_results_ = static_cast<ObDatum **>(exec_ctx.get_allocator().alloc(sizeof(ObDatum *) * result_width_));
     for(int i = 0; i < result_width_; i++) {
       ObExpr *e = buf_exprs_.at(i);
-      OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], 4096));
+      OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], 256));
     }
     if(!OB_SUCC(ret)) {
       LOG_WARN("Fail to init Predict Operator", K(ret));
@@ -94,8 +94,8 @@ int ObPythonUDFOp::find_predict_size(ObExpr *expr, int32_t &predict_size)
     }
   }
   predict_size = predict_size > max_size ? predict_size : max_size;
-  if(predict_size > 4096)
-    predict_size = 4096;
+  if(predict_size > 256)
+    predict_size = 256;
   return ret;
 }
 
