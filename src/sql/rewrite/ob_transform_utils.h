@@ -1730,7 +1730,15 @@ public:
                                       ObIArray<ObRawExpr *> &dst_exprs);
 
   static bool expr_contain_type(ObRawExpr *expr,
-                               ObExprOperatorType type);                        
+                               ObExprOperatorType type);   
+
+  static int count_python_udf_num(ObRawExpr *expr);
+
+  static int extract_python_udf_exprs_idx_in_condition(ObIArray<int64_t> &idx_list,
+                                         ObIArray<ObRawExpr *> &src_exprs);  
+
+  static int extract_all_python_udf_raw_expr_in_raw_expr(ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+                                        ObRawExpr *src_expr);                
 private:
   static int inner_get_lazy_left_join(ObDMLStmt *stmt,
                                       TableItem *table,

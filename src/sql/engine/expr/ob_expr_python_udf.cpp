@@ -460,6 +460,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   ObBitVector &my_skip = expr.get_pvt_skip(ctx);
   my_skip.deep_copy(skip, batch_size);
   for (int i = 0; i < expr.arg_cnt_; i++) {
+    if (expr.args_[i]->is_const_expr())
+      continue;
     //do eval
     if (OB_FAIL(expr.args_[i]->eval_batch(ctx, my_skip, batch_size))) {
       ret = OB_ERR_UNEXPECTED;
@@ -543,7 +545,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     //转换得到numpy array --> 单一元素
     int j = 0, zero = 0;
     int *index;
-    if (expr.args_[i]->is_const_expr()) 
+    if (!expr.args_[i]->is_const_expr()) 
       index = &j;
     else 
       index = &zero;
@@ -574,18 +576,24 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObInt32Type:
       case ObIntType: {
         numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
-        for (int j = 0; j < batch_size; j++) {
+        for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
-          else
-            //put integer into numpy array
-            PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyLong_FromLong(argDatum[*index].get_int()));
+          //put integer into numpy array
+          if(expr.args_[i]->is_const_expr()&&!expr.args_[i]->is_batch_result()){
+            int tmp2=argDatum[0].get_int();
+            PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyLong_FromLong(argDatum[0].get_int()));
+          }else{
+            int tmp3=argDatum[j].get_int();
+            PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyLong_FromLong(argDatum[j].get_int()));
+          }
+          
         }
         break;
       }
       case ObDoubleType: {
         numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT32, 0);
-        for (int j = 0; j < batch_size; j++) {
+        for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
@@ -650,8 +658,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       for (int j = 0; j < batch_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
-        results[j].set_int(PyLong_AsLong(
-          PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
+        int tmp=PyLong_AsLong(
+          PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
+        results[j].set_int(tmp);
       }
       break;
     }

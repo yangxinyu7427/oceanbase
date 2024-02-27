@@ -4250,6 +4250,24 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf)
   return ret;
 }
 
+int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDFMeta &src){
+  int ret = OB_SUCCESS;
+  udf_meta_.init_ = src.init_;
+  udf_meta_.ret_ = src.ret_;
+  if (OB_FAIL(ob_write_string(*inner_alloc_, src.name_, udf_meta_.name_))) {
+    LOG_WARN("fail to write name", K(src.name_), K(ret));
+  } else if (OB_FAIL(ob_write_string(*inner_alloc_, src.pycall_, udf_meta_.pycall_))) {
+    LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
+  } else { 
+    udf_meta_.udf_attributes_types_.reset();
+    for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
+      udf_meta_.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+    }
+  }
+  LOG_DEBUG("set udf meta");
+  return ret;
+}
+
 bool ObPythonUdfRawExpr::inner_same_as(const ObRawExpr &expr,
                                        ObExprEqualCheckContext *check_context) const
 {
