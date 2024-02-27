@@ -5034,9 +5034,8 @@ int ObSchemaServiceSQLImpl::fetch_python_udfs(
     ObSqlString sql;
     const int64_t snapshot_timestamp = schema_status.snapshot_timestamp_;
     const uint64_t exec_tenant_id = fill_exec_tenant_id(schema_status);
-    //系统表test_model
-    const char *const TABLE_NAME = "__all_python_udf";
-    if (OB_FAIL(sql.append_fmt(COMMON_SQL_WITH_TENANT, TABLE_NAME,
+    
+    if (OB_FAIL(sql.append_fmt(COMMON_SQL_WITH_TENANT, OB_ALL_PYTHON_UDF_TNAME,
                                fill_extract_tenant_id(schema_status, tenant_id)))) {
       LOG_WARN("append sql failed", K(ret));
     } else if (OB_FAIL(sql.append_fmt(" AND SCHEMA_VERSION <= %ld", schema_version))) {
@@ -5045,7 +5044,7 @@ int ObSchemaServiceSQLImpl::fetch_python_udfs(
       if (OB_FAIL(sql.append_fmt(" AND (name) in"))) {
         LOG_WARN("append failed", K(ret));
       } else if (OB_FAIL(SQL_APPEND_PYTHON_UDF_ID(schema_keys, exec_tenant_id, schema_key_size, sql))) {
-        LOG_WARN("sql append model name failed", K(ret));
+        LOG_WARN("sql append python udf name failed", K(ret));
       }
     }
     if (OB_SUCC(ret)) {
@@ -5059,7 +5058,7 @@ int ObSchemaServiceSQLImpl::fetch_python_udfs(
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("fail to get result. ", K(ret));
       } else if (OB_FAIL(ObSchemaRetrieveUtils::retrieve_python_udf_schema(tenant_id, *result, schema_array))) {
-        LOG_WARN("failed to retrieve model", K(ret));
+        LOG_WARN("failed to retrieve python udf", K(ret));
       }
     }
   }

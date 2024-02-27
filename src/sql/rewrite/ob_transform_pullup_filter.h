@@ -39,6 +39,9 @@ public:
     const ObIArray<ObRawExpr*> &column_exprs,
     ObIArray<ColumnItem> &column_items);
 
+  int check_hint_allowed(const ObDMLStmt &stmt,
+                         bool &allowed);
+
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

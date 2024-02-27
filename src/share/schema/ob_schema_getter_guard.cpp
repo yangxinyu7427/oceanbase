@@ -7689,9 +7689,9 @@ int ObSchemaGetterGuard::get_udf_info(const uint64_t tenant_id,
 }
 
 int ObSchemaGetterGuard::check_python_udf_exist_with_name(const uint64_t tenant_id,
-                                                     const common::ObString &name,
-                                                     bool &exist,
-                                                     uint64_t &udf_id)
+                                                          const common::ObString &name,
+                                                          bool &exist,
+                                                          uint64_t &udf_id)
 {
   int ret = OB_SUCCESS;
   const ObSchemaMgr *mgr = NULL;

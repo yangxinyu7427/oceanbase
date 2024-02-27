@@ -30520,7 +30520,7 @@ int ObDDLService::drop_python_udf(const obrpc::ObDropPythonUdfArg &drop_python_u
                                                           ddl_operator, *schema_service_))) {
         LOG_WARN("failed to modify obj status", K(ret));
       } else if (OB_FAIL(ddl_operator.drop_python_udf(tenant_id, name, trans, &drop_python_udf_arg.ddl_stmt_str_))) {
-        LOG_WARN("ddl_operator drop_model failed", K(tenant_id), K(ret));
+        LOG_WARN("ddl_operator drop_python_udf failed", K(tenant_id), K(ret));
       } else {/*do nothing*/}
     }
   }
@@ -30548,7 +30548,7 @@ int ObDDLService::check_python_udf_exist(uint64 tenant_id, const common::ObStrin
 {
   int ret = OB_SUCCESS;
   if (OB_FAIL(schema_service_->check_python_udf_exist(tenant_id, name, is_exist, udf_id))) {
-    LOG_WARN("failed to check if model_name exists", K(name), K(ret));
+    LOG_WARN("failed to check if udf_name exists", K(name), K(ret));
   }
   return ret;
 }
