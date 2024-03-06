@@ -49,6 +49,8 @@ int ObExprPythonUdf::calc_result_typeN(ObExprResType &type,
   switch(udf_meta_.ret_) {
   case share::schema::ObPythonUDF::PyUdfRetType::STRING : 
     type.set_varchar();
+    type.set_collation_level(CS_LEVEL_SYSCONST);
+    type.set_default_collation_type();
     break;
   case share::schema::ObPythonUDF::PyUdfRetType::DECIMAL :
     type.set_number();
@@ -377,7 +379,7 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
     case ObTextType:
     case ObMediumTextType:
     case ObLongTextType: {
-      expr_datum.set_string(common::ObString(PyUnicode_AS_DATA(
+      expr_datum.set_string(common::ObString(PyUnicode_AsUTF8(
         PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, 0)))));
       break;
     }
@@ -635,7 +637,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       for (int j = 0; j < batch_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
-        results[j].set_string(common::ObString(PyUnicode_AS_DATA(
+        results[j].set_string(common::ObString(PyUnicode_AsUTF8(
           PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)))));
       }
       break;
