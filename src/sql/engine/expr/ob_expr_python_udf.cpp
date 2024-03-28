@@ -440,7 +440,7 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
 int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                          const ObBitVector &skip, const int64_t batch_size) {
   int ret = OB_SUCCESS;
-  
+
   // 开始统计时间
   struct timeval t1,t2;
   double timeuse;
@@ -451,6 +451,52 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   std::string pyfun_handler = name.append("_pyfun");
+  // 加载对应的funcache
+  bool isFuncacheNew=false;
+  ObSQLSessionInfo* session=ctx.exec_ctx_.get_my_session();
+  ObPyUdfFunCacheMap &funcache_map = session->get_pyudf_funcache_map();
+  ObString udf_name=info->udf_meta_.name_;
+  ObSinglePyUdfFunCacheMap* single_func_map;
+  if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
+    if(OB_HASH_NOT_EXIST == ret){
+      isFuncacheNew=true;
+      // remember to delete!!!!
+      single_func_map = new ObSinglePyUdfFunCacheMap();
+      if(OB_FAIL(single_func_map->create(hash::cal_next_prime(500000),
+                                          ObModIds::OB_HASH_BUCKET,
+                                          ObModIds::OB_HASH_NODE))){
+        LOG_WARN("new_single_func_map create fail", K(ret));
+      }else{
+        funcache_map.set_refactored(udf_name,single_func_map);
+      }
+      ret = OB_SUCCESS;
+    }else if(OB_HASH_EXIST == ret){
+      ret = OB_SUCCESS;
+    }
+  }
+  // test hash
+  // std::string str1="hello";
+  // std::string str2="hello";
+  // std::string str3="hello";
+  // uint64_t hash1 = murmurhash(str1.c_str(), str1.size(), 0);
+  // uint64_t hash2 = murmurhash(str2.c_str(), str2.size(), 0);
+  // uint64_t hash3 = murmurhash(str3.c_str(), str3.size(), 0);
+  // uint64_t hash1_1 = murmurhash(str1.c_str(), str1.size(), 0);
+  // uint64_t hash2_1 = murmurhash(str2.c_str(), str2.size(), 0);
+  // uint64_t hash3_1 = murmurhash(str3.c_str(), str3.size(), 0);
+  // ObString obstr1="hello";
+  // ObString obstr2="hello";
+  // ObString obstr3="hello";
+  // uint64_t obhash1 = murmurhash(obstr1.ptr(), obstr1.size(), 0);
+  // uint64_t obhash2 = murmurhash(obstr2.ptr(), obstr2.size(), 0);
+  // uint64_t obhash3 = murmurhash(obstr3.ptr(), obstr3.size(), 0);
+  // uint64_t obhash1_1 = murmurhash(obstr1.ptr(), obstr1.size(), 0);
+  // uint64_t obhash2_1 = murmurhash(obstr2.ptr(), obstr2.size(), 0);
+  // uint64_t obhash3_1 = murmurhash(obstr3.ptr(), obstr3.size(), 0);
+
+  // 创建缓存入参和结果对应的数组
+  std::vector<std::string>* input=new std::vector<std::string>(batch_size,"");
+  //std::vector<bool> output(batch_size);
 
   //返回值
   ObDatum *results = expr.locate_batch_datums(ctx);
@@ -488,7 +534,96 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     else
       ++real_param;
   }
-
+  
+  // 遍历构建input数组
+  ObDatum *argDatum = NULL;
+  for(int i=0;i<expr.arg_cnt_; i++){
+    argDatum = expr.args_[i]->locate_batch_datums(ctx);
+    int j = 0, zero = 0;
+    int *index;
+    if (!expr.args_[i]->is_const_expr()) 
+      index = &j;
+    else 
+      index = &zero;
+    switch (expr.args_[i]->datum_meta_.type_) {
+      case ObCharType:
+      case ObVarcharType:
+      case ObTinyTextType:
+      case ObTextType:
+      case ObMediumTextType:
+      case ObLongTextType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          else {
+            //str in OB
+            ObString str = argDatum[*index].get_string();
+            // put str into input array(funcache)
+            (*input)[j].append(std::string(str.ptr(), str.length()));
+          }
+        }
+        break;
+      }
+      case ObTinyIntType:
+      case ObSmallIntType:
+      case ObMediumIntType:
+      case ObInt32Type:
+      case ObIntType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          //put integer into numpy array
+          if(expr.args_[i]->is_const_expr()&&!expr.args_[i]->is_batch_result()){
+            int tmp2=argDatum[0].get_int();
+            // put str into input array(funcache)
+            (*input)[j].append(std::to_string(tmp2));
+          }else{
+            int tmp3=argDatum[j].get_int();
+            // put str into input array(funcache)
+            (*input)[j].append(std::to_string(tmp3));
+          }
+          
+        }
+        break;
+      }
+      case ObDoubleType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          else{
+            double tmp = argDatum[*index].get_double();
+            (*input)[j].append(std::to_string(tmp));
+          }
+        }
+        break;
+      }
+      case ObNumberType: 
+      default: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+      }
+    }
+  }
+  // 检查是否存在funcache,若存在就替换为缓存结果
+  if(!isFuncacheNew){
+    for(int i=0;i<batch_size;i++){
+      if (my_skip.at(i) || eval_flags.at(i))
+        continue;
+      ObString tmp=ObString((*input)[i].size(),(*input)[i].c_str());
+      uint64_t obhash1 = murmurhash(tmp.ptr(), tmp.size(), 0);
+      uint64_t hash1 = murmurhash((*input)[i].c_str(), (*input)[i].size(), 0);
+      int res;
+      if(OB_FAIL(single_func_map->get_refactored(tmp,res))){
+        if(OB_HASH_NOT_EXIST == ret)
+          ret=OB_SUCCESS;
+      }else{
+          results[i].set_int(res);
+          my_skip.set(i);
+          eval_flags.set(i);
+          real_param--;
+      }
+    }
+  }
   //Ensure GIL
   bool nStatus = PyGILState_Check();
   PyGILState_STATE gstate;
@@ -511,7 +646,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
   npy_intp elements[1] = {real_param}; // row size
-  ObDatum *argDatum = NULL;
+  // ObDatum *argDatum = NULL;
 
   /*if(info->udf_meta_.init_) {
   } else if (OB_FAIL(import_udf(info->udf_meta_))) {
@@ -622,8 +757,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     }
     arrays[i] = numpyarray;
   }
-
-  //执行Python Code并获取返回值
+  if(real_param!=0){
+      //执行Python Code并获取返回值
   pResult = PyObject_CallObject(pFunc, pArgs);
   if(!pResult){
     process_python_exception();
@@ -661,6 +796,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         int tmp=PyLong_AsLong(
           PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
         results[j].set_int(tmp);
+        // set funCache
+        single_func_map->set_refactored(ObString((*input)[j].size(),(*input)[j].c_str()),tmp);
       }
       break;
     }
@@ -686,6 +823,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       goto destruction;
     }
   }
+  }
+  
   
 
   //释放资源

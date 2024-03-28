@@ -315,6 +315,12 @@ DEF_SESSION_TXN_ENCODER(ObTxnExtraInfoEncoder);
 
 typedef common::hash::ObHashMap<uint64_t, pl::ObPLPackageState *,
                                 common::hash::NoPthreadDefendMode> ObPackageStateMap;
+
+typedef common::hash::ObHashMap<common::ObString, int,
+                                common::hash::NoPthreadDefendMode> ObSinglePyUdfFunCacheMap; 
+
+typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,
+                                common::hash::NoPthreadDefendMode> ObPyUdfFunCacheMap;               
 typedef common::hash::ObHashMap<uint64_t, share::ObSequenceValue,
                                 common::hash::NoPthreadDefendMode> ObSequenceCurrvalMap;
 typedef common::hash::ObHashMap<common::ObString,
@@ -912,6 +918,7 @@ public:
   ObClientIdInfoEncoder &get_client_info_encoder() { return client_id_info_encoder_;}
   ObControlInfoEncoder &get_control_info_encoder() { return control_info_encoder_;}
   ObContextsMap &get_contexts_map() { return contexts_map_; }
+  ObPyUdfFunCacheMap &get_pyudf_funcache_map() { return pyudf_funcache_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
   int update_sess_sync_info(const SessionSyncInfoType sess_sync_info_type,
                                 const char *buf, const int64_t length, int64_t &pos);
@@ -1120,6 +1127,9 @@ private:
   ObPackageStateMap package_state_map_;
   ObSequenceCurrvalMap sequence_currval_map_;
   ObContextsMap contexts_map_;
+public:
+  ObPyUdfFunCacheMap pyudf_funcache_map_;
+private:
   int64_t curr_session_context_size_;
 
   pl::ObPLContext *pl_context_;
