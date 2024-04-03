@@ -452,6 +452,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   name = name.substr(0, info->udf_meta_.name_.length());
   std::string pyfun_handler = name.append("_pyfun");
   // 加载对应的funcache
+  bool useCache=false;
   bool isFuncacheNew=false;
   ObSQLSessionInfo* session=ctx.exec_ctx_.get_my_session();
   ObPyUdfFunCacheMap &funcache_map = session->get_pyudf_funcache_map();
@@ -537,6 +538,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   
   // 遍历构建input数组
   ObDatum *argDatum = NULL;
+  if(useCache){
   for(int i=0;i<expr.arg_cnt_; i++){
     argDatum = expr.args_[i]->locate_batch_datums(ctx);
     int j = 0, zero = 0;
@@ -623,6 +625,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           real_param--;
       }
     }
+  }
   }
   //Ensure GIL
   bool nStatus = PyGILState_Check();
@@ -797,7 +800,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
         results[j].set_int(tmp);
         // set funCache
-        single_func_map->set_refactored(ObString((*input)[j].size(),(*input)[j].c_str()),tmp);
+        if(useCache)
+          single_func_map->set_refactored(ObString((*input)[j].size(),(*input)[j].c_str()),tmp);
       }
       break;
     }
