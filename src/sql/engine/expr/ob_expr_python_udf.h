@@ -76,7 +76,13 @@ public:
   common::ObIAllocator &allocator_;
   share::schema::ObPythonUDFMeta udf_meta_;
   int predict_size;
-  double best_effi;
+  //double best_effi;
+  double tps_s;
+  double lambda; // batch size increase percentage 𝜆
+  double alpha; // tps* decrease speed
+  int round;
+  int round_limit; // rounds of stoping batch size motification
+  int delta; // delta batch size
 };
 } /* namespace sql */
 } /* namespace oceanbase */

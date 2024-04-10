@@ -442,7 +442,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   int ret = OB_SUCCESS;
   
   // 开始统计时间
-  struct timeval t1,t2;
+  struct timeval t1, t2, t3, t4, t5, t6;
   double timeuse;
   gettimeofday(&t1, NULL);
 
@@ -535,7 +535,10 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     goto destruction;
   }
 
+  gettimeofday(&t2, NULL);
+
   int k;
+  int ret_size;
   //传递udf运行时参数
   for (int i = 0;i < expr.arg_cnt_;i++) {
     k = 0;
@@ -615,16 +618,21 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     arrays[i] = numpyarray;
   }
 
+  gettimeofday(&t3, NULL);
+
   //执行Python Code并获取返回值
   pResult = PyObject_CallObject(pFunc, pArgs);
-  if(!pResult){
+  if (!pResult) {
     process_python_exception();
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("execute error", K(ret));
     goto destruction;
   }
 
+  gettimeofday(&t4, NULL);
+
   //根据类型从numpy数组中取出返回值并填入返回值
+  ret_size = PyArray_SIZE((PyArrayObject *)pResult);
   k = 0;
   switch (expr.datum_meta_.type_)
   {
@@ -634,7 +642,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     case ObTextType:
     case ObMediumTextType:
     case ObLongTextType: {
-      for (int j = 0; j < batch_size; j++) {
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_string(common::ObString(PyUnicode_AsUTF8(
@@ -647,7 +655,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     case ObMediumIntType:
     case ObInt32Type:
     case ObIntType: {
-      for (int j = 0; j < batch_size; j++) {
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_int(PyLong_AsLong(
@@ -656,7 +664,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       break;
     }
     case ObDoubleType:{
-      for (int j = 0; j < batch_size; j++) {
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_double(PyFloat_AsDouble(
@@ -677,45 +685,98 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       goto destruction;
     }
   }
-  
+  gettimeofday(&t5, NULL);
 
   //释放资源
   destruction:
   //释放运行时变量
-  Py_XDECREF(pArgs);
   Py_XDECREF(pKwargs);
   //释放函数参数
   for (int i = 0; i < expr.arg_cnt_; i++) {
-    if(OB_ISNULL(arrays[i]))
+    if(arrays[i] == NULL)
       continue;
     else
       PyArray_XDECREF((PyArrayObject *)arrays[i]);
   }
+  Py_XDECREF(pArgs);
   //释放计算结果
   if(pResult != NULL) {
     PyArray_XDECREF((PyArrayObject *)pResult);
     Py_XDECREF(pResult);
   }
 
-  PyGC_Enable();
-  PyGC_Collect();
+  //PyGC_Enable();
+  //PyGC_Collect();
 
   //release GIL
   if(nStatus)
     PyGILState_Release(gstate);
-
-  // 计算运行时间，调整predict size
-  gettimeofday(&t2, NULL);
-  timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec);
-  double current_effi = timeuse / real_param;
-  if (info->best_effi == 0) {
-    info->best_effi = current_effi;
-    info->predict_size += 256;
-  } else if (real_param == info->predict_size && current_effi < 0.9 * info->best_effi) { // 阈值为10% 且 目前计算数量与给定batch size相符
-    info->best_effi = current_effi;
-    info->predict_size += 256;
+  gettimeofday(&t6, NULL);
+  
+  // 计算运行时间，调整predict size | pjx
+  /*gettimeofday(&t6, NULL);
+  timeuse = (t6.tv_sec - t1.tv_sec) * 1000000 + (double)(t6.tv_usec - t1.tv_usec); // usec
+  double tps = real_param * 1000000 / timeuse; // current tuples per sec
+  if (info->tps_s == 0) { // 初始化
+    info->tps_s = tps;
+    info->predict_size += info->delta; // 尝试调整
+  } else if (info->round > info->round_limit || real_param != info->predict_size) { //超过轮次，停止调整batch size
+    // do nothing
+  } else if (tps > (1 + info->lambda) * info->tps_s) { 
+    // 提升阈值λ为10% 且 目前计算数量与给定batch size相符，重置轮次
+    info->tps_s = tps;
+    info->predict_size += info->delta;
+    info->round = 0;
+  } else if (tps < info->tps_s * (1 - 0.0)) { // 未达到阈值， 且差距较大 ，减小到达阈值的难度，提升轮次
+    // 降低阈值σ
+    info->tps_s = (1 - info->alpha) * info->tps_s + info->alpha * tps; // 平滑系数α
+    info->round++;
+  }*/
+  
+  // 计算运行时间，调整predict size | zcy
+  bool start_query = false;
+  gettimeofday(&t6, NULL);
+  timeuse = (t6.tv_sec - t1.tv_sec) * 1000000 + (double)(t6.tv_usec - t1.tv_usec); // usec
+  double tps = real_param * 1000000 / timeuse; // current tuples per sec
+  if (info->tps_s == 0) { // 初始化
+    info->tps_s = tps;
+    info->predict_size += info->delta; // 尝试调整
+    start_query = true;
+  } else if (info->round > info->round_limit || real_param != info->predict_size) { //超过轮次，停止调整batch size 或 不符合predict size
+    // do nothing
+  } else if (tps > info->tps_s) { 
+    // 提升阈值λ为10% 且 目前计算数量与给定batch size相符，进行调整
+    if (tps < (1 + info->lambda) * info->tps_s)
+      info->round++;
+    info->tps_s = tps;
+    info->predict_size += info->delta;
+  } else { //tps <= info->tps_s
+    // 未达到阈值
+    info->tps_s = (1 - info->alpha) * info->tps_s + info->alpha * tps; // 平滑系数α
+    if (tps > (1 - info->lambda) * info->tps_s)
+      info->round++;
   }
-
+  
+  // 插桩 记录运行时间
+  double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
+  std::string file_name("/home/test/log/");
+  file_name.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
+  file_name.append(".log");
+  std::fstream f;
+  f.open(file_name, std::ios::out | std::ios::app); // 追加写入
+  if (start_query)
+    f << "Start a new Query!" << std::endl;
+  f << "inference batch size: " << real_param << std::endl;
+  f << "execution time: " << timeuse/1000 << " ms" << std::endl;
+  f << "pre process time: " << (t2.tv_sec - t1.tv_sec) * 1000 + (double)(t2.tv_usec - t1.tv_usec) / 1000 << " ms" << std::endl;
+  f << "ob_py transformation time: " << (t3.tv_sec - t2.tv_sec) * 1000 + (double)(t3.tv_usec - t2.tv_usec) / 1000 << " ms" << std::endl;
+  f << "inference time: " << inference_time << " ms" << std::endl;
+  f << "py_ob transformation time: " << (t5.tv_sec - t4.tv_sec) * 1000 + (double)(t5.tv_usec - t4.tv_usec) / 1000 << " ms" << std::endl;
+  f << "after process time: " << (t6.tv_sec - t5.tv_sec) * 1000 + (double)(t6.tv_usec - t5.tv_usec) / 1000 << " ms" << std::endl;
+  f << "tuples per second: " << tps << std::endl;
+  f << "tps* : " << info->tps_s << std::endl;
+  f << std::endl;
+  f.close();
   return ret;
 }
 
@@ -755,11 +816,18 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
 
 //异常输出
 void ObExprPythonUdf::message_error_dialog_show(char* buf) {
-  std::ofstream ofile;
-  if(ofile) {
-      ofile.open("/home/test/log/expedia/log", std::ios::out);
+  const char* folder_dir = "/home/obtest/log/";
+  if (access(folder_dir, 0) == -1) {
+    // 不存在该文件夹则创建
+    mkdir(folder_dir, S_IRWXU);
+  } else {
+    // 存在该文件夹则写入异常信息
+    std::ofstream ofile;
+    if (ofile) {
+      ofile.open("/home/obtest/log/python_error", std::ios::out);
       ofile << buf;
       ofile.close();
+    }
   }
   return;
 }
@@ -815,8 +883,14 @@ int ObPythonUdfInfo::from_raw_expr(const ObPythonUdfRawExpr &raw_expr)
 {
   int ret = OB_SUCCESS;
   OZ(ObExprPythonUdf::deep_copy_udf_meta(udf_meta_, allocator_, raw_expr.get_udf_meta()));
+  //predict_size = 4096; // max
   predict_size = 256; //default
-  best_effi = 0; // default
+  tps_s = 0; // init
+  round = 0; // init
+  lambda = 0.1;
+  alpha = 0.25;
+  delta = 256;
+  round_limit = 10;
   return ret;
 }
 
