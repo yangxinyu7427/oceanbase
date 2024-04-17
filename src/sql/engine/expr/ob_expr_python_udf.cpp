@@ -280,7 +280,9 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
-  PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
+  ObEvalCtx::TempAllocGuard alloc_guard(ctx);
+  ObIAllocator &tmp_alloc = alloc_guard.get_allocator(); 
+  PyObject **arrays = (PyObject **)tmp_alloc.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
   npy_intp elements[1] = {1};
@@ -499,18 +501,30 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   _import_array(); 
 
   //运行时变量
+  ObEvalCtx::TempAllocGuard alloc_guard(ctx);
+  ObIAllocator &tmp_alloc = alloc_guard.get_allocator(); 
+  //tmp_alloc.reset();
+  PyObject **arrays = (PyObject **)tmp_alloc.alloc(sizeof(PyObject *) * expr.arg_cnt_);
+  //PyObject **arrays = (PyObject **)ctx.allocator_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
+  //PyObject **arrays = new PyObject* [expr.arg_cnt_];
+  if (arrays == nullptr) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to allocate numpy arrays", K(ret));
+    return ret;
+  } else {
+    for(int i = 0; i < expr.arg_cnt_; i++)
+      arrays[i] = NULL;
+  }
+
   PyObject *pModule = NULL;
   PyObject *pFunc = NULL;
   PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
   PyObject *pKwargs = PyDict_New();
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
-  PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
-  for(int i = 0; i < expr.arg_cnt_; i++)
-    arrays[i] = NULL;
   npy_intp elements[1] = {real_param}; // row size
   ObDatum *argDatum = NULL;
-
+  
   /*if(info->udf_meta_.init_) {
   } else if (OB_FAIL(import_udf(info->udf_meta_))) {
     ret = OB_ERR_UNEXPECTED;
@@ -695,9 +709,13 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   for (int i = 0; i < expr.arg_cnt_; i++) {
     if(arrays[i] == NULL)
       continue;
-    else
+    else {
       PyArray_XDECREF((PyArrayObject *)arrays[i]);
+      //arrays[i] = NULL;
+    }
   }
+  //arrays = NULL;
+  //delete[] arrays;
   Py_XDECREF(pArgs);
   //释放计算结果
   if(pResult != NULL) {
@@ -758,7 +776,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   }
   
   // 插桩 记录运行时间
-  double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
+  /*double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
   std::string file_name("/home/test/log/");
   file_name.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
   file_name.append(".log");
@@ -776,7 +794,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   f << "tuples per second: " << tps << std::endl;
   f << "tps* : " << info->tps_s << std::endl;
   f << std::endl;
-  f.close();
+  f.close();*/
   return ret;
 }
 
