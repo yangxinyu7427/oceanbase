@@ -475,28 +475,10 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       ret = OB_SUCCESS;
     }
   }
-  // test hash
-  // std::string str1="hello";
-  // std::string str2="hello";
-  // std::string str3="hello";
-  // uint64_t hash1 = murmurhash(str1.c_str(), str1.size(), 0);
-  // uint64_t hash2 = murmurhash(str2.c_str(), str2.size(), 0);
-  // uint64_t hash3 = murmurhash(str3.c_str(), str3.size(), 0);
-  // uint64_t hash1_1 = murmurhash(str1.c_str(), str1.size(), 0);
-  // uint64_t hash2_1 = murmurhash(str2.c_str(), str2.size(), 0);
-  // uint64_t hash3_1 = murmurhash(str3.c_str(), str3.size(), 0);
-  // ObString obstr1="hello";
-  // ObString obstr2="hello";
-  // ObString obstr3="hello";
-  // uint64_t obhash1 = murmurhash(obstr1.ptr(), obstr1.size(), 0);
-  // uint64_t obhash2 = murmurhash(obstr2.ptr(), obstr2.size(), 0);
-  // uint64_t obhash3 = murmurhash(obstr3.ptr(), obstr3.size(), 0);
-  // uint64_t obhash1_1 = murmurhash(obstr1.ptr(), obstr1.size(), 0);
-  // uint64_t obhash2_1 = murmurhash(obstr2.ptr(), obstr2.size(), 0);
-  // uint64_t obhash3_1 = murmurhash(obstr3.ptr(), obstr3.size(), 0);
+
 
   // 创建缓存入参和结果对应的数组
-  std::vector<std::string>* input=new std::vector<std::string>(batch_size,"");
+  std::vector<std::string> input=std::vector<std::string>(batch_size,"");
   //std::vector<bool> output(batch_size);
 
   //返回值
@@ -561,7 +543,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             //str in OB
             ObString str = argDatum[*index].get_string();
             // put str into input array(funcache)
-            (*input)[j].append(std::string(str.ptr(), str.length()));
+            input[j].append(std::string(str.ptr(), str.length()));
           }
         }
         break;
@@ -578,11 +560,11 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           if(expr.args_[i]->is_const_expr()&&!expr.args_[i]->is_batch_result()){
             int tmp2=argDatum[0].get_int();
             // put str into input array(funcache)
-            (*input)[j].append(std::to_string(tmp2));
+            input[j].append(std::to_string(tmp2));
           }else{
             int tmp3=argDatum[j].get_int();
             // put str into input array(funcache)
-            (*input)[j].append(std::to_string(tmp3));
+            input[j].append(std::to_string(tmp3));
           }
           
         }
@@ -594,7 +576,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             continue;
           else{
             double tmp = argDatum[*index].get_double();
-            (*input)[j].append(std::to_string(tmp));
+            input[j].append(std::to_string(tmp));
           }
         }
         break;
@@ -611,9 +593,14 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     for(int i=0;i<batch_size;i++){
       if (my_skip.at(i) || eval_flags.at(i))
         continue;
-      ObString tmp=ObString((*input)[i].size(),(*input)[i].c_str());
-      uint64_t obhash1 = murmurhash(tmp.ptr(), tmp.size(), 0);
-      uint64_t hash1 = murmurhash((*input)[i].c_str(), (*input)[i].size(), 0);
+
+      const char* cstr = input[i].c_str();
+      // 获取字符串长度
+      size_t length = input[i].size();
+      // 分配内存并复制字符串内容
+      char* tmp = new char[length + 1];
+      std::memcpy(tmp, cstr, length + 1);
+
       int res;
       if(OB_FAIL(single_func_map->get_refactored(tmp,res))){
         if(OB_HASH_NOT_EXIST == ret)
@@ -624,6 +611,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           eval_flags.set(i);
           real_param--;
       }
+      delete[] tmp;
     }
   }
   }
@@ -800,8 +788,15 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
         results[j].set_int(tmp);
         // set funCache
-        if(useCache)
-          single_func_map->set_refactored(ObString((*input)[j].size(),(*input)[j].c_str()),tmp);
+        if(useCache){
+          const char* cstr = input[j].c_str();
+          // 获取字符串长度
+          size_t length = input[j].size();
+          // 分配内存并复制字符串内容
+          char* newStr = new char[length + 1];
+          std::memcpy(newStr, cstr, length + 1);
+          single_func_map->set_refactored(newStr,tmp);
+        }
       }
       break;
     }

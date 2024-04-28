@@ -316,7 +316,7 @@ DEF_SESSION_TXN_ENCODER(ObTxnExtraInfoEncoder);
 typedef common::hash::ObHashMap<uint64_t, pl::ObPLPackageState *,
                                 common::hash::NoPthreadDefendMode> ObPackageStateMap;
 
-typedef common::hash::ObHashMap<common::ObString, int,
+typedef common::hash::ObHashMap<char*, int,
                                 common::hash::NoPthreadDefendMode> ObSinglePyUdfFunCacheMap; 
 
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,

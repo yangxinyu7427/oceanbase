@@ -34,7 +34,9 @@ std::map<ObItemType, string> predicate_map={
   {T_OP_GE,"GreaterOrEqual"},
   {T_OP_LT,"Less"},
   {T_OP_LE,"LessOrEqual"},
-  {T_OP_EQ,"Equal"}
+  {T_OP_EQ,"Equal"},
+  {T_OP_ADD,"Add"},
+  {T_OP_MUL,"Mul"}
 };
 std::map<ObItemType, ObItemType> predicate_opposite_map={
   {T_OP_OR,T_OP_OR},
@@ -43,7 +45,9 @@ std::map<ObItemType, ObItemType> predicate_opposite_map={
   {T_OP_GE,T_OP_LE},
   {T_OP_LT,T_OP_GT},
   {T_OP_LE,T_OP_GE},
-  {T_OP_EQ,T_OP_EQ}
+  {T_OP_EQ,T_OP_EQ},
+  {T_OP_ADD,T_OP_ADD},
+  {T_OP_MUL,T_OP_MUL}
 };
 
 ObTransformPyUDFMerge::ObTransformPyUDFMerge(ObTransformerCtx *ctx)
