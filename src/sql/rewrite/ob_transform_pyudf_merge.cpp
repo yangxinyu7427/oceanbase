@@ -67,6 +67,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
   ObSelectStmt *select_stmt = NULL;
   string onnx_model_opted_path;
+  ObSEArray<ObString, 4> merged_udf_name_list;
   if (OB_ISNULL(stmt) || OB_ISNULL(ctx_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("stmt is null", K(ret), K(stmt), K(ctx_));
@@ -80,9 +81,9 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
+  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
+  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } 
   else{
@@ -95,7 +96,8 @@ int ObTransformPyUDFMerge::transform_one_stmt(
 
 int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   ObIArray<ObRawExpr *> &src_exprs,
-  string& out_path)
+  string& out_path,
+  ObIArray<ObString> &merged_udf_name_list)
 {
   int ret = OB_SUCCESS;
   // 辅助获取model前缀
@@ -112,6 +114,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   }
 
   // 对每个包含python udf的表达式树的根节点进行修改
+  // udf_input_count是原始udf的输入数量
   int udf_input_count;
   std::vector<string> prefix_list;
   ObSEArray<ObRawExpr *, 4> expr_opted_list;
@@ -189,6 +192,10 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     }
   }
   ObRawExpr* expr=expr_opted_list.at(0);
+  // 
+  ObPythonUdfRawExpr* python_udf_expr=static_cast<ObPythonUdfRawExpr*>(expr);
+  python_udf_expr->set_udf_meta_merged_udf_name_list(merged_udf_name_list);
+  python_udf_expr->set_udf_meta_origin_input_count(udf_input_count);
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
   }
@@ -507,7 +514,8 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
 
 int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
   ObIArray<ObRawExpr *> &src_exprs,
-  string& out_path)
+  string& out_path,
+  ObIArray<ObString> &merged_udf_name_list)
 {
   int ret = OB_SUCCESS;
   ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
@@ -516,6 +524,10 @@ int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
     LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
   } else if(OB_FAIL(merge_onnx_model_from_python_udf_expr_list(out_path, python_udf_expr_list))){
     LOG_WARN("merge_onnx_model_from_python_udf_expr_list fail", K(ret));
+  }
+  // 记录被融合的udf的名字，存入merged_udf_name_list中
+  for(int i=0;i<python_udf_expr_list.count();i++){
+    merged_udf_name_list.push_back(python_udf_expr_list.at(i)->get_udf_meta().name_);
   }
   return ret;
 }

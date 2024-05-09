@@ -119,7 +119,7 @@ class ObPythonUDFMeta
   OB_UNIS_VERSION_V(1);
 public :
   ObPythonUDFMeta() : name_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), 
-                      udf_attributes_names_(), udf_attributes_types_(), init_(false) {} 
+                      udf_attributes_names_(), udf_attributes_types_(), init_(false), ismerged_(false), merged_udf_names_(), origin_input_count_(0) {} 
   virtual ~ObPythonUDFMeta() = default;
 
   void assign(const ObPythonUDFMeta &other) { 
@@ -129,6 +129,9 @@ public :
     udf_attributes_names_ = other.udf_attributes_names_;
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
+    ismerged_=other.ismerged_;
+    merged_udf_names_=other. merged_udf_names_;
+    origin_input_count_=other.origin_input_count_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
@@ -138,6 +141,9 @@ public :
     udf_attributes_names_ = other.udf_attributes_names_;
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
+    ismerged_=other.ismerged_;
+    merged_udf_names_=other. merged_udf_names_;
+    origin_input_count_=other.origin_input_count_;
     return *this;
   }
 
@@ -146,7 +152,10 @@ public :
                K_(pycall),
                K_(udf_attributes_names),
                K_(udf_attributes_types),
-               K_(init));
+               K_(init),
+               K_(ismerged),
+               K_(merged_udf_names),
+               K_(origin_input_count));
 
   common::ObString name_; //函数名
   ObPythonUDF::PyUdfRetType ret_; //返回值类型
@@ -154,6 +163,9 @@ public :
   common::ObSEArray<common::ObString, 16> udf_attributes_names_; //参数名称
   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
   bool init_; //是否已初始化
+  bool ismerged_;//是否经查询内冗余消除融合
+  common::ObSEArray<common::ObString, 16> merged_udf_names_; //融合的udf名
+  int origin_input_count_; //初始udf的input数
 };
 
 }

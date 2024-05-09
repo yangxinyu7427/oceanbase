@@ -451,6 +451,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   std::string pyfun_handler = name.append("_pyfun");
+  bool is_merged_udf=info->udf_meta_.ismerged_;
+  common::ObSEArray<common::ObString, 16> merged_udf_names_list=info->udf_meta_.merged_udf_names_;
   // 加载对应的funcache
   bool useCache=false;
   bool isFuncacheNew=false;
@@ -458,7 +460,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   ObPyUdfFunCacheMap &funcache_map = session->get_pyudf_funcache_map();
   ObString udf_name=info->udf_meta_.name_;
   ObSinglePyUdfFunCacheMap* single_func_map;
-  if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
+  common::ObSEArray<ObSinglePyUdfFunCacheMap*,4> funcache_map_list;
+  if(!is_merged_udf){
+    if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
     if(OB_HASH_NOT_EXIST == ret){
       isFuncacheNew=true;
       // remember to delete!!!!
@@ -475,6 +479,30 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       ret = OB_SUCCESS;
     }
   }
+  }else{
+    // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
+    for(int i=0;i<merged_udf_names_list.count();i++){
+
+      if(OB_FAIL(funcache_map.get_refactored(merged_udf_names_list.at(i), single_func_map))){
+        if(OB_HASH_NOT_EXIST == ret){
+          single_func_map = new ObSinglePyUdfFunCacheMap();
+          if(OB_FAIL(single_func_map->create(hash::cal_next_prime(500000),
+                                          ObModIds::OB_HASH_BUCKET,
+                                          ObModIds::OB_HASH_NODE))){
+            LOG_WARN("new_single_func_map create fail", K(ret));
+          }else{
+            funcache_map.set_refactored(udf_name,single_func_map);
+          }
+          ret = OB_SUCCESS;
+        }else if(OB_HASH_EXIST == ret){
+          ret = OB_SUCCESS;
+        }
+      }
+      funcache_map_list.push_back(single_func_map);
+
+    }
+  }
+  
 
 
   // 创建缓存入参和结果对应的数组
@@ -521,7 +549,14 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   // 遍历构建input数组
   ObDatum *argDatum = NULL;
   if(useCache){
-  for(int i=0;i<expr.arg_cnt_; i++){
+  // 如果是mergedudf，构造input数组时只需要缓存原来udf的input列数
+  int input_num;
+  if(is_merged_udf)
+    input_num=info->udf_meta_.origin_input_count_;
+  else
+    input_num=expr.arg_cnt_;
+  
+  for(int i=0;i<input_num; i++){
     argDatum = expr.args_[i]->locate_batch_datums(ctx);
     int j = 0, zero = 0;
     int *index;
@@ -587,9 +622,10 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         ret = OB_ERR_UNEXPECTED;
       }
     }
+  
   }
   // 检查是否存在funcache,若存在就替换为缓存结果
-  if(!isFuncacheNew){
+  if(!isFuncacheNew&&!is_merged_udf){
     for(int i=0;i<batch_size;i++){
       if (my_skip.at(i) || eval_flags.at(i))
         continue;
@@ -614,6 +650,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       delete[] tmp;
     }
   }
+
   }
   //Ensure GIL
   bool nStatus = PyGILState_Check();
@@ -633,6 +670,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject *pKwargs = PyDict_New();
   PyObject *pResult = NULL;
   PyObject *numpyarray = NULL;
+  PyObject *resultarray = NULL;
   PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
@@ -750,14 +788,20 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   }
   if(real_param!=0){
       //执行Python Code并获取返回值
-  pResult = PyObject_CallObject(pFunc, pArgs);
-  if(!pResult){
+  resultarray = PyObject_CallObject(pFunc, pArgs);
+  if(!resultarray){
     process_python_exception();
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("execute error", K(ret));
     goto destruction;
   }
-
+  // 判断是普通list还是numpylist，如果是numpy list代表udf直接返回的结果列，那么就直接将其作为pResult，
+  // 如果是普通list，那么代表是经查询内冗余消除后返回的包含融合后的udf以及每个udf的结果的大的list
+  int isNumPyArray = PyArray_Check(resultarray);
+  if(isNumPyArray)
+    pResult = resultarray;
+  else
+    pResult = PyList_GetItem(resultarray, 0);
   //根据类型从numpy数组中取出返回值并填入返回值
   k = 0;
   switch (expr.datum_meta_.type_)
@@ -789,13 +833,18 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         results[j].set_int(tmp);
         // set funCache
         if(useCache){
-          const char* cstr = input[j].c_str();
-          // 获取字符串长度
-          size_t length = input[j].size();
-          // 分配内存并复制字符串内容
-          char* newStr = new char[length + 1];
-          std::memcpy(newStr, cstr, length + 1);
-          single_func_map->set_refactored(newStr,tmp);
+          if(!is_merged_udf){
+            const char* cstr = input[j].c_str();
+            // 获取字符串长度
+            size_t length = input[j].size();
+            // 分配内存并复制字符串内容
+            char* newStr = new char[length + 1];
+            std::memcpy(newStr, cstr, length + 1);
+            single_func_map->set_refactored(newStr,tmp);
+          }else{
+            // todo 存多个udf的输出到对应的funcache中
+          }
+          
         }
       }
       break;

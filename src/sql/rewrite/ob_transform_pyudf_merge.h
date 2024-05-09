@@ -37,10 +37,11 @@ public:
 
   virtual int push_predicate_into_onnx_model(
     ObIArray<ObRawExpr *> &src_exprs,
-    string& out_path);
+    string& out_path,
+    ObIArray<ObString> &merged_udf_name_list);
 
   virtual int merge_python_udf_expr_in_condition(
-    ObIArray<ObRawExpr *> &src_exprs,string& out_path);  
+    ObIArray<ObRawExpr *> &src_exprs,string& out_path,ObIArray<ObString> &merged_udf_name_list);  
 
   virtual int extract_python_udf_expr_in_condition(
     ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,

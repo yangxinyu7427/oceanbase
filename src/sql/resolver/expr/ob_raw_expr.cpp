@@ -4268,6 +4268,21 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDFMeta &src){
   return ret;
 }
 
+int ObPythonUdfRawExpr::set_udf_meta_merged_udf_name_list(ObIArray<ObString> &merged_udf_name_list){
+  int ret = OB_SUCCESS;
+  for(int i=0;i<merged_udf_name_list.count();i++){
+    udf_meta_.merged_udf_names_.push_back(merged_udf_name_list.at(i));
+  }
+  udf_meta_.ismerged_=true;
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_origin_input_count(int num){
+  int ret = OB_SUCCESS;
+  udf_meta_.origin_input_count_=num;
+  return ret;
+}
+
 bool ObPythonUdfRawExpr::inner_same_as(const ObRawExpr &expr,
                                        ObExprEqualCheckContext *check_context) const
 {

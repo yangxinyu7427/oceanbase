@@ -3463,6 +3463,8 @@ public:
   int set_udf_meta(share::schema::ObPythonUDF &udf);
   int set_udf_meta(share::schema::ObPythonUDFMeta &src);
   const share::schema::ObPythonUDFMeta &get_udf_meta() const { return udf_meta_; }
+  int set_udf_meta_merged_udf_name_list(ObIArray<ObString> &merged_udf_name_list);
+  int set_udf_meta_origin_input_count(int num);
   virtual bool inner_same_as(const ObRawExpr &expr,
                              ObExprEqualCheckContext *check_context = NULL) const override;
   virtual int get_name_internal(char *buf, const int64_t buf_len, int64_t &pos, ExplainType type) const override;

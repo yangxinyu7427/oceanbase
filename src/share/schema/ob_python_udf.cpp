@@ -156,7 +156,9 @@ OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     pycall_,
                     udf_attributes_names_,
                     udf_attributes_types_,
-                    init_);
+                    init_,
+                    ismerged_,
+                    merged_udf_names_);
 
 }// end schema
 }// end share
