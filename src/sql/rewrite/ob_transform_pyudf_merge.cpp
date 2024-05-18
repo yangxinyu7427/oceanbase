@@ -196,6 +196,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   ObPythonUdfRawExpr* python_udf_expr=static_cast<ObPythonUdfRawExpr*>(expr);
   python_udf_expr->set_udf_meta_merged_udf_name_list(merged_udf_name_list);
   python_udf_expr->set_udf_meta_origin_input_count(udf_input_count);
+  expr=python_udf_expr;
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
   }
@@ -527,7 +528,13 @@ int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
   }
   // 记录被融合的udf的名字，存入merged_udf_name_list中
   for(int i=0;i<python_udf_expr_list.count();i++){
-    merged_udf_name_list.push_back(python_udf_expr_list.at(i)->get_udf_meta().name_);
+    ObString tmpstring=python_udf_expr_list.at(i)->get_udf_meta().name_;
+    
+    char* tmp = new char[tmpstring.length()];
+    std::memcpy(tmp, tmpstring.ptr(), tmpstring.length());
+
+    ObString name=ObString(tmpstring.length(),tmp);
+    merged_udf_name_list.push_back(name);
   }
   return ret;
 }
