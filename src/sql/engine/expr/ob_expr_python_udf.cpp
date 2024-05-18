@@ -49,7 +49,9 @@ int ObExprPythonUdf::calc_result_typeN(ObExprResType &type,
   UNUSED(param_num);
   UNUSED(types_array);
   switch(udf_meta_.ret_) {
-  case share::schema::ObPythonUDF::PyUdfRetType::STRING : 
+  case share::schema::ObPythonUDF::PyUdfRetType::STRING :
+    type.set_collation_level(CS_LEVEL_SYSCONST);
+    type.set_default_collation_type(); 
     type.set_varchar();
     break;
   case share::schema::ObPythonUDF::PyUdfRetType::DECIMAL :
@@ -384,7 +386,7 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
     case ObTextType:
     case ObMediumTextType:
     case ObLongTextType: {
-      expr_datum.set_string(common::ObString(PyUnicode_AS_DATA(
+      expr_datum.set_string(common::ObString(PyUnicode_AsUTF8(
         PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, 0)))));
       break;
     }
@@ -462,7 +464,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   bool useCache=true;
   bool isFuncacheNew=false;
   ObSQLSessionInfo* session=ctx.exec_ctx_.get_my_session();
+  ObPythonUDF::PyUdfRetType ret_type=info->udf_meta_.ret_;
   ObPyUdfFunCacheMap &funcache_map = session->get_pyudf_funcache_map();
+  ObPyUdfStrFunCacheMap &str_funcache_map = session->get_pyudf_str_funcache_map();
   ObString udf_name=info->udf_meta_.name_;
     
   char* tmp = new char[udf_name.length()];
@@ -470,9 +474,55 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   udf_name=ObString(udf_name.length(),tmp);
 
   ObSinglePyUdfFunCacheMap* single_func_map;
+  ObSinglePyUdfStrFunCacheMap* single_str_func_map;
   //common::ObSEArray<ObSinglePyUdfFunCacheMap*,4> funcache_map_list;
   ObSinglePyUdfFunCacheMap* funcache_map_list[merged_udf_names_list.count()+1];
+  ObSinglePyUdfStrFunCacheMap* str_funcache_map_list[merged_udf_names_list.count()+1];
+  if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
   if(!is_merged_udf){
+    if(OB_FAIL(str_funcache_map.get_refactored(udf_name, single_str_func_map))){
+    if(OB_HASH_NOT_EXIST == ret){
+      isFuncacheNew=true;
+      // remember to delete!!!!
+      single_str_func_map = new ObSinglePyUdfStrFunCacheMap();
+      if(OB_FAIL(single_str_func_map->create(hash::cal_next_prime(500000),
+                                          ObModIds::OB_HASH_BUCKET,
+                                          ObModIds::OB_HASH_NODE))){
+        LOG_WARN("new_single_str_func_map create fail", K(ret));
+      }else{
+        str_funcache_map.set_refactored(udf_name,single_str_func_map);
+      }
+      ret = OB_SUCCESS;
+    }else if(OB_HASH_EXIST == ret){
+      ret = OB_SUCCESS;
+    }
+  }
+  }else{
+    // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
+    for(int i=0;i<merged_udf_names_list.count();i++){
+
+      if(OB_FAIL(str_funcache_map.get_refactored(merged_udf_names_list.at(i), single_str_func_map))){
+        if(OB_HASH_NOT_EXIST == ret){
+          ObString tmp=merged_udf_names_list.at(i);
+          single_str_func_map = new ObSinglePyUdfStrFunCacheMap();
+          if(OB_FAIL(single_str_func_map->create(hash::cal_next_prime(500000),
+                                          ObModIds::OB_HASH_BUCKET,
+                                          ObModIds::OB_HASH_NODE))){
+            LOG_WARN("new_single_str_func_map create fail", K(ret));
+          }else{
+            str_funcache_map.set_refactored(merged_udf_names_list.at(i),single_str_func_map);
+          }
+          ret = OB_SUCCESS;
+        }else if(OB_HASH_EXIST == ret){
+          ret = OB_SUCCESS;
+        }
+      }
+      //str_funcache_map_list.push_back(single_str_func_map);
+      str_funcache_map_list[i]=single_str_func_map;
+    }
+  }
+  }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+    if(!is_merged_udf){
     if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
     if(OB_HASH_NOT_EXIST == ret){
       isFuncacheNew=true;
@@ -513,6 +563,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       //funcache_map_list.push_back(single_func_map);
       funcache_map_list[i]=single_func_map;
     }
+  }
   }
   
 
@@ -638,7 +689,32 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   }
   // 检查是否存在funcache,若存在就替换为缓存结果
   if(!isFuncacheNew&&!is_merged_udf){
-    for(int i=0;i<batch_size;i++){
+    if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+      for(int i=0;i<batch_size;i++){
+      if (my_skip.at(i) || eval_flags.at(i))
+        continue;
+
+      const char* cstr = input[i].c_str();
+      // 获取字符串长度
+      size_t length = input[i].size();
+      // 分配内存并复制字符串内容
+      char* tmp = new char[length + 1];
+      std::memcpy(tmp, cstr, length + 1);
+
+      char* res;
+      if(OB_FAIL(single_str_func_map->get_refactored(tmp,res))){
+        if(OB_HASH_NOT_EXIST == ret)
+          ret=OB_SUCCESS;
+      }else{
+          results[i].set_string(ObString(strlen(res),res));
+          my_skip.set(i);
+          eval_flags.set(i);
+          real_param--;
+      }
+      delete[] tmp;
+    }
+    }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+      for(int i=0;i<batch_size;i++){
       if (my_skip.at(i) || eval_flags.at(i))
         continue;
 
@@ -661,6 +737,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       }
       delete[] tmp;
     }
+    }
+    
   }
 
   }
@@ -830,8 +908,37 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       for (int j = 0; j < batch_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
-        results[j].set_string(common::ObString(PyUnicode_AS_DATA(
-          PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)))));
+        ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
+        results[j].set_string(tmp);
+        // set funCache
+        if(useCache){
+          if(!is_merged_udf){
+            const char* cstr = input[j].c_str();
+            // 获取字符串长度
+            size_t length = input[j].size();
+            // 分配内存并复制字符串内容
+            char* newStr = new char[length + 1];
+            std::memcpy(newStr, cstr, length + 1);
+            // 分配内存并复制值字符串的内容
+            char* tmpValue = new char[tmp.length() + 1];
+            std::memcpy(tmpValue, tmp.ptr(), tmp.length() + 1);
+            single_str_func_map->set_refactored(newStr, tmpValue);
+          }else{
+            // todo 存多个udf的输出到对应的funcache中
+            for(int i=0;i<merged_udf_names_list.count();i++){
+              pOutputArray=PyList_GetItem(resultarray, i+1);
+              common::ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pOutputArray, (char *)PyArray_GETPTR1((PyArrayObject *)pOutputArray, k-1))));
+              const char* cstr = input[j].c_str();
+              size_t length = input[j].size();
+              char* newStr = new char[length + 1];
+              std::memcpy(newStr, cstr, length + 1);
+              //funcache_map_list.at(i)->set_refactored(newStr,tmp);
+              char* tmpValue = new char[tmp.length() + 1];
+              std::memcpy(tmpValue, tmp.ptr(), tmp.length() + 1);
+              str_funcache_map_list[i]->set_refactored(newStr,tmpValue);
+            }
+          }
+        }
       }
       break;
     }
