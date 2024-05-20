@@ -1041,8 +1041,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   // }
   // Py_XDECREF(resultarray);
 
-  PyGC_Enable();
-  PyGC_Collect();
+  // PyGC_Enable();
+  // PyGC_Collect();
   
   //release GIL
   if(nStatus)
