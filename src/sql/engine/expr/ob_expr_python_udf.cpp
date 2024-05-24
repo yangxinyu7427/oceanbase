@@ -1041,8 +1041,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   // }
   // Py_XDECREF(resultarray);
 
-  PyGC_Enable();
-  PyGC_Collect();
+  // PyGC_Enable();
+  // PyGC_Collect();
   
   //release GIL
   if(nStatus)
@@ -1060,6 +1060,93 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     info->predict_size += 256;
   }
 
+    // 插桩 记录运行时间
+  double runtime = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec);
+  //double inference_time = (t2.tv_sec - t1.tv_sec) * 1000 + (double)(t2.tv_usec - t1.tv_usec) / 1000;
+  double currentTimeValue = 0.0;
+  int currentBatchAllValue = 0;
+  int currentBatchRealValue = 0;
+  std::string file_name_time("/home/udf_time/");
+  file_name_time.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
+  file_name_time.append(".log");
+
+  std::string file_name_all("/home/udf_batch_all/");
+  file_name_all.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
+  file_name_all.append(".log");
+
+  std::string file_name_real("/home/udf_batch_real/");
+  file_name_real.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
+  file_name_real.append(".log");
+  // std::fstream f_time;
+  // f_time.open(file_name_time, std::ios::out | std::ios::app); // 追加写入
+  // f_time << "inference batch size: " << real_param << std::endl;
+  // 运行时间
+  std::ifstream infile_run(file_name_time);
+  if (infile_run.is_open()) {
+    std::fstream file(file_name_time, std::ios::in | std::ios::out);
+    file >> currentTimeValue;
+    double newValue = currentTimeValue + runtime/1000;
+    // file.seekp(0, std::ios::beg);
+    // file << newValue;
+    // file.flush();
+    // file.close();
+    std::ofstream outfile(file_name_time, std::ios::out | std::ios::trunc);
+    outfile << newValue;
+    outfile.close();
+  } else {
+    std::ofstream outfile(file_name_time);
+    double initialValue = runtime/1000; 
+    outfile << initialValue;
+    outfile.close();
+  }
+  //总批数
+  std::ifstream infile_all(file_name_all);
+  if (infile_all.is_open()) {
+    std::fstream file(file_name_all, std::ios::in | std::ios::out);
+    file >> currentBatchAllValue;
+    double newValue = currentBatchAllValue + batch_size;
+    // file.seekp(0, std::ios::beg);
+    // file << newValue;
+    // file.flush();
+    // file.close();
+    std::ofstream outfile(file_name_all, std::ios::out | std::ios::trunc);
+    outfile << newValue;
+    outfile.close();
+  } else {
+    std::ofstream outfile(file_name_all);
+    double initialValue = batch_size; 
+    outfile << initialValue;
+    outfile.close();
+  }
+  //实际批数
+  std::ifstream infile_real(file_name_real);
+  if (infile_real.is_open()) {
+    std::fstream file(file_name_real, std::ios::in | std::ios::out);
+    file >> currentBatchRealValue;
+    double newValue = currentBatchRealValue + real_param;
+    // file.seekp(0, std::ios::beg);
+    // file << newValue;
+    // file.flush();
+    // file.close();
+    std::ofstream outfile(file_name_real, std::ios::out | std::ios::trunc);
+    outfile << newValue;
+    outfile.close();
+  } else {
+    std::ofstream outfile(file_name_real);
+    double initialValue = real_param; 
+    outfile << initialValue;
+    outfile.close();
+  }
+  
+  // f << "pre process time: " << (t2.tv_sec - t1.tv_sec) * 1000 + (double)(t2.tv_usec - t1.tv_usec) / 1000 << " ms" << std::endl;
+  // f << "ob_py transformation time: " << (t3.tv_sec - t2.tv_sec) * 1000 + (double)(t3.tv_usec - t2.tv_usec) / 1000 << " ms" << std::endl;
+  // f << "inference time: " << inference_time << " ms" << std::endl;
+  // f << "py_ob transformation time: " << (t5.tv_sec - t4.tv_sec) * 1000 + (double)(t5.tv_usec - t4.tv_usec) / 1000 << " ms" << std::endl;
+  // f << "after process time: " << (t6.tv_sec - t5.tv_sec) * 1000 + (double)(t6.tv_usec - t5.tv_usec) / 1000 << " ms" << std::endl;
+  // f << "tuples per second: " << tps << std::endl;
+  // f << "tps* : " << info->tps_s << std::endl;
+  // f << std::endl;
+  // f.close();
   return ret;
 }
 

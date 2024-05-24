@@ -25,7 +25,7 @@ ObPythonUDFOp::ObPythonUDFOp(
   
   use_input_buf_ = true;
   use_output_buf_ = true;
-  use_fake_frame_ = true;
+  use_fake_frame_ = false;
   if (predict_size_ > MY_SPEC.max_batch_size_)
     use_fake_frame_ = true;
   else

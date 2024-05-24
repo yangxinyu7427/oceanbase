@@ -113,6 +113,7 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
   } else {
     //remove select items
     sub_stmt->get_select_items().reset();
+    sub_stmt->get_order_items().reset();
     //remove limit exprs
     sub_stmt->set_limit_offset(NULL, NULL);
     ObRawExpr *limit_percent_expr = sub_stmt->get_limit_percent_expr();
@@ -152,7 +153,7 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
     select_stmt->get_joined_tables().reset();
     select_stmt->get_from_items().reset();
     select_stmt->get_having_exprs().reset();
-    select_stmt->get_order_items().reset();
+    //select_stmt->get_order_items().reset();
     select_stmt->get_group_exprs().reset();
     select_stmt->get_rollup_exprs().reset();
     select_stmt->get_column_items().reset();
