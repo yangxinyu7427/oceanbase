@@ -84,13 +84,27 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } 
+  } else if(optimize_on_merged_onnx_model(onnx_model_opted_path)){
+    LOG_WARN("optimize_on_merged_model fail", K(ret));
+  }
   else{
     trans_happened = true;
     stmt = select_stmt;
   }
   return ret;  
 
+}
+
+int ObTransformPyUDFMerge::optimize_on_merged_onnx_model(string& out_path)
+{
+  int ret = OB_SUCCESS;
+  try{
+        optimize_on_merged_model(out_path,out_path);
+      } catch(...){
+        LOG_WARN("optimize_with_model_path fail");
+        ret=OB_ERROR;
+      }
+  return ret;
 }
 
 int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
@@ -581,7 +595,8 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
       string pre2=prefix_list.at(i);
       count++;
       try{
-        optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+        // optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+        merge_with_model_path(path1,path2,pre1,pre2,out_path);
       } catch(...){
         LOG_WARN("optimize_with_model_path fail");
         ret=OB_ERROR;
@@ -592,7 +607,8 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
       string path2=model_path_list.at(i);
       string pre2=prefix_list.at(i);
       try{
-        optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+        // optimize_with_model_path(path1,path2,pre1,pre2,out_path);
+        merge_with_model_path(path1,path2,pre1,pre2,out_path);
       } catch(...){
         LOG_WARN("optimize_with_model_path fail");
         ret=OB_ERROR;
