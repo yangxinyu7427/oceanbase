@@ -26,14 +26,14 @@ namespace schema
 {
 
 ObPythonUDF::ObPythonUDF(common::ObIAllocator *allocator)
-    : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
+    : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), model_name_(), arg_num_(0), arg_names_(), arg_types_(),
       ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();
 }
 
 ObPythonUDF::ObPythonUDF(const ObPythonUDF &src_schema)
-    : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), model_name_(), arg_num_(0), arg_names_(), arg_types_(),
       ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();

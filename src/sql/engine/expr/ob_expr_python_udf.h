@@ -47,6 +47,9 @@ public:
 
   static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
 
+  static int eval_python_udf_batch_pyobject(const ObExpr &expr, ObEvalCtx &ctx,
+                                            const ObBitVector &skip, const int64_t batch_size);
+
   static int eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                  const ObBitVector &skip, const int64_t batch_size);
 
@@ -76,7 +79,13 @@ public:
   common::ObIAllocator &allocator_;
   share::schema::ObPythonUDFMeta udf_meta_;
   int predict_size;
-  double best_effi;
+  //double best_effi;
+  double tps_s;
+  double lambda; // batch size increase percentage 𝜆
+  double alpha; // tps* decrease speed
+  int round;
+  int round_limit; // rounds of stoping batch size motification
+  int delta; // delta batch size
 };
 } /* namespace sql */
 } /* namespace oceanbase */

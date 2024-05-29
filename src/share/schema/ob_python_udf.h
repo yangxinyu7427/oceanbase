@@ -41,7 +41,7 @@ public:
     };
 
 public:
-    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), 
+    ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), model_name_(), arg_num_(0), arg_names_(), 
                     arg_types_(), ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
                     { reset(); };
     explicit ObPythonUDF(common::ObIAllocator *allocator);
@@ -57,6 +57,7 @@ public:
     inline void set_tenant_id(const uint64_t id) { tenant_id_ = id; }
     inline void set_udf_id(const uint64_t id) { udf_id_ = id; }
     inline int set_name(const common::ObString &name) { return deep_copy_str(name, name_); }
+    inline int set_model_name(const common::ObString &model_name) { return deep_copy_str(model_name, model_name_); }
     inline void set_ret(const enum PyUdfRetType ret) { ret_ = ret; }
     inline void set_ret(const int ret) { ret_ = PyUdfRetType(ret); }
     inline void set_arg_num(const int arg_num) { arg_num_ = arg_num; }
@@ -70,6 +71,8 @@ public:
     inline uint64_t get_udf_id() const { return udf_id_; }
     inline const char *get_name() const { return extract_str(name_); }
     inline const common::ObString &get_name_str() const { return name_; }
+    inline const char *get_model_name() const { return extract_str(model_name_); }
+    inline const common::ObString &get_model_name_str() const { return model_name_; }
     inline int get_arg_num() const { return arg_num_; }
     const char *get_arg_names() const { return extract_str(arg_names_); }
     inline const common::ObString &get_arg_names_str() const { return arg_names_; }
@@ -93,6 +96,7 @@ public:
     TO_STRING_KV(K_(tenant_id),
                  K_(udf_id),
                  K_(name),
+                 K_(model_name),
                  K_(arg_num),
                  K_(arg_names),
                  K_(arg_types),
@@ -104,6 +108,7 @@ public:
     uint64_t tenant_id_;
     uint64_t udf_id_;
     common::ObString name_;
+    common::ObString model_name_;
     int arg_num_; //参数数量
     common::ObString arg_names_; //参数名称
     common::ObString arg_types_; //参数类型
