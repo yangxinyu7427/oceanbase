@@ -439,6 +439,325 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   return ret;
 }
 
+int ObExprPythonUdf::eval_python_udf_batch_pyobject(const ObExpr &expr, ObEvalCtx &ctx,
+                                                    const ObBitVector &skip, const int64_t batch_size) {
+  int ret = OB_SUCCESS;
+  
+  // 开始统计时间
+  struct timeval t1, t2, t3, t4, t5, t6;
+  double timeuse;
+  gettimeofday(&t1, NULL);
+
+  //extract pyfun handler
+  ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
+  std::string name(info->udf_meta_.name_.ptr());
+  name = name.substr(0, info->udf_meta_.name_.length());
+  std::string pyfun_handler = name.append("_pyfun");
+
+  //返回值
+  ObDatum *results = expr.locate_batch_datums(ctx);
+
+  //eval and check params
+  ObBitVector &eval_flags = expr.get_evaluated_flags(ctx);
+  ObBitVector &my_skip = expr.get_pvt_skip(ctx);
+  my_skip.deep_copy(skip, batch_size);
+  for (int i = 0; i < expr.arg_cnt_; i++) {
+    //do eval
+    if (OB_FAIL(expr.args_[i]->eval_batch(ctx, my_skip, batch_size))) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("failed to eval batch result args", K(ret));
+      return ret;
+    }
+    //do check
+    ObDatum *datum_array = expr.args_[i]->locate_batch_datums(ctx);
+    for (int j = 0; j < batch_size; j++) {
+      if (my_skip.at(j) || eval_flags.at(j))
+        continue;
+      else if (datum_array[j].is_null()) {
+        //存在null推理结果即为空
+        results[j].set_null();
+        my_skip.set(j);
+        eval_flags.set(j);
+      }
+    }
+  }
+  int64_t real_param = 0;
+  for (int i = 0; i < batch_size; i++) {
+    if (my_skip.at(i) || eval_flags.at(i))
+      continue;
+    else
+      ++real_param;
+  }
+
+  //Ensure GIL
+  bool nStatus = PyGILState_Check();
+  PyGILState_STATE gstate;
+  if(!nStatus) {
+    gstate = PyGILState_Ensure();
+    nStatus = true;
+  }
+
+  PyObject *pModule = NULL;
+  PyObject *pFunc = NULL;
+  PyObject *pArgs = PyTuple_New(expr.arg_cnt_);
+  PyObject *pKwargs = PyDict_New();
+  PyObject *pResult = NULL;
+  PyObject *argTuple = NULL;
+  ObDatum *argDatum = NULL;
+  
+  /*if(info->udf_meta_.init_) {
+  } else if (OB_FAIL(import_udf(info->udf_meta_))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import udf", K(ret));
+    goto destruction;
+  } else {
+    info->udf_meta_.init_ = true;
+  }*/
+
+  //获取udf实例并核验
+  pModule = PyImport_AddModule("__main__");
+  if (OB_ISNULL(pModule)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to import main module", K(ret));
+    goto destruction;
+  }
+  
+  pFunc = PyObject_GetAttrString(pModule, pyfun_handler.c_str());
+  if (OB_ISNULL(pFunc) || !PyCallable_Check(pFunc)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Fail to get function handler", K(ret));
+    goto destruction;
+  }
+
+  gettimeofday(&t2, NULL);
+
+  int k, ret_size;
+  //传递udf运行时参数
+  for (int i = 0;i < expr.arg_cnt_;i++) {
+    k = 0;
+    argDatum = expr.args_[i]->locate_batch_datums(ctx);
+    argTuple = PyTuple_New(real_param); // row size
+    int j = 0, zero = 0;
+    int *index;
+    if (!expr.args_[i]->is_const_expr()) 
+      index = &j;
+    else 
+      index = &zero;
+    switch (expr.args_[i]->datum_meta_.type_) {
+      case ObCharType:
+      case ObVarcharType:
+      case ObTinyTextType:
+      case ObTextType:
+      case ObMediumTextType:
+      case ObLongTextType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          else {
+            //str in OB
+            ObString str = argDatum[*index].get_string();
+            //put str into pyobject array
+            PyTuple_SetItem(argTuple, k++, PyUnicode_FromStringAndSize(str.ptr(), str.length()));
+          }
+        }
+        break;
+      }
+      case ObTinyIntType:
+      case ObSmallIntType:
+      case ObMediumIntType:
+      case ObInt32Type:
+      case ObIntType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          else
+            //put integer into pyobject array
+            PyTuple_SetItem(argTuple, k++, PyLong_FromLong(argDatum[*index].get_int()));
+        }
+        break;
+      }
+      case ObDoubleType: {
+        for (j = 0; j < batch_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          else
+            //put double into pyobject array
+            PyTuple_SetItem(argTuple, k++, PyLong_FromLong(argDatum[*index].get_double()));
+        }
+        break;
+      }
+      case ObNumberType: {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("number type, fail in obdatum2array", K(ret));
+        goto destruction;
+      }
+      default: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unknown arg type, fail in obdatum2array", K(ret));
+        goto destruction;
+      }
+    }
+    //插入pArg
+    if(PyTuple_SetItem(pArgs, i, argTuple) != 0){
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to set pyobject array arg", K(ret));
+      goto destruction;
+    }
+  }
+
+  gettimeofday(&t3, NULL);
+
+  //执行Python Code并获取返回值
+  pResult = PyObject_CallObject(pFunc, pArgs);
+  if (!pResult) {
+    process_python_exception();
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("execute error", K(ret));
+    goto destruction;
+  }
+
+  gettimeofday(&t4, NULL);
+
+  //根据类型从numpy数组中取出返回值并填入返回值
+  k = 0;
+  ret_size = PyTuple_Size(pResult);
+  switch (expr.datum_meta_.type_)
+  {
+    case ObCharType:
+    case ObVarcharType:
+    case ObTinyTextType:
+    case ObTextType:
+    case ObMediumTextType:
+    case ObLongTextType: {
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
+        if (my_skip.at(j) || eval_flags.at(j))
+          continue;
+        results[j].set_string(common::ObString(PyUnicode_AsUTF8(
+          PyTuple_GetItem(pResult, k++))));
+      }
+      break;
+    }
+    case ObTinyIntType:
+    case ObSmallIntType:
+    case ObMediumIntType:
+    case ObInt32Type:
+    case ObIntType: {
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
+        if (my_skip.at(j) || eval_flags.at(j))
+          continue;
+        results[j].set_int(PyLong_AsLong(
+          PyTuple_GetItem(pResult, k++)));
+      }
+      break;
+    }
+    case ObDoubleType:{
+      for (int j = 0; j < batch_size && k < ret_size; j++) {
+        if (my_skip.at(j) || eval_flags.at(j))
+          continue;
+        results[j].set_double(PyFloat_AsDouble(
+          PyTuple_GetItem(pResult, k++)));
+      }
+      break;
+    }
+    case ObNumberType: {
+      //error
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("not support ObNumberType", K(ret));
+      goto destruction;
+    }
+    default: {
+      //error
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("unknown result type", K(ret));
+      goto destruction;
+    }
+  }
+  gettimeofday(&t5, NULL);
+
+  //释放资源
+  destruction:
+  //释放运行时变量
+  Py_XDECREF(pKwargs);
+  //释放函数参数
+  Py_XDECREF(pArgs);
+  //释放计算结果
+  Py_XDECREF(pResult);
+
+  //PyGC_Enable();
+  //PyGC_Collect();
+
+  //release GIL
+  if(nStatus)
+    PyGILState_Release(gstate);
+  
+  // 计算运行时间，调整predict size | pjx
+  /*gettimeofday(&t6, NULL);
+  timeuse = (t6.tv_sec - t1.tv_sec) * 1000000 + (double)(t6.tv_usec - t1.tv_usec); // usec
+  double tps = real_param * 1000000 / timeuse; // current tuples per sec
+  if (info->tps_s == 0) { // 初始化
+    info->tps_s = tps;
+    info->predict_size += info->delta; // 尝试调整
+  } else if (info->round > info->round_limit || real_param != info->predict_size) { //超过轮次，停止调整batch size
+    // do nothing
+  } else if (tps > (1 + info->lambda) * info->tps_s) { 
+    // 提升阈值λ为10% 且 目前计算数量与给定batch size相符，重置轮次
+    info->tps_s = tps;
+    info->predict_size += info->delta;
+    info->round = 0;
+  } else if (tps < info->tps_s * (1 - 0.0)) { // 未达到阈值， 且差距较大 ，减小到达阈值的难度，提升轮次
+    // 降低阈值σ
+    info->tps_s = (1 - info->alpha) * info->tps_s + info->alpha * tps; // 平滑系数α
+    info->round++;
+  }*/
+  
+  // 计算运行时间，调整predict size | zcy
+  bool start_query = false;
+  gettimeofday(&t6, NULL);
+  timeuse = (t6.tv_sec - t1.tv_sec) * 1000000 + (double)(t6.tv_usec - t1.tv_usec); // usec
+  double tps = real_param * 1000000 / timeuse; // current tuples per sec
+  if (info->tps_s == 0) { // 初始化
+    info->tps_s = tps;
+    info->predict_size += info->delta; // 尝试调整
+    start_query = true;
+  } else if (info->round > info->round_limit || real_param != info->predict_size) { //超过轮次，停止调整batch size 或 不符合predict size
+    // do nothing
+  } else if (tps > info->tps_s) { 
+    // 提升阈值λ为10% 且 目前计算数量与给定batch size相符，进行调整
+    if (tps < (1 + info->lambda) * info->tps_s)
+      info->round++;
+    info->tps_s = tps;
+    info->predict_size += info->delta;
+  } else { //tps <= info->tps_s
+    // 未达到阈值
+    info->tps_s = (1 - info->alpha) * info->tps_s + info->alpha * tps; // 平滑系数α
+    if (tps > (1 - info->lambda) * info->tps_s)
+      info->round++;
+  }
+  
+  // 插桩 记录运行时间
+  /*double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
+  std::string file_name("/home/test/log/");
+  file_name.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
+  file_name.append(".log");
+  std::fstream f;
+  f.open(file_name, std::ios::out | std::ios::app); // 追加写入
+  if (start_query)
+    f << "Start a new Query!" << std::endl;
+  f << "inference batch size: " << real_param << std::endl;
+  f << "execution time: " << timeuse/1000 << " ms" << std::endl;
+  f << "pre process time: " << (t2.tv_sec - t1.tv_sec) * 1000 + (double)(t2.tv_usec - t1.tv_usec) / 1000 << " ms" << std::endl;
+  f << "ob_py transformation time: " << (t3.tv_sec - t2.tv_sec) * 1000 + (double)(t3.tv_usec - t2.tv_usec) / 1000 << " ms" << std::endl;
+  f << "inference time: " << inference_time << " ms" << std::endl;
+  f << "py_ob transformation time: " << (t5.tv_sec - t4.tv_sec) * 1000 + (double)(t5.tv_usec - t4.tv_usec) / 1000 << " ms" << std::endl;
+  f << "after process time: " << (t6.tv_sec - t5.tv_sec) * 1000 + (double)(t6.tv_usec - t5.tv_usec) / 1000 << " ms" << std::endl;
+  f << "tuples per second: " << tps << std::endl;
+  f << "tps* : " << info->tps_s << std::endl;
+  f << std::endl;
+  f.close();*/
+  return ret;
+}
+
 int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                          const ObBitVector &skip, const int64_t batch_size) {
   int ret = OB_SUCCESS;
@@ -525,15 +844,6 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   npy_intp elements[1] = {real_param}; // row size
   ObDatum *argDatum = NULL;
   
-  /*if(info->udf_meta_.init_) {
-  } else if (OB_FAIL(import_udf(info->udf_meta_))) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to import udf", K(ret));
-    goto destruction;
-  } else {
-    info->udf_meta_.init_ = true;
-  }*/
-
   //获取udf实例并核验
   pModule = PyImport_AddModule("__main__");
   if (OB_ISNULL(pModule)) {
@@ -551,8 +861,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
 
   gettimeofday(&t2, NULL);
 
-  int k;
-  int ret_size;
+  int k, ret_size;
   //传递udf运行时参数
   for (int i = 0;i < expr.arg_cnt_;i++) {
     k = 0;
@@ -590,25 +899,32 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObMediumIntType:
       case ObInt32Type:
       case ObIntType: {
-        numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
+        int *pint = (int *)tmp_alloc.alloc(sizeof(int32_t) * real_param);
+        //numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
         for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
             //put integer into numpy array
-            PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyLong_FromLong(argDatum[*index].get_int()));
+            //PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyLong_FromLong(argDatum[*index].get_int()));
+            pint[k++] = argDatum[*index].get_int();
         }
+        numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_INT32, NULL, pint, real_param, 0, NULL);
         break;
       }
       case ObDoubleType: {
-        numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
+        double *pdouble = (double *)tmp_alloc.alloc(sizeof(double) * real_param);
+        //numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
+        
         for (j = 0; j < batch_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
             //put double into numpy array
-            PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyFloat_FromDouble(argDatum[*index].get_double()));
+            //PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyFloat_FromDouble(argDatum[*index].get_double()));
+            pdouble[k++] = argDatum[*index].get_double();
         }
+        numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_FLOAT64, NULL, pdouble, real_param, 0, NULL);
         break;
       }
       case ObNumberType: {
@@ -729,7 +1045,6 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   //release GIL
   if(nStatus)
     PyGILState_Release(gstate);
-  gettimeofday(&t6, NULL);
   
   // 计算运行时间，调整predict size | pjx
   /*gettimeofday(&t6, NULL);
@@ -825,7 +1140,8 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
     }
   }
   if(is_batch) {
-    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
+    //rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
+    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_python_udf_batch_pyobject;
   } else {
     rt_expr.extra_buf_.buf_flag_ = false;
   }

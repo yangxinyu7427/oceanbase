@@ -47,6 +47,9 @@ public:
 
   static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
 
+  static int eval_python_udf_batch_pyobject(const ObExpr &expr, ObEvalCtx &ctx,
+                                            const ObBitVector &skip, const int64_t batch_size);
+
   static int eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
                                  const ObBitVector &skip, const int64_t batch_size);
 

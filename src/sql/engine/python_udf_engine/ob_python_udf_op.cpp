@@ -26,11 +26,11 @@ ObPythonUDFOp::ObPythonUDFOp(
   predict_size_ = 256;
   //predict_size_ = MY_SPEC.max_batch_size_; //default
 
-  //max_buffer_size_ = 8192;
-  
+  max_buffer_size_ = 4096;
+  // pile
   use_input_buf_ = true;
   use_output_buf_ = true;
-  use_fake_frame_ = true;
+  use_fake_frame_ = false;
   //if (predict_size_ > MY_SPEC.max_batch_size_)
     //use_fake_frame_ = true;
   //else
