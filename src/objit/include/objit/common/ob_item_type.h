@@ -2222,6 +2222,9 @@ typedef enum ObItemType
   T_DROP_PYTHON_UDF,  
   T_FUNCTION_ELEMENT_LIST,
   T_PARAM_DEFINITION,
+  T_PYTHON_CODE_TYPE,
+  T_PYTHON_CODE,
+  T_FILE_PATH,
 } ObItemType;
 
 typedef enum ObCacheType
