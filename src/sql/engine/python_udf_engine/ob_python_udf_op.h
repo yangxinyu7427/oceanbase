@@ -61,15 +61,17 @@ public:
 
   virtual int get_next_batch(const int64_t max_row_cnt, const ObBatchRows *&batch_rows) override;
 
+  int clear_calc_exprs_evaluated_flags();
+
 private:
   ExprFixedArray buf_exprs_; //all exprs with fake frames
-  int64_t result_width_;
+  int64_t result_width_; //要进行拷贝的expr数
   int64_t brs_skip_size_;
   ObVectorBuffer input_buffer_;
   ObVectorBuffer output_buffer_;
-  ObDatum **buf_results_;
-  int predict_size_;
-  bool use_input_buf_;
+  ObDatum **buf_results_; // for fake frame
+  int predict_size_; //每次python udf计算的元组数
+  bool use_input_buf_; 
   bool use_output_buf_;
   bool use_fake_frame_;
 };

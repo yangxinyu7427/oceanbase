@@ -5467,6 +5467,7 @@ int ObLogPlan::create_plan_tree_from_path(Path *path,
       } else {/* do nothing */ }
     } else if (path->is_subquery_path()) {
       SubQueryPath *subquery_path = static_cast<SubQueryPath *>(path);
+      // pile 
       bool contain_python_udf = false;
       // find python udf in condition exprs
       for (int i = 0; i < subquery_path->filter_.count(); ++i) {
@@ -5474,7 +5475,7 @@ int ObLogPlan::create_plan_tree_from_path(Path *path,
           contain_python_udf = true;
       }
       // find python udf in projection exprs
-      if (get_stmt()->is_select_stmt()) {
+      if (get_stmt()->is_select_stmt()) { // 这是整个stmt，判断可能出错
         ObSEArray<ObRawExpr *, 4> select_exprs;
         static_cast<const ObSelectStmt *>(get_stmt())->get_select_exprs(select_exprs);
         for (int i = 0; i < select_exprs.count();++i) {
