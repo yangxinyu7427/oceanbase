@@ -937,7 +937,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             //PyArray_SETITEM((PyArrayObject *)numpyarray, (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, k++), PyFloat_FromDouble(argDatum[*index].get_double()));
             pdouble[k++] = argDatum[*index].get_double();
         }
-        numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_FLOAT32, NULL, pdouble, real_param, 0, NULL);
+        numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_FLOAT64, NULL, pdouble, real_param, 0, NULL);
         break;
       }
       case ObNumberType: {
