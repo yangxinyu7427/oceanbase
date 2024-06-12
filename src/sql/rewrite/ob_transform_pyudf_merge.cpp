@@ -84,7 +84,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if(optimize_on_merged_onnx_model(onnx_model_opted_path)){
+  } else if(OB_FAIL(optimize_on_merged_onnx_model(onnx_model_opted_path))){
     LOG_WARN("optimize_on_merged_model fail", K(ret));
   }
   else{
