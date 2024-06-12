@@ -111,11 +111,12 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
   } else if (OB_FAIL(ObTransformUtils::extract_python_udf_exprs(select_exprs, python_udf_exprs))) {
     LOG_WARN("failed to remove python udf projection exprs.", K(ret));
   } else {
-    //remove select items
+    // remove select items
     sub_stmt->get_select_items().reset();
     sub_stmt->get_order_items().reset();
-    //remove limit exprs
+    // remove limit exprs
     sub_stmt->set_limit_offset(NULL, NULL);
+    // keep group-by exprs
     ObRawExpr *limit_percent_expr = sub_stmt->get_limit_percent_expr();
     if(OB_NOT_NULL(limit_percent_expr))
       limit_percent_expr->reset();
@@ -128,6 +129,15 @@ int ObTransformPullUpFilter::generate_child_level_stmt(
       LOG_WARN("failed to push back into select item array.", K(ret));
     } else { /*do nothing.*/ }
   }
+  // add aggr items into selectItem
+  for (int64_t j = 0; OB_SUCC(ret) && j < sub_stmt->get_aggr_item_size(); ++j) {
+    if (OB_FAIL(ObTransformUtils::create_select_item(*ctx_->allocator_,
+                                                     sub_stmt->get_aggr_item(j),
+                                                     sub_stmt))) {
+      LOG_WARN("failed to push back into select item array.", K(ret));
+    }
+  }
+  
   return ret;
 }
 
@@ -144,17 +154,20 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
   if (OB_ISNULL(select_stmt)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("select stmt is null", K(ret));
-  } else if(OB_FAIL(select_stmt->get_column_exprs(old_exprs))) {
+  } else if (OB_FAIL(select_stmt->get_column_exprs(old_exprs))) {
     LOG_WARN("old exprs is null", K(ret));
-  }
-  else {
-    //clear select stmt, keep conditions and projections
+  //} else if (extract_old_exprs(old_exprs, select_stmt)) {
+  } else if (append(old_exprs, select_stmt->get_aggr_items())) {
+    LOG_WARN("failed to extract aggr items into old exprs is null", K(ret));
+  } else {
+    // clear select stmt, keep conditions and projections 
     select_stmt->get_table_items().reset();
     select_stmt->get_joined_tables().reset();
     select_stmt->get_from_items().reset();
     select_stmt->get_having_exprs().reset();
     //select_stmt->get_order_items().reset();
-    select_stmt->get_group_exprs().reset();
+    select_stmt->get_group_exprs().reset(); // remove group-by exprs & aggr exprs
+    select_stmt->get_aggr_items().reset();
     select_stmt->get_rollup_exprs().reset();
     select_stmt->get_column_items().reset();
     select_stmt->get_part_exprs().reset();
@@ -197,8 +210,8 @@ int ObTransformPullUpFilter::generate_parent_level_stmt(ObSelectStmt *&select_st
 }
 
 int ObTransformPullUpFilter::construct_column_items_from_exprs(
-    const ObIArray<ObRawExpr*> &column_exprs,
-    ObIArray<ColumnItem> &column_items)
+  const ObIArray<ObRawExpr*> &column_exprs,
+  ObIArray<ColumnItem> &column_items)
 {
   int ret = OB_SUCCESS;
   for (int64_t i = 0; OB_SUCC(ret) && i < column_exprs.count(); ++i) {
@@ -228,10 +241,10 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
   if (!stmt.is_select_stmt()) {
     // do nothing
     OPT_TRACE("not select stmt, can not transform");
-  } else if (OB_FAIL(stmt.get_child_stmts(child_stmts))) {
+  /*} else if (OB_FAIL(stmt.get_child_stmts(child_stmts))) {
     LOG_WARN("get child stmt failed.", K(ret));
   } else if (!child_stmts.empty()) {
-    LOG_WARN("exist child stmts.", K(ret));
+    LOG_WARN("exist child stmts.", K(ret));*/
   } else if (OB_FAIL(static_cast<const ObSelectStmt &>(stmt).get_select_exprs(select_exprs))) {
     LOG_WARN("get select exprs failed.", K(ret));
   } else if (select_exprs.empty()) {
@@ -241,6 +254,7 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
     for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
       if(ObTransformUtils::expr_contain_type(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)), T_FUN_SYS_PYTHON_UDF)) {
         need_trans = true;
+        LOG_WARN("python udf in condition exprs.", K(ret));
         break;
       }
     }
@@ -248,6 +262,7 @@ int ObTransformPullUpFilter::need_transform(const common::ObIArray<ObParentDMLSt
     for(int32_t i = 0; i < select_exprs.count(); i++) {
       if(ObTransformUtils::expr_contain_type(select_exprs.at(i), T_FUN_SYS_PYTHON_UDF)) {
         need_trans = true;
+        LOG_WARN("python udf in select exprs.", K(ret));
         break;
       }
     }
@@ -280,6 +295,7 @@ int ObTransformPullUpFilter::check_hint_allowed(const ObDMLStmt &stmt,
       LOG_WARN("failed to add used trans hint", K(ret));
     }
   }
+  allowed = true;
   return ret;
 }
 

@@ -10,6 +10,8 @@ using namespace common;
 namespace sql
 {
 
+static int max_buffer_size_ = 8192;
+
 ObPythonUDFSpec::ObPythonUDFSpec(ObIAllocator &alloc, const ObPhyOperatorType type)
     : ObSubPlanScanSpec(alloc, type), col_exprs_(alloc) {}
 
@@ -21,22 +23,26 @@ ObPythonUDFOp::ObPythonUDFOp(
 {
   int ret = OB_SUCCESS;
   brs_skip_size_ = spec.max_batch_size_;
-  predict_size_ = 32;
   
+  predict_size_ = 32;
+  //predict_size_ = 256;
+
+  max_buffer_size_ = 256;
+  // pile
   use_input_buf_ = true;
   use_output_buf_ = true;
   use_fake_frame_ = false;
-  if (predict_size_ > MY_SPEC.max_batch_size_)
-    use_fake_frame_ = true;
-  else
-    predict_size_ += MY_SPEC.max_batch_size_;
+  //if (predict_size_ > MY_SPEC.max_batch_size_)
+    //use_fake_frame_ = true;
+  //else
+    //predict_size_ += MY_SPEC.max_batch_size_;
   if (use_input_buf_) {  
     // init input buffer
-    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, 2 * 256);
+    input_buffer_.init(MY_SPEC.col_exprs_, exec_ctx, 2 * max_buffer_size_);
   }
   if (use_output_buf_) {
     // init output buffer
-    output_buffer_.init(MY_SPEC.output_, exec_ctx, 2 * 256);
+    output_buffer_.init(MY_SPEC.output_, exec_ctx, 2 * max_buffer_size_);
   }
   if (use_fake_frame_) {
     //extra buf_exprs_
@@ -53,7 +59,7 @@ ObPythonUDFOp::ObPythonUDFOp(
     buf_results_ = static_cast<ObDatum **>(exec_ctx.get_allocator().alloc(sizeof(ObDatum *) * result_width_));
     for(int i = 0; i < result_width_; i++) {
       ObExpr *e = buf_exprs_.at(i);
-      OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], 256));
+      OZ(alloc_predict_buffer(exec_ctx.get_allocator(), (*e), buf_results_[i], max_buffer_size_));
     }
     if(!OB_SUCC(ret)) {
       LOG_WARN("Fail to init Predict Operator", K(ret));
@@ -84,18 +90,19 @@ int ObPythonUDFOp::alloc_predict_buffer(ObIAllocator &alloc, ObExpr &expr, ObDat
 int ObPythonUDFOp::find_predict_size(ObExpr *expr, int32_t &predict_size)
 {
   int ret = OB_SUCCESS;
-  int max_size = 256; //default
+  int expr_size = 256; //default
   if (expr->type_ == T_FUN_SYS_PYTHON_UDF) {
     int size = static_cast<ObPythonUdfInfo *>(expr->extra_info_)->predict_size;
-    max_size = size > max_size ? size : max_size;
+    expr_size = size > expr_size ? size : expr_size;
   } else {
     for (int32_t i = 0; i < expr->arg_cnt_; i++) {
-      find_predict_size(expr->args_[i], max_size);
+      find_predict_size(expr->args_[i], expr_size);
     }
   }
-  predict_size = predict_size > max_size ? predict_size : max_size;
-  if(predict_size > 256)
-    predict_size = 256;
+  if (predict_size < expr_size)
+    predict_size = expr_size;
+  if (predict_size > max_buffer_size_)
+    predict_size = max_buffer_size_;
   return ret;
 }
 
@@ -122,6 +129,8 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
     // 取出参数
     if (OB_FAIL(input_buffer_.load(eval_ctx_, brs_, brs_skip_size_, predict_size_))) {
       LOG_WARN("fail to load input batchrows", K(ret));
+    } else if (OB_FAIL(clear_calc_exprs_evaluated_flags())) {
+      LOG_WARN("fail to clear calc_exprs evaluated flages", K(ret));
     }
   } else {
     ret = ObSubPlanScanOp::inner_get_next_batch(max_row_cnt);
@@ -149,6 +158,14 @@ int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *
     batch_rows = &brs_;
   } else {
     ret = ObOperator::get_next_batch(max_row_cnt, batch_rows);
+  }
+  return ret;
+}
+
+int ObPythonUDFOp::clear_calc_exprs_evaluated_flags() {
+  int ret = OB_SUCCESS;
+  for (int i = 0; i < MY_SPEC.calc_exprs_.count(); i++) {
+    MY_SPEC.calc_exprs_[i]->get_eval_info(eval_ctx_).clear_evaluated_flag();
   }
   return ret;
 }
@@ -225,6 +242,7 @@ int ObVectorBuffer::load(ObEvalCtx &eval_ctx, ObBatchRows &brs_, int64_t &brs_sk
       /* deep copy */
       MEMCPY(e->locate_batch_datums(eval_ctx), datums_ + i * max_size_, sizeof(ObDatum) * size); 
       e->get_pvt_skip(eval_ctx).reset(size);
+      e->get_evaluated_flags(eval_ctx).reset(size);
     }
     move(size);
     brs_.size_ = size;

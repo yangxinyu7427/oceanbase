@@ -268,7 +268,7 @@ END_P SET_VAR DELIMITER
         ESCAPE EVENT EVENTS EVERY EXCHANGE EXECUTE EXPANSION EXPIRE EXPIRE_INFO EXPORT OUTLINE EXTENDED
         EXTENDED_NOADDR EXTENT_SIZE EXTRACT EXCEPT EXPIRED
 
-        FAILOVER FAST FAULTS FIELDS FILEX FINAL_COUNT FIRST FIRST_VALUE FIXED FLUSH FOLLOWER FORMAT
+        FAILOVER FAST FAULTS FIELDS FILEX FILE_PATH FINAL_COUNT FIRST FIRST_VALUE FIXED FLUSH FOLLOWER FORMAT
         FOUND FREEZE FREQUENCY FUNCTION FOLLOWING FLASHBACK FULL FRAGMENTATION FROZEN FILE_ID
 
         GENERAL GEOMETRY GEOMCOLLECTION GEOMETRYCOLLECTION GET_FORMAT GLOBAL GRANTS GROUP_CONCAT GROUPING GTS
@@ -304,11 +304,11 @@ END_P SET_VAR DELIMITER
         OBSOLETE OCCUR OF OFF OFFSET OLD OLD_PASSWORD ONE ONE_SHOT ONLY OPEN OPTIONS ORIG_DEFAULT OWNER OLD_KEY OVER
         OBCONFIG_URL OJ
 
-        PACK_KEYS PAGE PARALLEL PARAMETERS PARSER PARTIAL PARTITION_ID PARTITIONING PARTITIONS PASSWORD PAUSE PERCENTAGE
+        PACK_KEYS PAGE PARALLEL PARAMETERS PARSER PARTIAL PARTITION_ID PARTITIONING PARTITIONS PASSWORD PATH PAUSE PERCENTAGE
         PERCENT_RANK PHASE PLAN PHYSICAL PLANREGRESS PLUGIN PLUGIN_DIR PLUGINS POINT POLYGON PERFORMANCE
         PROTECTION PRIORITY PL POLICY POOL PORT POSITION PREPARE PRESERVE PRETTY PRETTY_COLOR PREV PRIMARY_ZONE PRIVILEGES PROCESS
         PROCESSLIST PROFILE PROFILES PROXY PRECEDING PCTFREE P_ENTITY P_CHUNK
-        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS PREDICT PYTHON_UDF
+        PUBLIC PROGRESSIVE_MERGE_NUM PREVIEW PS PLUS PREDICT PYTHON_CODE PYTHON_UDF 
 
         QUARTER QUERY QUERY_RESPONSE_TIME QUEUE_TIME QUICK
 
@@ -334,7 +334,7 @@ END_P SET_VAR DELIMITER
 
         TABLE_CHECKSUM TABLE_MODE TABLE_ID TABLE_NAME TABLEGROUPS TABLES TABLESPACE TABLET TABLET_ID TABLET_MAX_SIZE
         TEMPLATE TEMPORARY TEMPTABLE TENANT TEXT THAN TIME TIMESTAMP TIMESTAMPADD TIMESTAMPDIFF TP_NO
-        TP_NAME TRACE TRADITIONAL TRANSACTION TRIGGERS TRIM TRUNCATE TYPE TYPES TASK TABLET_SIZE
+        TP_NAME TRACE TRADITIONAL TRAIN TRANSACTION TRIGGERS TRIM TRUNCATE TYPE TYPES TASK TABLET_SIZE
         TABLEGROUP_ID TENANT_ID THROTTLE TIME_ZONE_INFO TOP_K_FRE_HIST TIMES
 
         UNCOMMITTED UNDEFINED UNDO_BUFFER_SIZE UNDOFILE UNICODE UNINSTALL UNIT UNIT_GROUP UNIT_NUM UNLOCKED UNTIL
@@ -498,7 +498,7 @@ END_P SET_VAR DELIMITER
 %type <node> recover_tenant_stmt recover_point_clause
 /*新增*/ 
 %type <node> create_python_udf_stmt drop_python_udf_stmt
-%type <node> function_element_list function_element param_name param_type
+%type <node> function_element_list function_element param_name param_type python_code_type
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -2718,6 +2718,21 @@ MOD '(' expr ',' expr ')'
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }
+| TRAIN function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $4)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $4);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_PYTHON_UDF, 2, $2, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_PYTHON_UDF, 1, $2);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
 | sys_interval_func
 {
   $$ = $1;
@@ -4413,15 +4428,27 @@ NUMERIC
 ;
 
 create_python_udf_stmt:
-CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' RETURNS ret_type '{' STRING_VALUE '}'
+CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' RETURNS ret_type python_code_type
 {
   ParseNode *function_elements = NULL;
+  ParseNode *code_type_node = NULL;
   merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $5);
+  merge_nodes(code_type_node, result, T_PYTHON_CODE_TYPE, $9);
   malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_PYTHON_UDF, 4, 
                            $3,                             /* udf name */
                            function_elements,              /* function parameter */
                            $8,                             /* return type */
-                           $10);                           /* python code */
+                           code_type_node);                /* python code type */
+}
+|
+CREATE PYTHON_UDF NAME_OB MODEL NAME_OB python_code_type
+{
+  ParseNode *code_type_node = NULL;
+  merge_nodes(code_type_node, result, T_PYTHON_CODE_TYPE, $6);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_PYTHON_UDF, 3, 
+                           $3,                             /* udf name */
+                           $5,                             /* model name */
+                           code_type_node);               /* python code type */
 }
 ;
 
@@ -4488,6 +4515,18 @@ NUMERIC
 {
   malloc_terminal_node($$, result->malloc_pool_, T_INT);
   $$->value_ = 4;
+}
+;
+
+python_code_type:
+PYTHON_CODE '{' STRING_VALUE '}'
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_PYTHON_CODE, 1, $3);
+}
+|
+FILE_PATH STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_FILE_PATH, 1, $2);
 }
 ;
 

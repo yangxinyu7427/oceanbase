@@ -30,6 +30,8 @@ public:
   virtual ~ObCreatePythonUdfResolver();
 
   virtual int resolve(const ParseNode &parse_tree);
+  int resolve_model_path(const ParseNode *parse_node, obrpc::ObCreatePythonUdfArg &create_python_udf_arg);
+  int resolve_pycall(const ParseNode *parse_node, obrpc::ObCreatePythonUdfArg &create_python_udf_arg);
 };
 
 }
