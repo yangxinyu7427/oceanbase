@@ -11,40 +11,21 @@ namespace sql
 {
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
-                    udf_exprs_);
-
-static int max_buffer_size_ = 8192;
+                    udf_exprs_,
+                    input_exprs_);
 
 ObPythonUDFSpec::ObPythonUDFSpec(ObIAllocator &alloc, const ObPhyOperatorType type)
-    : ObOpSpec(alloc, type), udf_exprs_(alloc) {}
+    : ObOpSpec(alloc, type), udf_exprs_(alloc), input_exprs_(alloc) {}
 
 ObPythonUDFSpec::~ObPythonUDFSpec() {}
 
 ObPythonUDFOp::ObPythonUDFOp(
     ObExecContext &exec_ctx, const ObOpSpec &spec, ObOpInput *input)
-  //: ObOperator(exec_ctx, spec, input), buf_exprs_(exec_ctx.get_allocator())
   : ObOperator(exec_ctx, spec, input), local_allocator_(), controller_(local_allocator_)
 {
   int ret = OB_SUCCESS;
-  //brs_skip_size_ = MY_SPEC.max_batch_size_;
   //predict_size_ = 256;
   //predict_size_ = MY_SPEC.max_batch_size_; //default
-
-  max_buffer_size_ = 4096;
-  // pile
-  /*use_input_buf_ = false;
-  use_output_buf_ = false;
-
-  test_controller_ = true;
-
-  if (use_input_buf_) {  
-    // init input buffer
-    input_buffer_.init(&local_allocator_, MY_SPEC.get_child()->output_, exec_ctx, 2 * max_buffer_size_);
-  }
-  if (use_output_buf_) {
-    // init output buffer
-    output_buffer_.init(&local_allocator_, MY_SPEC.output_, exec_ctx, 2 * max_buffer_size_);
-  }*/
 
   const uint64_t tenant_id = ctx_.get_my_session()->get_effective_tenant_id();
   local_allocator_.set_tenant_id(tenant_id);
@@ -53,31 +34,6 @@ ObPythonUDFOp::ObPythonUDFOp(
 }
 
 ObPythonUDFOp::~ObPythonUDFOp() {}
-
-/* override */
-/*int ObPythonUDFOp::get_next_batch(const int64_t max_row_cnt, const ObBatchRows *&batch_rows) 
-{
-  int ret = OB_SUCCESS;
-
-  if (use_output_buf_) {
-    while (OB_SUCC(ret) && (output_buffer_.get_size() <= output_buffer_.get_max_size() / 2) && !brs_.end_) {
-      if (OB_FAIL(ObOperator::get_next_batch(max_row_cnt, batch_rows))) {
-        LOG_WARN("fail to inner get next batch", K(ret));
-      } else if (OB_FAIL(output_buffer_.save(eval_ctx_, brs_))){
-        LOG_WARN("fail to save input batchrows", K(ret));
-      }
-    }
-    if (!output_buffer_.is_saved()) {
-      // do nothing
-    } else if (OB_FAIL(output_buffer_.load(eval_ctx_, brs_, brs_skip_size_, MY_SPEC.max_batch_size_))) {
-      LOG_WARN("fail to load input batchrows", K(ret));
-    }
-    batch_rows = &brs_;
-  } else {
-    ret = ObOperator::get_next_batch(max_row_cnt, batch_rows);
-  }
-  return ret;
-}*/
 
 int ObPythonUDFOp::inner_open()
 {
@@ -133,6 +89,7 @@ void ObPythonUDFOp::destroy()
 int ObPythonUDFOp::inner_get_next_row() 
 {
   int ret = OB_SUCCESS;
+  // not support yet
   clear_evaluated_flag();
   if (OB_FAIL(child_->get_next_row())) {
     if (OB_ITER_END != ret) {
@@ -150,43 +107,6 @@ int ObPythonUDFOp::inner_get_next_row()
 * 5. 将output缓存复制回frame上的输出
 * 6. 重复5至output缓存清空
  */
-/*int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
-{
-  int ret = OB_SUCCESS;
-  clear_evaluated_flag();
-  const ObBatchRows *child_brs = nullptr;
-  if (use_input_buf_) {
-    while (OB_SUCC(ret) && (input_buffer_.get_size() <= input_buffer_.get_max_size() - MY_SPEC.max_batch_size_) && !brs_.end_) {
-      if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
-        LOG_WARN("get child next batch failed", K(ret));
-      } else if (brs_.copy(child_brs)) {
-        LOG_WARN("copy child batch rows failed", K(ret));
-      } else if (OB_FAIL(input_buffer_.save(eval_ctx_, brs_))){
-        LOG_WARN("save input batchrows failed", K(ret));
-      }
-    }
-    // 根据exprs的运行时间调整predict size
-    int32_t current_size = 256; //default
-    FOREACH_CNT_X(e, MY_SPEC.calc_exprs_, OB_SUCC(ret)) 
-      OZ(find_predict_size((*e), current_size));
-    FOREACH_CNT_X(e, MY_SPEC.output_, OB_SUCC(ret)) 
-      OZ(find_predict_size((*e), current_size));
-    predict_size_ = current_size;
-    // 取出参数
-    if (OB_FAIL(input_buffer_.load(eval_ctx_, brs_, brs_skip_size_, predict_size_))) {
-      LOG_WARN("fail to load input batchrows", K(ret));
-    } else if (OB_FAIL(clear_calc_exprs_evaluated_flags())) {
-      LOG_WARN("fail to clear calc_exprs evaluated flages", K(ret));
-    }
-  } else {
-    if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
-        LOG_WARN("get child next batch failed", K(ret));
-    } else {
-      brs_.copy(child_brs);
-    }
-  }
-  return ret;
-}*/
 int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
@@ -215,14 +135,11 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
   return ret;
 }
 
-
-/*---private functions---*/
-
 /* find predict_size of buffer */
 int ObPythonUDFOp::find_predict_size(ObExpr *expr, int32_t &predict_size)
 {
   int ret = OB_SUCCESS;
-  int expr_size = 256; //default
+  /*int expr_size = 256; //default
   if (expr->type_ == T_FUN_PYTHON_UDF) {
     int size = static_cast<ObPythonUdfInfo *>(expr->extra_info_)->predict_size;
     expr_size = size > expr_size ? size : expr_size;
@@ -234,7 +151,7 @@ int ObPythonUDFOp::find_predict_size(ObExpr *expr, int32_t &predict_size)
   if (predict_size < expr_size)
     predict_size = expr_size;
   if (predict_size > max_buffer_size_)
-    predict_size = max_buffer_size_;
+    predict_size = max_buffer_size_;*/
   return ret;
 }
 
@@ -247,169 +164,12 @@ int ObPythonUDFOp::clear_calc_exprs_evaluated_flags()
   return ret;
 }
 
-/* ------------------------------------ buffer for python_udf ----------------------------------- */
-int ObVectorBuffer::init(common::ObIAllocator *alloc, const common::ObIArray<ObExpr *> &exprs, 
-                         ObExecContext &exec_ctx, int64_t max_buffer_size)
-{
-  int ret = OB_SUCCESS;
-  if (OB_UNLIKELY(inited_)) {
-    saved_size_ = 0;
-    // do nothing
-  } else if (exprs.count() == 0) {
-    // do nothing
-  } else {
-    alloc_ = alloc;
-    exprs_ = &exprs;
-    exec_ctx_ = &exec_ctx;
-    max_size_ = max_buffer_size; 
-    datums_ = static_cast<ObDatum *>(exec_ctx.get_allocator().alloc(
-      max_size_ * exprs.count() * sizeof(ObDatum)));
-    if (OB_ISNULL(datums_)) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      LOG_WARN("allocate memory failed", K(ret), K(max_size_), K(exprs.count()));
-    }
-    inited_ = true;
-    saved_size_ = 0;
-  }
-  return ret;
-}
-
-int ObVectorBuffer::save(ObEvalCtx &eval_ctx, ObBatchRows &brs_) 
-{
-  int ret = OB_SUCCESS;
-  int cnt = brs_.size_ - brs_.skip_->accumulate_bit_cnt(brs_.size_);
-  if (NULL == exprs_) {
-    // empty expr_: do nothing
-  } else if (NULL == datums_) {
-    ret = OB_NOT_INIT;
-  } else if (saved_size_ + cnt <= max_size_) {
-    for (int64_t i = 0; i < exprs_->count(); i++) {
-      ObExpr *e = exprs_->at(i);
-      ObDatum *src = e->locate_batch_datums(eval_ctx);
-      int64_t k = 0;
-      for (int64_t j = 0; j < brs_.size_; j++) {
-        /* remove skipped rows */
-        if (!brs_.skip_->at(j)) {
-          /* deep copy */
-          datums_[i * max_size_ + saved_size_ + k].deep_copy(src[j], *alloc_);
-          ++k;
-        }
-      }
-    }
-    saved_size_ += cnt;
-    //brs_.size_ = 0;
-  } else {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to save vector buffer", K(ret));
-  }
-  return ret;
-}
-
-int ObVectorBuffer::load(ObEvalCtx &eval_ctx, ObBatchRows &brs_, int64_t &brs_skip_size_ , int64_t batch_size) 
-{
-  int ret = OB_SUCCESS;
-  if (NULL == exprs_) {
-    // empty expr_: do nothing
-  } else if (NULL == datums_ || saved_size_ < 0) {
-    ret = OB_NOT_INIT;
-  } else if (saved_size_ == 0) {
-    //* brs_.size_ = 0;
-    //brs_.end_ = true;
-  } else {
-    int64_t size = (saved_size_ < batch_size) ? saved_size_ : batch_size;
-    for (int64_t i = 0; i < exprs_->count(); i++) {
-      ObExpr *e = exprs_->at(i);
-      /* deep copy */
-      //MEMCPY(e->locate_batch_datums(eval_ctx), datums_ + i * max_size_, sizeof(ObDatum) * size);
-      //* e->get_pvt_skip(eval_ctx).reset(size);
-      //* e->get_evaluated_flags(eval_ctx).reset(size);
-
-      ObDatum *src_datums = datums_ + i * max_size_;
-      ObDatum *result_datums = e->locate_batch_datums(eval_ctx);
-      switch(e->datum_meta_.type_) {
-        case ObCharType:
-        case ObVarcharType:
-        case ObTinyTextType:
-        case ObTextType:
-        case ObMediumTextType:
-        case ObLongTextType: {
-          for (int j = 0; j < size; ++j) {
-            e->reset_ptr_in_datum(eval_ctx, i);
-            result_datums[j].set_string(src_datums[j].ptr_, src_datums[j].len_);
-          }
-          break;
-        }
-        case ObTinyIntType:
-        case ObSmallIntType:
-        case ObMediumIntType:
-        case ObInt32Type:
-        case ObIntType: {
-          for (int j = 0; j < size; ++j) {
-            e->reset_ptr_in_datum(eval_ctx, i);
-            result_datums[j].set_int(src_datums[j].get_int());
-          }
-          break;
-        }
-        case ObDoubleType: {
-          for (int j = 0; j < size; ++j) {
-            e->reset_ptr_in_datum(eval_ctx, i);
-            result_datums[j].set_int(src_datums[j].get_double());
-          }
-          break;
-        }
-        default: {
-          //error
-          ret = OB_NOT_SUPPORTED;
-          LOG_WARN("Unsupported result type.", K(ret));
-        }
-      }
-    }
-    move(size);
-    /* brs_.size_ = size;
-    brs_.end_ = false;
-    if(size > brs_skip_size_) {
-      //realloc batchrows size
-      void *mem = exec_ctx_->get_allocator().alloc(ObBitVector::memory_size(size));
-      if (OB_ISNULL(mem)) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        LOG_WARN("allocate memory failed", K(ret));
-      } else {
-        brs_.skip_ = to_bit_vector(mem);
-        brs_.skip_->init(size);
-        brs_skip_size_ = size;
-      }
-    } else {
-      brs_.skip_->reset(size);
-    }*/
-  }
-  return ret;
-}
-
-int ObVectorBuffer::move(int64_t size) 
-{
-  int ret = OB_SUCCESS;
-  if (NULL == exprs_) {
-    // empty expr_: do nothing
-  } else if (NULL == datums_) {
-    ret = OB_NOT_INIT;
-  } else if (saved_size_ > 0) {
-    for (int64_t i = 0; i < exprs_->count(); i++) {
-      /* shallow copy */
-      MEMMOVE(datums_ + i * max_size_, datums_ + i * max_size_ + size, sizeof(ObDatum) * (saved_size_ - size)); 
-    }
-    saved_size_ -= size;
-  }
-  return ret;
-}
 /* ---------------------------------- ObColInputStore -------------------------------------*/
 int ObColInputStore::init(const common::ObIArray<ObExpr *> &exprs,
                           int64_t batch_size,
                           int64_t length)
 {
   int ret = OB_SUCCESS;
-  //ObSEArray<ObExpr *, 8> exprs;
-  //OZ(append(exprs, outputs));
-  //OZ(append(exprs, filters));
   exprs_.init(exprs.count());
   datums_copy_.init(exprs.count());
   for (int i = 0; OB_SUCC(ret) && i < exprs.count(); ++i) {
@@ -473,14 +233,7 @@ int ObColInputStore::save_batch(ObEvalCtx &eval_ctx, ObBatchRows &brs)
   } else {
     for (int64_t i = 0; OB_SUCC(ret) && i < exprs_.count(); ++i) {
       ObExpr *expr = exprs_.at(i);
-      /*ObBitVector &my_skip = expr->get_pvt_skip(eval_ctx);
-      for (int64_t j = 0; OB_SUCC(ret) && j < expr->arg_cnt_; ++j) {
-        ObExpr *arg = expr->args_[j];
-        if (OB_FAIL(arg->eval_batch(eval_ctx, my_skip, batch_size_))) {
-          ret = OB_ERR_UNEXPECTED;
-          LOG_WARN("Eval other outputs args batch result failed.", K(ret));
-        }
-      }*/
+      expr->cast_to_uniform(brs.size_, eval_ctx); // 数据格式转换过程可能会产生额外开销
       ObDatum *src = expr->locate_batch_datums(eval_ctx);
       ObDatum *dst = datums_copy_.at(i);
       int j = 0, zero = 0;
@@ -505,6 +258,47 @@ int ObColInputStore::save_batch(ObEvalCtx &eval_ctx, ObBatchRows &brs)
   return ret;
 }
 
+int ObColInputStore::save_vector(ObEvalCtx &eval_ctx, ObBatchRows &brs)
+{
+  int ret = OB_SUCCESS;
+  int cnt = brs.size_ - brs.skip_->accumulate_bit_cnt(brs.size_);
+  if (saved_size_ + cnt > length_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Other Input Store overflow.", K(ret));
+  } else {
+    for (int64_t i = 0; OB_SUCC(ret) && i < exprs_.count(); ++i) {
+      ObExpr *expr = exprs_.at(i);
+      ObIVector *vector = expr->get_vector(eval_ctx);
+      ObDatum *dst = datums_copy_.at(i);
+      int dst_idx = saved_size_; // use dst idx to reform data
+      for (int64_t j = 0; OB_SUCC(ret) && j < brs.size_; ++j) {
+        if (brs.skip_->at(j)) {
+          /* do nothing */
+        } else {
+          // deep copy from vector to datums
+          ObLength copy_len;
+          const char *payload;
+          vector->get_payload(j, payload, copy_len);
+          char *buf = static_cast<char *>(alloc_.alloc(copy_len));
+          if (OB_ISNULL(buf)) {
+            ret = OB_ALLOCATE_MEMORY_FAILED;
+            LOG_WARN("allocate memory failed", K(copy_len), K(ret));
+          } else {
+            MEMCPY(buf, payload, copy_len);
+            dst[dst_idx].ptr_ = buf;
+            dst[dst_idx].set_pack(copy_len);
+            ++dst_idx;
+          }
+        }
+      }
+    }
+    if (OB_SUCC(ret)) {
+      saved_size_ += cnt;
+    }
+  }
+  return ret;
+}
+
 int ObColInputStore::load_batch(ObEvalCtx &eval_ctx, int64_t load_size)
 {
   int ret = OB_SUCCESS;
@@ -517,11 +311,8 @@ int ObColInputStore::load_batch(ObEvalCtx &eval_ctx, int64_t load_size)
       ObDatum *src = datums_copy_.at(i);
       ObDatum *dst = expr->locate_batch_datums(eval_ctx);
       for (int j = 0; j < load_size; ++j) {
-        //expr->reset_ptr_in_datum(eval_ctx, j);
         dst[j].set_datum(src[output_idx_ + j]);
-        //dst[j].deep_copy(src[output_idx_ + j], alloc_);
       }
-      //expr->set_evaluated_projected(eval_ctx);
     }
     if (OB_SUCC(ret)) {
       output_idx_ += load_size;
@@ -530,8 +321,28 @@ int ObColInputStore::load_batch(ObEvalCtx &eval_ctx, int64_t load_size)
   return ret;
 }
 
+int ObColInputStore::load_vector(ObEvalCtx &eval_ctx, int64_t load_size)
+{
+  int ret = OB_SUCCESS;
+  if (output_idx_ + load_size > saved_size_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Not enough data to load.", K(ret));
+  } else {
+    for (int64_t i = 0; i < exprs_.count(); ++i) {
+      ObExpr *expr = exprs_.at(i);
+      ObDatum *src = datums_copy_.at(i);
+      ObIVector *dst = expr->get_vector(eval_ctx);
+      for (int j = 0; j < load_size; ++j) {
+        dst->set_payload(j, src[output_idx_ + j].ptr_, src[output_idx_ + j].len_);
+      }
+    }
+    if (OB_SUCC(ret)) {
+      output_idx_ += load_size;
+    }
+  }
+  return ret;
+}
 /* ---------------------------------- ObPUInputStore -------------------------------- */
-
 int ObPUInputStore::init(common::ObIAllocator *alloc, ObExpr *expr, int64_t length)
 {
   int ret = OB_SUCCESS;
@@ -699,17 +510,6 @@ int ObPUInputStore::save_batch(ObEvalCtx &eval_ctx, ObBatchRows &brs)
         case ObTextType:
         case ObMediumTextType:
         case ObLongTextType: {
-          /*char **dst = reinterpret_cast<char **>(data_ptrs_[i]);
-          for (j = 0; j < brs.size_; j++) {
-            if (!brs.skip_->at(j)) {
-              // copy string
-              ObDatum &src_datum = src[*index];
-              char *buf = static_cast<char *>(alloc_->alloc(src_datum.len_));
-              MEMCPY(buf, src_datum.ptr_, src_datum.len_);
-              //alloc_.free(dst[k]);
-              dst[k++] = buf;
-            }
-          }*/
           PyObject **dst = reinterpret_cast<PyObject **>(data_ptrs_[i]);
           for (j = 0; j < brs.size_; j++) {
             if (!brs.skip_->at(j)) {
@@ -767,6 +567,15 @@ int ObPUInputStore::save_batch(ObEvalCtx &eval_ctx, ObBatchRows &brs)
   return ret;
 }
 
+int ObPUInputStore::save_vector(ObEvalCtx &eval_ctx, ObBatchRows &brs)
+{
+  // not implemented yet
+  int ret = OB_NOT_SUPPORTED;
+  UNUSED(eval_ctx);
+  UNUSED(brs);
+  return ret;
+}
+
 /* ----------------------------------- ObPythonUDFCell --------------------------------- */
 int ObPythonUDFCell::init(common::ObIAllocator *alloc, ObExpr *expr, int64_t batch_size, int64_t length)
 {
@@ -803,18 +612,19 @@ int ObPythonUDFCell::do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
     LOG_WARN("Expr in input store is NULL.", K(ret));
   } else {
     // decide save function according to data transfer type
+    // 因为要判断skip并进行重整，不能直接MEMCPY，所以用save_batch方法就足够了
     ObBitVector &my_skip = expr_->get_pvt_skip(eval_ctx);
     for (int64_t i = 0; i < expr_->arg_cnt_ && OB_SUCC(ret); i++) {
       ObExpr *e = expr_->args_[i];
-      //ObBitVector &eval_flags = expr.get_evaluated_flags(eval_ctx);
+      // eval_batch() = eval_vector() + cast_to_uniform()
       if (OB_FAIL(e->eval_batch(eval_ctx, my_skip, batch_size_))) {
         ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("Eval Python UDF args' batch result failed.", K(ret));
+        LOG_WARN("Eval Python UDF args' vector/batch result failed.", K(ret));
       }
     }
-    // spec_.use_rich_format_ ? input_store_.save_vector(eval_ctx, brs) 
-    //                        : input_store_.save_batch(eval_ctx, brs)
-    if (OB_FAIL(ret) || OB_FAIL(input_store_.save_batch(eval_ctx, brs))) {
+
+    // expr参数结果已经被设置为UNIFORM格式
+    if (OB_FAIL(ret) || OB_FAIL(input_store_.save_batch(eval_ctx, brs))) { 
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Save Python UDF input batch failed.", K(ret), K(expr_), K(batch_size_));
     }
@@ -855,7 +665,7 @@ int ObPythonUDFCell::do_process()
   return ret;
 }
 
-int ObPythonUDFCell::do_restore(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t output_idx, int64_t output_size)
+int ObPythonUDFCell::do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size)
 {
   int ret = OB_SUCCESS;
   if (output_idx + output_size > result_size_) { //确保访问结果数组时不会越界
@@ -864,58 +674,129 @@ int ObPythonUDFCell::do_restore(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t o
   } else if (OB_ISNULL(expr_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Unexpected NULL expr_.", K(ret));
+  } else if (expr_->enable_rich_format() && OB_FAIL(do_restore_vector(eval_ctx, output_idx, output_size))){
+    ret = OB_NOT_SUPPORTED;
+    LOG_WARN("Unsupported result type.", K(ret));
+  } else if (!expr_->enable_rich_format() && OB_FAIL(do_restore_batch(eval_ctx, output_idx, output_size))) {
+    ret = OB_NOT_SUPPORTED;
+    LOG_WARN("Unsupported result type.", K(ret));
   } else {
-  // } else if (!spec_.use_rich_format_) {
-    ObDatum *result_datums = expr_->locate_batch_datums(eval_ctx);
-    PyArrayObject *result_store = reinterpret_cast<PyArrayObject *>(result_store_);
-    switch(expr_->datum_meta_.type_) {
-      case ObCharType:
-      case ObVarcharType:
-      case ObTinyTextType:
-      case ObTextType:
-      case ObMediumTextType:
-      case ObLongTextType: {
-        for (int i = 0; i < output_size; ++i) {
-          expr_->reset_ptr_in_datum(eval_ctx, i);
-          result_datums[i].set_string(common::ObString(PyUnicode_AsUTF8(
-            PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i)))));
-        }
-        break;
-      }
-      case ObTinyIntType:
-      case ObSmallIntType:
-      case ObMediumIntType:
-      case ObInt32Type:
-      case ObIntType: {
-        for (int i = 0; i < output_size; ++i) {
-          expr_->reset_ptr_in_datum(eval_ctx, i);
-          result_datums[i].set_int(PyLong_AsLong(
-            PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
-        }
-        break;
-      }
-      case ObDoubleType: {
-        for (int i = 0; i < output_size; ++i) {
-          expr_->reset_ptr_in_datum(eval_ctx, i);
-          result_datums[i].set_double(PyLong_AsLong(
-            PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
-        }
-        break;
-      }
-      default: {
-        //error
-        ret = OB_NOT_SUPPORTED;
-        LOG_WARN("Unsupported result type.", K(ret));
-      }
-    }
-    // set flags
-    //expr_->set_evaluated_flag(eval_ctx);
     expr_->set_evaluated_projected(eval_ctx);
   }
-  /* else {
-    // construct vector and insert back into the reserved_buf
-    
-  }*/
+  return ret;
+}
+
+int ObPythonUDFCell::do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size)
+{
+  int ret = OB_SUCCESS;
+  ObDatum *result_datums = expr_->locate_batch_datums(eval_ctx);
+  PyArrayObject *result_store = reinterpret_cast<PyArrayObject *>(result_store_);
+  switch(expr_->datum_meta_.type_) {
+    case ObCharType:
+    case ObVarcharType:
+    case ObTinyTextType:
+    case ObTextType:
+    case ObMediumTextType:
+    case ObLongTextType: {
+      for (int i = 0; i < output_size; ++i) {
+        expr_->reset_ptr_in_datum(eval_ctx, i);
+        result_datums[i].set_string(common::ObString(PyUnicode_AsUTF8(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i)))));
+      }
+      break;
+    }
+    case ObTinyIntType:
+    case ObSmallIntType:
+    case ObMediumIntType:
+    case ObInt32Type:
+    case ObIntType: {
+      for (int i = 0; i < output_size; ++i) {
+        expr_->reset_ptr_in_datum(eval_ctx, i);
+        result_datums[i].set_int(PyLong_AsLong(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
+      }
+      break;
+    }
+    case ObDoubleType: {
+      for (int i = 0; i < output_size; ++i) {
+        expr_->reset_ptr_in_datum(eval_ctx, i);
+        result_datums[i].set_double(PyFloat_AsDouble(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
+      }
+      break;
+    }
+    default: {
+      //error
+      ret = OB_NOT_SUPPORTED;
+      LOG_WARN("Unsupported result type.", K(ret));
+    }
+  }
+  return ret;
+}
+
+int ObPythonUDFCell::do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size)
+{
+  int ret = OB_SUCCESS;
+  if (!expr_->get_eval_info(eval_ctx).evaluated_) {
+    VectorFormat format = VEC_INVALID;
+    const ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
+    switch(info->udf_meta_.ret_) {
+      case share::schema::ObPythonUDF::PyUdfRetType::STRING:
+        //format = VEC_DISCRETE;
+        format = VEC_CONTINUOUS;
+      break;
+      case share::schema::ObPythonUDF::PyUdfRetType::INTEGER:
+      case share::schema::ObPythonUDF::PyUdfRetType::REAL:
+        format = VEC_FIXED;
+      break;
+      default:
+        ret = OB_NOT_SUPPORTED;
+        LOG_WARN("Unsupported result type.", K(ret));
+    }
+    expr_->init_vector_for_write(eval_ctx, format, batch_size_);
+  }
+  ObIVector *vector = expr_->get_vector(eval_ctx);
+  PyArrayObject *result_store = reinterpret_cast<PyArrayObject *>(result_store_);
+  // 构造vector并赋回expr_
+  switch(expr_->datum_meta_.type_) {
+    case ObCharType:
+    case ObVarcharType:
+    case ObTinyTextType:
+    case ObTextType:
+    case ObMediumTextType:
+    case ObLongTextType: {
+      for (int i = 0; i < output_size; ++i) {
+        vector->set_string(i, common::ObString(PyUnicode_AsUTF8(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i)))));
+      }
+      break;
+    }
+    case ObTinyIntType:
+    case ObSmallIntType:
+    case ObMediumIntType:
+    case ObInt32Type:
+    case ObIntType: {
+      //VectorFormat format = VEC_FIXED;
+      //expr_->init_vector_for_write(eval_ctx, format, batch_size_);
+      for (int i = 0; i < output_size; ++i) {
+        vector->set_int(i, PyLong_AsLong(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
+      }
+      break;
+    }
+    case ObDoubleType: {
+      for (int i = 0; i < output_size; ++i) {
+        vector->set_double(i, PyFloat_AsDouble(
+          PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
+      }
+      break;
+    }
+    default: {
+      //error
+      ret = OB_NOT_SUPPORTED;
+      LOG_WARN("Unsupported result type.", K(ret));
+    }
+  }
   return ret;
 }
 
@@ -1111,9 +992,10 @@ int ObPUStoreController::store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
   }
   if (OB_SUCC(ret)) {
     // do other inputs store
-    // MY_SPEC.use_rich_format_ ? other_store_->save_vector(eval_ctx, brs)
-    //                          : other_store_->save_batch(eval_ctx, brs)
-    if (OB_FAIL(other_store_.save_batch(eval_ctx, brs))) {
+    // 要判断skip进行数据重整，使用local allocator进行数据复制
+    // load时要转为相应类型的vector
+    // 下层传上来的数据不一定为uniform格式，需要save_vector()或cast_to_uniform()
+    if (OB_FAIL(other_store_.save_vector(eval_ctx, brs))) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Save other input cols failed.", K(ret));
     } else {
@@ -1160,15 +1042,13 @@ int ObPUStoreController::restore(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t 
     for (ObPythonUDFCell* cell = cells_list_.get_first(); 
         cell != header && OB_SUCC(ret); 
         cell = cell->get_next()) {
-      if (OB_FAIL(cell->do_restore(eval_ctx, brs, output_idx_, output_size))) {
+      if (OB_FAIL(cell->do_restore(eval_ctx, output_idx_, output_size))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Do Python UDF Cell restore failed.", K(ret));
       }
     }
     if (OB_SUCC(ret)) {
-      // MY_SPEC.use_rich_format_ ? other_store_->load_vector(eval_ctx, brs)
-      //                          : other_store_->load_batch(eval_ctx, brs)
-      if (OB_FAIL(other_store_.load_batch(eval_ctx, output_size))) {
+      if (OB_FAIL(other_store_.load_vector(eval_ctx, output_size))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Load other input cols failed.", K(ret));
       } else {

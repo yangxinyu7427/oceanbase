@@ -1132,7 +1132,7 @@ static ObExpr::EvalFunc g_expr_eval_functions[] = {
   NULL, // ObExprGTIDSubtract::eval_subtract,                         /* 687 */
   NULL, // ObExprWaitForExecutedGTIDSet::eval_wait_for_executed_gtid_set, /* 688 */
   NULL, // ObExprWaitUntilSQLThreadAfterGTIDs::eval_wait_until_sql_thread_after_gtids /* 689 */
-  ObExprPythonUdf::eval_test_udf,                                   /* python udf */
+  ObExprPythonUdf::eval_python_udf,                                   /* python udf */
 };
 
 static ObExpr::EvalBatchFunc g_expr_eval_batch_functions[] = {
@@ -1266,8 +1266,8 @@ static ObExpr::EvalBatchFunc g_expr_eval_batch_functions[] = {
   ObBatchCast::explicit_batch_cast<ObDecimalIntTC, ObNumberTC>,       /* 127 */
   ObBatchCast::implicit_batch_cast<ObDecimalIntTC, ObNumberTC>,       /* 128 */
   NULL,//ObExprDecodeTraceId::calc_decode_trace_id_expr_batch,        /* 129 */
-  ObExprPythonUdf::eval_test_udf_batch,                             /* python udf */
-  //ObExprPythonUdf::eval_test_udf_batch_pyobject,                    /* python udf with pyobject */
+  ObExprPythonUdf::eval_python_udf_batch,                             /* python udf */
+  //ObExprPythonUdf::eval_python_udf_batch_pyobject,                    /* python udf with pyobject */
 };
 
 static ObExpr::EvalVectorFunc g_expr_eval_vector_functions[] = {

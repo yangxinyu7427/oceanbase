@@ -45,10 +45,11 @@ public:
 
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
-  static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
+  static int eval_python_udf(EVAL_FUNC_ARG_DECL);
 
-  static int eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
-                                 const ObBitVector &skip, const int64_t batch_size);
+  static int eval_python_udf_batch(BATCH_EVAL_FUNC_ARG_DECL);
+
+  static int eval_python_udf_vector(VECTOR_EVAL_FUNC_ARG_DECL);
 
   static void message_error_dialog_show(char* buf);
 

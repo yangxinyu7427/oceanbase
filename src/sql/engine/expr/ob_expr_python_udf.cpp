@@ -254,8 +254,9 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
   return ret;
 }
 
-int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &expr_datum) {
-  return OB_ERROR_FUNC_VERSION;
+int ObExprPythonUdf::eval_python_udf(EVAL_FUNC_ARG_DECL) {
+  // expr evaluation implemented in predict operator
+  return OB_NOT_SUPPORTED;
   int ret = OB_SUCCESS;
 
   //extract pyfun handler
@@ -440,9 +441,9 @@ int ObExprPythonUdf::eval_test_udf(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
   return ret;
 }
 
-int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
-                                         const ObBitVector &skip, const int64_t batch_size) {
-  return OB_ERROR_FUNC_VERSION;
+int ObExprPythonUdf::eval_python_udf_batch(BATCH_EVAL_FUNC_ARG_DECL) {
+  // expr evaluation implemented in predict operator
+  return OB_NOT_SUPPORTED;
   int ret = OB_SUCCESS;
   // 开始统计时间
   struct timeval t1, t2, t3, t4, t5, t6;
@@ -461,17 +462,17 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   //eval and check params
   ObBitVector &eval_flags = expr.get_evaluated_flags(ctx);
   ObBitVector &my_skip = expr.get_pvt_skip(ctx);
-  my_skip.deep_copy(skip, batch_size);
+  my_skip.deep_copy(skip, size);
   for (int i = 0; i < expr.arg_cnt_; i++) {
     //do eval
-    if (OB_FAIL(expr.args_[i]->eval_batch(ctx, my_skip, batch_size))) {
+    if (OB_FAIL(expr.args_[i]->eval_batch(ctx, my_skip, size))) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("failed to eval batch result args", K(ret));
       return ret;
     }
     //do check
     ObDatum *datum_array = expr.args_[i]->locate_batch_datums(ctx);
-    for (int j = 0; j < batch_size; j++) {
+    for (int j = 0; j < size; j++) {
       if (my_skip.at(j) || eval_flags.at(j))
         continue;
       else if (datum_array[j].is_null()) {
@@ -483,7 +484,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     }
   }
   int64_t real_param = 0;
-  for (int i = 0; i < batch_size; i++) {
+  for (int i = 0; i < size; i++) {
     if (my_skip.at(i) || eval_flags.at(i))
       continue;
     else
@@ -573,7 +574,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObMediumTextType:
       case ObLongTextType: {
         numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
-        for (j = 0; j < batch_size; j++) {
+        for (j = 0; j < size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else {
@@ -594,7 +595,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         //int *p1 = new int[real_param];
         int *pint = (int *)tmp_alloc.alloc(sizeof(int32_t) * real_param);
         //numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
-        for (j = 0; j < batch_size; j++) {
+        for (j = 0; j < size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
@@ -609,7 +610,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         double *pdouble = (double *)tmp_alloc.alloc(sizeof(double) * real_param);
         //numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
         
-        for (j = 0; j < batch_size; j++) {
+        for (j = 0; j < size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
@@ -665,7 +666,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     case ObTextType:
     case ObMediumTextType:
     case ObLongTextType: {
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
+      for (int j = 0; j < size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_string(common::ObString(PyUnicode_AsUTF8(
@@ -678,7 +679,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     case ObMediumIntType:
     case ObInt32Type:
     case ObIntType: {
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
+      for (int j = 0; j < size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_int(PyLong_AsLong(
@@ -687,7 +688,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       break;
     }
     case ObDoubleType:{
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
+      for (int j = 0; j < size && k < ret_size; j++) {
         if (my_skip.at(j) || eval_flags.at(j))
           continue;
         results[j].set_double(PyFloat_AsDouble(
@@ -809,6 +810,15 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   return ret;
 }
 
+int ObExprPythonUdf::eval_python_udf_vector(VECTOR_EVAL_FUNC_ARG_DECL)
+{
+  UNUSED(expr);
+  UNUSED(ctx);
+  UNUSED(skip);
+  UNUSED(bound);
+  // not evaluated here
+  return OB_NOT_SUPPORTED;
+}
 
 int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr, ObExpr& rt_expr) const
 {
@@ -826,7 +836,7 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
     rt_expr.extra_info_ = info;
   }
   //绑定eval
-  rt_expr.eval_func_ = ObExprPythonUdf::eval_test_udf;
+  rt_expr.eval_func_ = ObExprPythonUdf::eval_python_udf;
   //绑定向量化eval
   bool is_batch = true;
   for(int i = 0; i < rt_expr.arg_cnt_; i++){
@@ -836,9 +846,8 @@ int ObExprPythonUdf::cg_expr(ObExprCGCtx& expr_cg_ctx, const ObRawExpr& raw_expr
     }
   }
   if(is_batch) {
-    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_test_udf_batch;
-  } else {
-    //rt_expr.extra_buf_.buf_flag_ = false;
+    rt_expr.eval_batch_func_ = ObExprPythonUdf::eval_python_udf_batch;
+    rt_expr.eval_vector_func_ = ObExprPythonUdf::eval_python_udf_vector;
   }
   return ret;
 }

@@ -20,32 +20,7 @@ namespace sql
 
 const int DEFAULT_PU_LENGTH = 4096;
 
-// buffer for python_udf, based on VectorStore and BatchResultHolder
-struct ObVectorBuffer
-{
-public:
-  ObVectorBuffer() 
-  : alloc_(NULL), exprs_(NULL), exec_ctx_(NULL), datums_(NULL),
-    max_size_(0), saved_size_(0), inited_(false)
-  {}
-  int init(common::ObIAllocator *alloc, const common::ObIArray<ObExpr *> &exprs, ObExecContext &exec_ctx, int64_t max_buffer_size);
-  int save(ObEvalCtx &eval_ctx, ObBatchRows &brs_);
-  bool is_saved() const { return saved_size_ > 0; }
-  int get_size() const { return saved_size_; }
-  int get_max_size() const { return max_size_; };
-  int load(ObEvalCtx &eval_ctx, ObBatchRows &brs_, int64_t &brs_skip_size_, int64_t batch_size);
-  int resize(int64_t size);
-  int move(int64_t size); // move datums and cut max_size_
-private:
-  common::ObIAllocator *alloc_;
-  const common::ObIArray<ObExpr *> *exprs_;
-  ObExecContext *exec_ctx_;
-  ObDatum *datums_;
-  int64_t max_size_;
-  int64_t saved_size_;
-  bool inited_;
-};
-
+// buffer for columns that are not evaluated by python udf
 struct ObColInputStore
 {
 public:
@@ -68,7 +43,8 @@ public:
 private:
   common::ObIAllocator &alloc_;
   common::ObFixedArray<ObExpr *, common::ObIAllocator> exprs_;
-  common::ObFixedArray<ObDatum *, common::ObIAllocator> datums_copy_;
+  common::ObFixedArray<ObDatum *, common::ObIAllocator> datums_copy_; // 相当于UNIFORM格式
+  common::ObFixedArray<ObIVector *, common::ObIAllocator> vector_copy_; // 如何事先allocate continus的数据格式
   int64_t length_;
   int64_t batch_size_;
   int64_t saved_size_;
@@ -89,11 +65,10 @@ public:
   int save_row(ObEvalCtx &eval_ctx, int64_t row_idx); // save row
   int save_batch(ObEvalCtx &eval_ctx, ObBatchRows &brs); // save batch
   int save_vector(ObEvalCtx &eval_ctx, ObBatchRows &brs); // save vector
-  //int load(); 
-  //int load(int64_t row_idx);
+  // not support load functions
   char** get_data_ptrs() { return data_ptrs_; }
   void* get_data_ptr_at(int64_t i) { // use with expr datum type
-    if (i >= 0 && i < expr_->arg_cnt_)
+    if (i >= 0 && OB_NOT_NULL(expr_) && i < expr_->arg_cnt_)
       return reinterpret_cast<void *>(data_ptrs_[i]);
     return nullptr;
   }
@@ -116,8 +91,9 @@ public:
   int free();
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
   int do_process(); // do real processing
-  int do_restore(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t output_idx, int64_t output_size);
-  int do_restore_vector(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t output_idx, int64_t output_size);
+  int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
+  int do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
+  int do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int wrap_input_numpy(PyObject *&pArgs);
   int eval(PyObject *&pArgs); // do python udf evaluation
 
@@ -126,7 +102,8 @@ private:
   ObExpr *expr_; // python_udf_expr
   ObPUInputStore input_store_; // 不同UDF间使用同一列存在冗余缓存, 公共表达式部份本来也存在冗余
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
-  // 运行时参数...
+  // 运行时参数... 
+  //predict size等
 
   // 运算结果暂存
   void *result_store_;
@@ -198,8 +175,6 @@ public:
 
   static int find_predict_size(ObExpr *expr, int32_t &predict_size);
 
-  //virtual int get_next_batch(const int64_t max_row_cnt, const ObBatchRows *&batch_rows) override;
-
   virtual int inner_open() override;
   virtual int inner_close() override;
   virtual int inner_rescan() override;
@@ -208,22 +183,11 @@ public:
   virtual void destroy() override;
 
 private:
-  //int alloc_predict_buffer(ObIAllocator &alloc, ObExpr &expr, ObDatum *&buf_result, int buffer_size);
   //int find_predict_size(ObExpr *expr, int32_t &predict_size);
   int clear_calc_exprs_evaluated_flags();
 
 private:
-  /*ExprFixedArray buf_exprs_; //all exprs with fake frames
-  nt64_t result_width_; //要进行拷贝的expr数
-  int64_t brs_skip_size_;
-  ObVectorBuffer input_buffer_;
-  ObVectorBuffer output_buffer_;
-  ObDatum **buf_results_; // for fake frame
   int predict_size_; //每次python udf计算的元组数
-  bool use_input_buf_;
-  bool use_output_buf_;
-  bool use_fake_frame_;
-  bool test_controller_;*/
 
   common::ObArenaAllocator local_allocator_;
   ObPUStoreController controller_;

@@ -509,7 +509,7 @@ class ObLogPythonUDF;
 class ObPythonUDFSpec;
 class ObPythonUDFOp;
 REGISTER_OPERATOR(ObLogPythonUDF, PHY_PYTHON_UDF, ObPythonUDFSpec,
-                  ObPythonUDFOp, NOINPUT, VECTORIZED_OP);
+                  ObPythonUDFOp, NOINPUT, VECTORIZED_OP, 0, SUPPORT_RICH_FORMAT);
 
 class ObLogJoin;
 class ObMergeJoinSpec;
