@@ -802,95 +802,92 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   ObSinglePyUdfFunCacheMap* funcache_map_list[merged_udf_names_list.count()+1];
   ObSinglePyUdfStrFunCacheMap* str_funcache_map_list[merged_udf_names_list.count()+1];
   if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
-  if(!is_merged_udf){
-    if(OB_FAIL(str_funcache_map.get_refactored(udf_name, single_str_func_map))){
-    if(OB_HASH_NOT_EXIST == ret){
-      isFuncacheNew=true;
-      // remember to delete!!!!
-      single_str_func_map = new ObSinglePyUdfStrFunCacheMap();
-      if(OB_FAIL(single_str_func_map->create(hash::cal_next_prime(500000),
-                                          ObModIds::OB_HASH_BUCKET,
-                                          ObModIds::OB_HASH_NODE))){
-        LOG_WARN("new_single_str_func_map create fail", K(ret));
-      }else{
-        str_funcache_map.set_refactored(udf_name,single_str_func_map);
-      }
-      ret = OB_SUCCESS;
-    }else if(OB_HASH_EXIST == ret){
-      ret = OB_SUCCESS;
-    }
-  }
-  }else{
-    // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
-    for(int i=0;i<merged_udf_names_list.count();i++){
-
-      if(OB_FAIL(str_funcache_map.get_refactored(merged_udf_names_list.at(i), single_str_func_map))){
+    if(!is_merged_udf){
+      if(OB_FAIL(str_funcache_map.get_refactored(udf_name, single_str_func_map))){
         if(OB_HASH_NOT_EXIST == ret){
-          ObString tmp=merged_udf_names_list.at(i);
+          isFuncacheNew=true;
+          // remember to delete!!!!
           single_str_func_map = new ObSinglePyUdfStrFunCacheMap();
           if(OB_FAIL(single_str_func_map->create(hash::cal_next_prime(500000),
-                                          ObModIds::OB_HASH_BUCKET,
-                                          ObModIds::OB_HASH_NODE))){
+                                              ObModIds::OB_HASH_BUCKET,
+                                              ObModIds::OB_HASH_NODE))){
             LOG_WARN("new_single_str_func_map create fail", K(ret));
           }else{
-            str_funcache_map.set_refactored(merged_udf_names_list.at(i),single_str_func_map);
+            str_funcache_map.set_refactored(udf_name,single_str_func_map);
           }
           ret = OB_SUCCESS;
         }else if(OB_HASH_EXIST == ret){
           ret = OB_SUCCESS;
         }
       }
-      //str_funcache_map_list.push_back(single_str_func_map);
-      str_funcache_map_list[i]=single_str_func_map;
+    }else{
+      // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
+      for(int i=0;i<merged_udf_names_list.count();i++){
+
+        if(OB_FAIL(str_funcache_map.get_refactored(merged_udf_names_list.at(i), single_str_func_map))){
+          if(OB_HASH_NOT_EXIST == ret){
+            ObString tmp=merged_udf_names_list.at(i);
+            single_str_func_map = new ObSinglePyUdfStrFunCacheMap();
+            if(OB_FAIL(single_str_func_map->create(hash::cal_next_prime(500000),
+                                            ObModIds::OB_HASH_BUCKET,
+                                            ObModIds::OB_HASH_NODE))){
+              LOG_WARN("new_single_str_func_map create fail", K(ret));
+            }else{
+              str_funcache_map.set_refactored(merged_udf_names_list.at(i),single_str_func_map);
+            }
+            ret = OB_SUCCESS;
+          }else if(OB_HASH_EXIST == ret){
+            ret = OB_SUCCESS;
+          }
+        }
+        //str_funcache_map_list.push_back(single_str_func_map);
+        str_funcache_map_list[i]=single_str_func_map;
+      }
     }
-  }
   }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
     if(!is_merged_udf){
-    if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
-    if(OB_HASH_NOT_EXIST == ret){
-      isFuncacheNew=true;
-      // remember to delete!!!!
-      single_func_map = new ObSinglePyUdfFunCacheMap();
-      if(OB_FAIL(single_func_map->create(hash::cal_next_prime(500000),
-                                          ObModIds::OB_HASH_BUCKET,
-                                          ObModIds::OB_HASH_NODE))){
-        LOG_WARN("new_single_func_map create fail", K(ret));
-      }else{
-        funcache_map.set_refactored(udf_name,single_func_map);
-      }
-      ret = OB_SUCCESS;
-    }else if(OB_HASH_EXIST == ret){
-      ret = OB_SUCCESS;
-    }
-  }
-  }else{
-    // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
-    for(int i=0;i<merged_udf_names_list.count();i++){
-
-      if(OB_FAIL(funcache_map.get_refactored(merged_udf_names_list.at(i), single_func_map))){
+      if(OB_FAIL(funcache_map.get_refactored(udf_name, single_func_map))){
         if(OB_HASH_NOT_EXIST == ret){
-          ObString tmp=merged_udf_names_list.at(i);
+          isFuncacheNew=true;
+          // remember to delete!!!!
           single_func_map = new ObSinglePyUdfFunCacheMap();
           if(OB_FAIL(single_func_map->create(hash::cal_next_prime(500000),
-                                          ObModIds::OB_HASH_BUCKET,
-                                          ObModIds::OB_HASH_NODE))){
+                                              ObModIds::OB_HASH_BUCKET,
+                                              ObModIds::OB_HASH_NODE))){
             LOG_WARN("new_single_func_map create fail", K(ret));
           }else{
-            funcache_map.set_refactored(merged_udf_names_list.at(i),single_func_map);
+            funcache_map.set_refactored(udf_name,single_func_map);
           }
           ret = OB_SUCCESS;
         }else if(OB_HASH_EXIST == ret){
           ret = OB_SUCCESS;
         }
       }
-      //funcache_map_list.push_back(single_func_map);
-      funcache_map_list[i]=single_func_map;
+    }else{
+      // 将被融合的udf建立对应的funcache,并依据次序存入funcache_map_list中
+      for(int i=0;i<merged_udf_names_list.count();i++){
+        if(OB_FAIL(funcache_map.get_refactored(merged_udf_names_list.at(i), single_func_map))){
+          if(OB_HASH_NOT_EXIST == ret){
+            ObString tmp=merged_udf_names_list.at(i);
+            single_func_map = new ObSinglePyUdfFunCacheMap();
+            if(OB_FAIL(single_func_map->create(hash::cal_next_prime(500000),
+                                            ObModIds::OB_HASH_BUCKET,
+                                            ObModIds::OB_HASH_NODE))){
+              LOG_WARN("new_single_func_map create fail", K(ret));
+            }else{
+              funcache_map.set_refactored(merged_udf_names_list.at(i),single_func_map);
+            }
+            ret = OB_SUCCESS;
+          }else if(OB_HASH_EXIST == ret){
+            ret = OB_SUCCESS;
+          }
+        }
+        //funcache_map_list.push_back(single_func_map);
+        funcache_map_list[i]=single_func_map;
+      }
     }
   }
-  }
   
-
-
   // 创建缓存入参和结果对应的数组
   std::vector<std::string> input=std::vector<std::string>(batch_size,"");
   //std::vector<bool> output(batch_size);
@@ -1230,134 +1227,132 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   }
   gettimeofday(&t3, NULL);
   if(real_param!=0){
+    //执行Python Code并获取返回值
+    resultarray = PyObject_CallObject(pFunc, pArgs);
+    if (!resultarray) {
+      process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("execute error", K(ret));
+      goto destruction;
+    }
+    // 判断是普通list还是numpylist，如果是numpy list代表udf直接返回的结果列，那么就直接将其作为pResult，
+    // 如果是普通list，那么代表是经查询内冗余消除后返回的包含融合后的udf以及每个udf的结果的大的list
+    isNumPyArray = PyArray_Check(resultarray);
+    if(isNumPyArray)
+      pResult = resultarray;
+    else
+      pResult = PyList_GetItem(resultarray, 0);
+    gettimeofday(&t4, NULL);
 
-      //执行Python Code并获取返回值
-  
-  resultarray = PyObject_CallObject(pFunc, pArgs);
-  if (!resultarray) {
-    process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("execute error", K(ret));
-    goto destruction;
-  }
-  // 判断是普通list还是numpylist，如果是numpy list代表udf直接返回的结果列，那么就直接将其作为pResult，
-  // 如果是普通list，那么代表是经查询内冗余消除后返回的包含融合后的udf以及每个udf的结果的大的list
-  isNumPyArray = PyArray_Check(resultarray);
-  if(isNumPyArray)
-    pResult = resultarray;
-  else
-    pResult = PyList_GetItem(resultarray, 0);
-  gettimeofday(&t4, NULL);
-
-  //根据类型从numpy数组中取出返回值并填入返回值
-  ret_size = PyArray_SIZE((PyArrayObject *)pResult);
-  k = 0;
-  switch (expr.datum_meta_.type_)
-  {
-    case ObCharType:
-    case ObVarcharType:
-    case ObTinyTextType:
-    case ObTextType:
-    case ObMediumTextType:
-    case ObLongTextType: {
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
-        if (my_skip.at(j) || eval_flags.at(j))
-          continue;
-        ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
-        results[j].set_string(tmp);
-        // set funCache
-        if(useCache){
-          if(!is_merged_udf){
-            const char* cstr = input[j].c_str();
-            // 获取字符串长度
-            size_t length = input[j].size();
-            // 分配内存并复制字符串内容
-            char* newStr = new char[length + 1];
-            std::memcpy(newStr, cstr, length + 1);
-            // 分配内存并复制值字符串的内容
-            char* tmpValue = new char[tmp.length() + 1];
-            std::memcpy(tmpValue, tmp.ptr(), tmp.length() + 1);
-            single_str_func_map->set_refactored(newStr, tmpValue);
-          }else{
-            // todo 存多个udf的输出到对应的funcache中
-            for(int i=0;i<merged_udf_names_list.count();i++){
-              pOutputArray=PyList_GetItem(resultarray, i+1);
-              common::ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pOutputArray, (char *)PyArray_GETPTR1((PyArrayObject *)pOutputArray, k-1))));
+    //根据类型从numpy数组中取出返回值并填入返回值
+    ret_size = PyArray_SIZE((PyArrayObject *)pResult);
+    k = 0;
+    switch (expr.datum_meta_.type_)
+    {
+      case ObCharType:
+      case ObVarcharType:
+      case ObTinyTextType:
+      case ObTextType:
+      case ObMediumTextType:
+      case ObLongTextType: {
+        for (int j = 0; j < batch_size && k < ret_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
+          results[j].set_string(tmp);
+          // set funCache
+          if(useCache){
+            if(!is_merged_udf){
               const char* cstr = input[j].c_str();
+              // 获取字符串长度
               size_t length = input[j].size();
+              // 分配内存并复制字符串内容
               char* newStr = new char[length + 1];
               std::memcpy(newStr, cstr, length + 1);
-              //funcache_map_list.at(i)->set_refactored(newStr,tmp);
+              // 分配内存并复制值字符串的内容
               char* tmpValue = new char[tmp.length() + 1];
               std::memcpy(tmpValue, tmp.ptr(), tmp.length() + 1);
-              str_funcache_map_list[i]->set_refactored(newStr,tmpValue);
+              single_str_func_map->set_refactored(newStr, tmpValue);
+            }else{
+              // todo 存多个udf的输出到对应的funcache中
+              for(int i=0;i<merged_udf_names_list.count();i++){
+                pOutputArray=PyList_GetItem(resultarray, i+1);
+                common::ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pOutputArray, (char *)PyArray_GETPTR1((PyArrayObject *)pOutputArray, k-1))));
+                const char* cstr = input[j].c_str();
+                size_t length = input[j].size();
+                char* newStr = new char[length + 1];
+                std::memcpy(newStr, cstr, length + 1);
+                //funcache_map_list.at(i)->set_refactored(newStr,tmp);
+                char* tmpValue = new char[tmp.length() + 1];
+                std::memcpy(tmpValue, tmp.ptr(), tmp.length() + 1);
+                str_funcache_map_list[i]->set_refactored(newStr,tmpValue);
+              }
             }
           }
         }
+        break;
       }
-      break;
-    }
-    case ObTinyIntType:
-    case ObSmallIntType:
-    case ObMediumIntType:
-    case ObInt32Type:
-    case ObIntType: {
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
-        if (my_skip.at(j) || eval_flags.at(j))
-          continue;
-        int tmp=PyLong_AsLong(
-          PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
-        results[j].set_int(tmp);
-        // set funCache
-        if(useCache){
-          if(!is_merged_udf){
-            const char* cstr = input[j].c_str();
-            // 获取字符串长度
-            size_t length = input[j].size();
-            // 分配内存并复制字符串内容
-            char* newStr = new char[length + 1];
-            std::memcpy(newStr, cstr, length + 1);
-            single_func_map->set_refactored(newStr,tmp);
-          }else{
-            // todo 存多个udf的输出到对应的funcache中
-            for(int i=0;i<merged_udf_names_list.count();i++){
-              pOutputArray=PyList_GetItem(resultarray, i+1);
-              int tmp=PyLong_AsLong(PyArray_GETITEM((PyArrayObject *)pOutputArray, (char *)PyArray_GETPTR1((PyArrayObject *)pOutputArray, k-1)));
+      case ObTinyIntType:
+      case ObSmallIntType:
+      case ObMediumIntType:
+      case ObInt32Type:
+      case ObIntType: {
+        for (int j = 0; j < batch_size && k < ret_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          int tmp=PyLong_AsLong(
+            PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
+          results[j].set_int(tmp);
+          // set funCache
+          if(useCache){
+            if(!is_merged_udf){
               const char* cstr = input[j].c_str();
+              // 获取字符串长度
               size_t length = input[j].size();
+              // 分配内存并复制字符串内容
               char* newStr = new char[length + 1];
               std::memcpy(newStr, cstr, length + 1);
-              //funcache_map_list.at(i)->set_refactored(newStr,tmp);
-              funcache_map_list[i]->set_refactored(newStr,tmp);
+              single_func_map->set_refactored(newStr,tmp);
+            }else{
+              // todo 存多个udf的输出到对应的funcache中
+              for(int i=0;i<merged_udf_names_list.count();i++){
+                pOutputArray=PyList_GetItem(resultarray, i+1);
+                int tmp=PyLong_AsLong(PyArray_GETITEM((PyArrayObject *)pOutputArray, (char *)PyArray_GETPTR1((PyArrayObject *)pOutputArray, k-1)));
+                const char* cstr = input[j].c_str();
+                size_t length = input[j].size();
+                char* newStr = new char[length + 1];
+                std::memcpy(newStr, cstr, length + 1);
+                //funcache_map_list.at(i)->set_refactored(newStr,tmp);
+                funcache_map_list[i]->set_refactored(newStr,tmp);
+              }
             }
+            
           }
-          
         }
+        break;
       }
-      break;
-    }
-    case ObDoubleType:{
-      for (int j = 0; j < batch_size && k < ret_size; j++) {
-        if (my_skip.at(j) || eval_flags.at(j))
-          continue;
-        results[j].set_double(PyFloat_AsDouble(
-          PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
+      case ObDoubleType:{
+        for (int j = 0; j < batch_size && k < ret_size; j++) {
+          if (my_skip.at(j) || eval_flags.at(j))
+            continue;
+          results[j].set_double(PyFloat_AsDouble(
+            PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
+        }
+        break;
       }
-      break;
+      case ObNumberType: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("not support ObNumberType", K(ret));
+        goto destruction;
+      }
+      default: {
+        //error
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("unknown result type", K(ret));
+        goto destruction;
+      }
     }
-    case ObNumberType: {
-      //error
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("not support ObNumberType", K(ret));
-      goto destruction;
-    }
-    default: {
-      //error
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("unknown result type", K(ret));
-      goto destruction;
-    }
-  }
   }
   gettimeofday(&t5, NULL);
   
