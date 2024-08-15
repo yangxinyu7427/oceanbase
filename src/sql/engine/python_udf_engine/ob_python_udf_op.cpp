@@ -21,19 +21,15 @@ ObPythonUDFSpec::~ObPythonUDFSpec() {}
 
 ObPythonUDFOp::ObPythonUDFOp(
     ObExecContext &exec_ctx, const ObOpSpec &spec, ObOpInput *input)
-  : ObOperator(exec_ctx, spec, input), buf_alloc_(), tmp_alloc_(), controller_(buf_alloc_, tmp_alloc_)
+  : ObOperator(exec_ctx, spec, input), controller_()
 {
   int ret = OB_SUCCESS;
   //predict_size_ = 256;
   //predict_size_ = MY_SPEC.max_batch_size_; //default
 
   const uint64_t tenant_id = ctx_.get_my_session()->get_effective_tenant_id();
-  ObMemAttr attr(tenant_id, ObModIds::OB_SQL_EXPR, ObCtxIds::WORK_AREA);
-  buf_alloc_.set_attr(attr);
-
-  tmp_alloc_.set_tenant_id(tenant_id);
-  tmp_alloc_.set_label(ObModIds::OB_SQL_EXPR);
-  tmp_alloc_.set_ctx_id(ObCtxIds::WORK_AREA);
+  ObMemAttr attr(tenant_id, ObModIds::RESTORE, ObCtxIds::MEMSTORE_CTX_ID);
+  //controller_.set_attr(attr);
 }
 
 ObPythonUDFOp::~ObPythonUDFOp() {}
@@ -85,7 +81,6 @@ int ObPythonUDFOp::inner_rescan()
 
 void ObPythonUDFOp::destroy()
 {
-  // destroy attrs
   ObOperator::destroy();
 }
 
@@ -114,10 +109,20 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
   // get data from buffer
+  //Ensure GIL
+  bool nStatus = PyGILState_Check();
+  PyGILState_STATE gstate;
+  if(!nStatus) {
+    gstate = PyGILState_Ensure();
+    nStatus = true;
+  }
+  //load numpy api
+  _import_array();
+
   if (!controller_.is_output()) {
     clear_evaluated_flag();
     controller_.resize(controller_.get_desirable());
-    tmp_alloc_.reset(); // clear temp data
+    //tmp_alloc_.reset(); // clear temp data
     const ObBatchRows *child_brs = nullptr;
     while (OB_SUCC(ret) && !brs_.end_ && !controller_.is_full()) {
       if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
@@ -137,6 +142,10 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Restore output batchrows failed.", K(ret));
   }
+  
+  // Release GIL
+  if(nStatus)
+    PyGILState_Release(gstate);
   return ret;
 }
 
@@ -202,7 +211,6 @@ int ObColInputStore::init(const common::ObIArray<ObExpr *> &exprs,
 int ObColInputStore::free()
 {
   int ret = OB_SUCCESS;
-  datums_copy_.destroy();
   tmp_alloc_.reset();
   return ret;
 }
@@ -218,10 +226,11 @@ int ObColInputStore::reuse()
 int ObColInputStore::reset(int64_t length)
 {
   int ret = OB_SUCCESS;
-  if (length <= length_) {
+  if (OB_FAIL(free())) {
+  } else if (length <= length_) {
     reuse();
-  } else if (OB_FAIL(free())) {
   } else {
+    datums_copy_.reset();
     datums_copy_.init(exprs_.count());
     for (int i = 0; i < exprs_.count(); ++i) {
       ObExpr *e = exprs_.at(i);
@@ -392,6 +401,7 @@ int ObPUInputStore::alloc_data_ptrs()
     ret = OB_NOT_INIT;
     LOG_WARN("Uninit allocator and expression.", K(ret));
   } else {
+    // allocated by buf_alloc_
     data_ptrs_ = static_cast<char **>(alloc_->alloc(expr_->arg_cnt_ * sizeof(char *))); // data lists
     if (OB_ISNULL(data_ptrs_)) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
@@ -463,9 +473,10 @@ int ObPUInputStore::free() {
   int ret = OB_SUCCESS;
   // malloc allocator支持free(ptr)
   // if expr_ = null, do not check
+  alloc_->reset();
+  /*
   for (int i = 0; OB_SUCC(ret) && i < expr_->arg_cnt_; ++i) {
     ObExpr *e = expr_->args_[i];
-    /* allocate by datum type */
     switch(e->datum_meta_.type_) {
       case ObCharType:
       case ObVarcharType:
@@ -493,7 +504,7 @@ int ObPUInputStore::free() {
         LOG_WARN("Unsupported input arg type, free failed in ObPUDataStore.", K(ret));
       }
     }
-  }
+  }*/
   return ret;
 }
 
@@ -589,20 +600,16 @@ int ObPUInputStore::save_vector(ObEvalCtx &eval_ctx, ObBatchRows &brs)
 }
 
 /* ----------------------------------- ObPythonUDFCell --------------------------------- */
-int ObPythonUDFCell::init(common::ObIAllocator *buf_alloc, 
-                          common::ObIAllocator *tmp_alloc, 
-                          ObExpr *expr, 
+int ObPythonUDFCell::init(ObExpr *expr, 
                           int64_t batch_size, 
                           int64_t length)
 {
   int ret = OB_SUCCESS;
   // init python udf expr according to its metadata
-  if (OB_FAIL(input_store_.init(buf_alloc, expr, length))) {
+  if (OB_FAIL(input_store_.init(&alloc_, expr, length))) {
     ret = OB_NOT_INIT;
     LOG_WARN("Init input store failed.", K(ret));
   } else {
-    buf_alloc_ = buf_alloc;
-    tmp_alloc_ = tmp_alloc;
     expr_ = expr;
     //desirable_ = expr->extra_info_.;
     ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
@@ -618,6 +625,13 @@ int ObPythonUDFCell::free()
   if (OB_FAIL(input_store_.free())) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Free Python UDF cell failed.", K(ret));
+  } else {
+    result_size_ = 0;
+    if (result_store_ != NULL) {
+      PyArrayObject *result_store = reinterpret_cast<PyArrayObject *>(result_store_);
+      PyArray_XDECREF(result_store);
+      result_store_ = NULL;
+    }
   }
   return ret;
 }
@@ -640,7 +654,6 @@ int ObPythonUDFCell::do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
         LOG_WARN("Eval Python UDF args' vector/batch result failed.", K(ret));
       }
     }
-
     // expr参数结果已经被设置为UNIFORM格式
     if (OB_FAIL(ret) || OB_FAIL(input_store_.save_batch(eval_ctx, brs))) { 
       ret = OB_ERR_UNEXPECTED;
@@ -650,6 +663,7 @@ int ObPythonUDFCell::do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
   return ret;
 }
 
+// not used
 int ObPythonUDFCell::do_process_all()
 {
   int ret = OB_SUCCESS;
@@ -691,15 +705,6 @@ int ObPythonUDFCell::do_process()
   // pre process
   result_store_ = NULL;
   result_size_ = 0;
-  //Ensure GIL
-  bool nStatus = PyGILState_Check();
-  PyGILState_STATE gstate;
-  if(!nStatus) {
-    gstate = PyGILState_Ensure();
-    nStatus = true;
-  }
-  //load numpy api
-  _import_array();
   struct timeval t1, t2;
   int64_t eval_size = 0;
   for (int idx = 0; OB_SUCC(ret) && idx < input_store_.get_saved_size(); idx += eval_size) {
@@ -715,11 +720,8 @@ int ObPythonUDFCell::do_process()
       gettimeofday(&t2, NULL);
       modify_desirable(t1, t2, eval_size);
     }
+    Py_XDECREF(pArgs);
   }
-  // Release GIL
-  if(nStatus)
-    PyGILState_Release(gstate);
-
   return ret;
 }
 
@@ -1025,9 +1027,9 @@ int ObPUStoreController::init(int64_t batch_size,
   // init python udf cells
   for (int i = 0; i < udf_exprs.count() && OB_SUCC(ret); ++i) {
     ObExpr *udf_expr = udf_exprs.at(i);
-    void *cell_ptr = static_cast<ObPythonUDFCell *>(buf_alloc_.alloc(sizeof(ObPythonUDFCell))); // buffer alloc
+    void *cell_ptr = static_cast<ObPythonUDFCell *>(alloc_.alloc(sizeof(ObPythonUDFCell)));
     ObPythonUDFCell *cell = new (cell_ptr) ObPythonUDFCell();
-    if (OB_ISNULL(cell) || OB_FAIL(cell->init(&buf_alloc_, &tmp_alloc_, udf_expr, batch_size, capacity_)) ) {
+    if (OB_ISNULL(cell) || OB_FAIL(cell->init(udf_expr, batch_size, capacity_)) ) {
       ret = OB_INIT_FAIL;
       LOG_WARN("Init Python UDF Cell failed.", K(ret));
     } else {

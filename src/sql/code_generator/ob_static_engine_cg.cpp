@@ -6180,20 +6180,11 @@ int ObStaticEngineCG::generate_spec(
   OZ(spec.udf_exprs_.init(python_udf_size));
   for (int i = 0; i < python_udf_size; ++i) {
     ObExpr *rt_expr = NULL;
-    const ObRawExpr *raw_expr = op.get_python_udf_exprs().at(i);
+    ObRawExpr *raw_expr = op.get_python_udf_exprs().at(i);
+    OZ(mark_expr_self_produced(raw_expr));  // set IS_COLUMNLIZED flag
     OZ(generate_rt_expr(*raw_expr, rt_expr));
     OZ(spec.udf_exprs_.push_back(rt_expr));
   }
-
-  // generate other inputs
-  /*ExprIArray &output_exprs = op.get_output_exprs();
-  ObSEArray<ObRawExpr *, 4> other_output_exprs;
-  for (int i = 0; i < output_exprs.count(); ++i) {
-    ObRawExpr *expr = output_exprs.at(i);
-    if (T_FUN_PYTHON_UDF != expr->get_expr_type()) {
-      other_output_exprs.push_back()
-    }
-  }*/
 
   std::function<void(ObRawExpr *, ObIArray<ObRawExpr *> &, ObIArray<ObRawExpr *> &)> findOtherInputs = 
     [&findOtherInputs](ObRawExpr *expr, 
@@ -6219,7 +6210,7 @@ int ObStaticEngineCG::generate_spec(
     findOtherInputs(self_output_exprs.at(i), other_input_exprs, child_output_exprs);
   }
 
-  //generate input exprs (not calculated by python udfs)
+  //generate input exprs (but not calculated by python udfs)
   OZ(spec.input_exprs_.init(other_input_exprs.count()));
   for (int i = 0; i < other_input_exprs.count(); ++i) {
     ObRawExpr *raw_expr = other_input_exprs.at(i);
@@ -6227,9 +6218,6 @@ int ObStaticEngineCG::generate_spec(
     OZ(generate_rt_expr(*raw_expr, rt_expr));
     OZ(spec.input_exprs_.push_back(rt_expr));
   }
-
-  // self produced exprs
-  OZ(mark_expr_self_produced(child_output_exprs));
 
   LOG_DEBUG("finish generate python udf spec", K(spec), K(ret));
   return ret;

@@ -24,9 +24,9 @@ const int DEFAULT_PU_LENGTH = 8192;
 struct ObColInputStore
 {
 public:
-  ObColInputStore(common::ObIAllocator &buf_alloc, common::ObIAllocator &tmp_alloc) 
-  : buf_alloc_(buf_alloc), tmp_alloc_(tmp_alloc), exprs_(buf_alloc), datums_copy_(buf_alloc), length_(0),
-    batch_size_(0), saved_size_(0), output_idx_(0), inited_(false)
+  ObColInputStore() 
+  : buf_alloc_(), tmp_alloc_(), exprs_(buf_alloc_), datums_copy_(buf_alloc_),
+    length_(0), batch_size_(0), saved_size_(0), output_idx_(0), inited_(false)
   {}
   ~ObColInputStore() {}
   int init(const common::ObIArray<ObExpr *> &exprs,
@@ -42,8 +42,8 @@ public:
   int load_vector(ObEvalCtx &eval_ctx, int64_t load_size);
 
 private:
-  common::ObIAllocator &buf_alloc_;
-  common::ObIAllocator &tmp_alloc_;
+  common::ObArenaAllocator buf_alloc_; // for array and pointers
+  common::ObArenaAllocator tmp_alloc_; // for data copy
   common::ObFixedArray<ObExpr *, common::ObIAllocator> exprs_;
   common::ObFixedArray<ObDatum *, common::ObIAllocator> datums_copy_; // 相当于UNIFORM格式
   int64_t length_; // 当前容量
@@ -76,7 +76,7 @@ public:
   int64_t get_saved_size() {return saved_size_;}
 
 private:
-  common::ObIAllocator *alloc_; // buffer allocater
+  common::ObIAllocator *alloc_; // input store allocator
   ObExpr *expr_; // Python UDF expr
   int64_t length_; // 当前容量
   char **data_ptrs_;
@@ -84,28 +84,11 @@ private:
   bool inited_;
 };
 
-struct ObPUResult
-{
-public:
-  ObPUResult(): result_ptr_(NULL), result_len_(0) {}
-  ObPUResult(void* result, int64_t size): result_ptr_(result), result_len_(size) {}
-  ~ObPUResult() {}
-  void* get_ptr() { return result_ptr_; }
-  int get_length() { return result_len_; }
-
-private:
-  void *result_ptr_;
-  int64_t result_len_;
-};
-
-
 class ObPythonUDFCell : public common::ObDLinkBase<ObPythonUDFCell> {
 public:
   ObPythonUDFCell() {}
   ~ObPythonUDFCell() {}
-  int init(common::ObIAllocator *buf_alloc,
-           common::ObIAllocator *tmp_alloc,
-           ObExpr *expr, 
+  int init(ObExpr *expr, 
            int64_t batch_size, 
            int64_t length);
   int free();
@@ -131,19 +114,16 @@ public:
 
 
 private:
-  common::ObIAllocator *buf_alloc_; // buffer allocator
-  common::ObIAllocator *tmp_alloc_; // temp allocator
+  common::ObArenaAllocator alloc_; // input store allocator
   ObExpr *expr_; // python_udf_expr
   ObPUInputStore input_store_; // 不同UDF间使用同一列存在冗余缓存, 公共表达式部份本来也存在冗余
+
+  // 运行时参数... 
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
   int64_t desirable_; // 理想的运行时计算size
-  // 运行时参数... 
-  //predict size等
 
   // 运算结果暂存
-  //common::ObSEArray<ObPUResult *, 16> result_store_;
   int result_size_;
-  //common::ObSEArray<int, 16> result_size_;
   void *result_store_;
 };
 typedef common::ObDList<ObPythonUDFCell> PythonUDFCellList;
@@ -152,18 +132,16 @@ typedef common::ObDList<ObPythonUDFCell> PythonUDFCellList;
 class ObPUStoreController
 {
 public:
-  ObPUStoreController(common::ObIAllocator &buf_alloc, common::ObIAllocator &tmp_alloc) : 
-    buf_alloc_(buf_alloc),
-    tmp_alloc_(tmp_alloc),
+  ObPUStoreController() : 
     cells_list_(),
-    other_store_(buf_alloc, tmp_alloc),
+    other_store_(),
     capacity_(DEFAULT_PU_LENGTH),
     desirable_(0),
     stored_input_cnt_(0),
     stored_output_cnt_(0),
     output_idx_(0),
     batch_size_(256) {}
-  ~ObPUStoreController() {}
+  ~ObPUStoreController() { free(); }
   int init(int64_t batch_size,
            const common::ObIArray<ObExpr *> &udf_exprs, 
            const common::ObIArray<ObExpr *> &input_exprs);
@@ -187,8 +165,7 @@ public:
   bool end_output() { return output_idx_ == stored_output_cnt_; }
 
 private:
-  common::ObIAllocator &buf_alloc_;
-  common::ObIAllocator &tmp_alloc_;
+  common::ObArenaAllocator alloc_; // alloc cells
   PythonUDFCellList cells_list_;
   ObColInputStore other_store_;
 
@@ -238,9 +215,6 @@ private:
 
 private:
   int predict_size_; //每次python udf计算的元组数
-
-  common::ObMalloc buf_alloc_; // for input stores
-  common::ObArenaAllocator tmp_alloc_; // for deep copy
   ObPUStoreController controller_;
 };
 
