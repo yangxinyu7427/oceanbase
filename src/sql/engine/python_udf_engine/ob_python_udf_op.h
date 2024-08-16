@@ -28,7 +28,11 @@ public:
   : buf_alloc_(), tmp_alloc_(), exprs_(buf_alloc_), datums_copy_(buf_alloc_),
     length_(0), batch_size_(0), saved_size_(0), output_idx_(0), inited_(false)
   {}
-  ~ObColInputStore() {}
+  ~ObColInputStore() {
+    free();
+    datums_copy_.destroy();
+    exprs_.destroy();
+  }
   int init(const common::ObIArray<ObExpr *> &exprs,
            int64_t batch_size,
            int64_t length);
@@ -42,7 +46,7 @@ public:
   int load_vector(ObEvalCtx &eval_ctx, int64_t load_size);
 
 private:
-  common::ObArenaAllocator buf_alloc_; // for array and pointers
+  common::ObFIFOAllocator buf_alloc_; // for array and pointers
   common::ObArenaAllocator tmp_alloc_; // for data copy
   common::ObFixedArray<ObExpr *, common::ObIAllocator> exprs_;
   common::ObFixedArray<ObDatum *, common::ObIAllocator> datums_copy_; // 相当于UNIFORM格式
@@ -58,6 +62,7 @@ struct ObPUInputStore
 {
 public:
   ObPUInputStore() : alloc_(NULL), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
+  ~ObPUInputStore() { free(); }
   int init(common::ObIAllocator *alloc, ObExpr *expr, int64_t length);
   int alloc_data_ptrs();
   int reuse();
@@ -76,7 +81,7 @@ public:
   int64_t get_saved_size() {return saved_size_;}
 
 private:
-  common::ObIAllocator *alloc_; // input store allocator
+  common::ObIAllocator *alloc_; // input store allocator (FIFO allocator)
   ObExpr *expr_; // Python UDF expr
   int64_t length_; // 当前容量
   char **data_ptrs_;
@@ -114,7 +119,7 @@ public:
 
 
 private:
-  common::ObArenaAllocator alloc_; // input store allocator
+  common::ObFIFOAllocator alloc_; // input store allocator need to free
   ObExpr *expr_; // python_udf_expr
   ObPUInputStore input_store_; // 不同UDF间使用同一列存在冗余缓存, 公共表达式部份本来也存在冗余
 

@@ -214,6 +214,8 @@ protected:
   bool cpu_dump_;
   bool has_synced_;
   static ObICtxMemConfigGetter *mcg_;
+  // for python udf malloc and free
+  lib::ObMallocHookAttrGuard malloc_guard = lib::ObMallocHookAttrGuard(lib::ObMemAttr(500, "PyUDFMod")); // tenant_id 500
   void* _save; //for Python Interpreter Thread State
 
 private:

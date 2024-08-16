@@ -212,12 +212,17 @@ int ObColInputStore::free()
 {
   int ret = OB_SUCCESS;
   tmp_alloc_.reset();
+  for (int i = 0; i < datums_copy_.count(); ++i) {
+    ObDatum *datums_buf = datums_copy_.at(i);
+    buf_alloc_.free(datums_buf);
+  }
   return ret;
 }
 
 int ObColInputStore::reuse()
 {
   int ret = OB_SUCCESS;
+  tmp_alloc_.reset();
   saved_size_ = 0;
   output_idx_ = 0;
   return ret;
@@ -226,9 +231,11 @@ int ObColInputStore::reuse()
 int ObColInputStore::reset(int64_t length)
 {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(free())) {
-  } else if (length <= length_) {
+  if (length <= length_) {
     reuse();
+  } else if (OB_FAIL(free())) {
+    // memory leak
+    ret = OB_ERR_UNEXPECTED;
   } else {
     datums_copy_.reset();
     datums_copy_.init(exprs_.count());
@@ -401,7 +408,7 @@ int ObPUInputStore::alloc_data_ptrs()
     ret = OB_NOT_INIT;
     LOG_WARN("Uninit allocator and expression.", K(ret));
   } else {
-    // allocated by buf_alloc_
+    // allocated by FIFO allocator
     data_ptrs_ = static_cast<char **>(alloc_->alloc(expr_->arg_cnt_ * sizeof(char *))); // data lists
     if (OB_ISNULL(data_ptrs_)) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
@@ -473,8 +480,7 @@ int ObPUInputStore::free() {
   int ret = OB_SUCCESS;
   // malloc allocator支持free(ptr)
   // if expr_ = null, do not check
-  alloc_->reset();
-  /*
+  //alloc_->reset();
   for (int i = 0; OB_SUCC(ret) && i < expr_->arg_cnt_; ++i) {
     ObExpr *e = expr_->args_[i];
     switch(e->datum_meta_.type_) {
@@ -504,7 +510,7 @@ int ObPUInputStore::free() {
         LOG_WARN("Unsupported input arg type, free failed in ObPUDataStore.", K(ret));
       }
     }
-  }*/
+  }
   return ret;
 }
 
