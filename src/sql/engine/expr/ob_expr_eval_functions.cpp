@@ -1383,6 +1383,7 @@ static ObExpr::EvalVectorFunc g_expr_eval_vector_functions[] = {
   ObExprInOrNotIn::eval_vector_in_without_row_fallback,         /* 109 */
   ObExprInOrNotIn::eval_vector_in_without_row,                  /* 110 */
   NULL,//ObExprDecodeTraceId::calc_decode_trace_id_expr_vector  /* 111 */
+  ObExprPythonUdf::eval_python_udf_vector,                      /* python udf */
 };
 
 REG_SER_FUNC_ARRAY(OB_SFA_SQL_EXPR_EVAL,
