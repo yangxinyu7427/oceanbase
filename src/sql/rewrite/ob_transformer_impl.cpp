@@ -49,6 +49,7 @@
 #include "sql/rewrite/ob_transform_dblink.h"
 #include "sql/rewrite/ob_transform_pullup_filter.h"
 #include "sql/rewrite/ob_transform_pyudf_merge.h"
+#include "sql/rewrite/ob_transform_pyudf_redundent.h"
 #include "common/ob_smart_call.h"
 #include "sql/engine/ob_exec_context.h"
 
@@ -320,6 +321,7 @@ int ObTransformerImpl::transform_rule_set(ObDMLStmt *&stmt,
     // pile
     bool trans_happened = false;
     APPLY_RULE_IF_NEEDED(PYUDF_MERGE,ObTransformPyUDFMerge);
+    APPLY_RULE_IF_NEEDED(PYUDF_REDUNDENT,ObTransformPyUDFRedundent);
     APPLY_RULE_IF_NEEDED(PULL_UP_FILTER, ObTransformPullUpFilter);
   }
   return ret;

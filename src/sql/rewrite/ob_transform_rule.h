@@ -176,6 +176,7 @@ enum TRANSFORM_TYPE {
   PROCESS_DBLINK                ,
   PULL_UP_FILTER                ,  // for python udf
   PYUDF_MERGE                   ,
+  PYUDF_REDUNDENT               ,
   TRANSFORM_TYPE_COUNT_PLUS_ONE ,
 };
 
