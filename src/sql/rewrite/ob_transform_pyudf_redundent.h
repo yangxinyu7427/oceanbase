@@ -26,6 +26,16 @@ public:
     ObDMLStmt *&stmt,
     bool &trans_happened) override;
 
+  virtual int check_redundent_on_udfs(ObIArray<ObRawExpr *> &src_exprs);
+  
+  virtual int compare_with_history_exprs(ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list);
+
+  virtual int get_onnx_model_path_from_python_udf_meta(string &onnx_model_path, 
+  oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta);
+
+  virtual int extract_python_udf_expr_in_condition(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObIArray<ObRawExpr *> &src_exprs);
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,

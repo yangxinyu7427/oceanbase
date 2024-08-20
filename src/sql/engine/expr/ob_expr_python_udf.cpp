@@ -101,6 +101,8 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   dst.ret_ = src.ret_;
   dst.ismerged_ = src.ismerged_;
   dst.origin_input_count_=src.origin_input_count_;
+  dst.has_new_model_path_=src.has_new_model_path_;
+  dst.new_model_path_=src.new_model_path_;
   if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {

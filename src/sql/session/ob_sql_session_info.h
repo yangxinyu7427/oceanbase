@@ -325,6 +325,9 @@ typedef common::hash::ObHashMap<char*, char*,
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,
                                 common::hash::NoPthreadDefendMode> ObPyUdfFunCacheMap;
 
+typedef common::hash::ObHashMap<common::ObString, common::ObString,
+                                common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
+
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfStrFunCacheMap*,
                                 common::hash::NoPthreadDefendMode> ObPyUdfStrFunCacheMap;
 
@@ -926,6 +929,7 @@ public:
   ObControlInfoEncoder &get_control_info_encoder() { return control_info_encoder_;}
   ObContextsMap &get_contexts_map() { return contexts_map_; }
   ObPyUdfFunCacheMap &get_pyudf_funcache_map() { return pyudf_funcache_map_; }
+  ObHistoryPyUdfMap &get_history_pyudf_map() { return history_pyudf_map_; }
   ObPyUdfStrFunCacheMap &get_pyudf_str_funcache_map() { return pyudf_str_funcache_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
   int update_sess_sync_info(const SessionSyncInfoType sess_sync_info_type,
@@ -1137,6 +1141,7 @@ private:
   ObContextsMap contexts_map_;
 public:
   ObPyUdfFunCacheMap pyudf_funcache_map_;
+  ObHistoryPyUdfMap history_pyudf_map_;
   ObPyUdfStrFunCacheMap pyudf_str_funcache_map_;
 private:
   int64_t curr_session_context_size_;

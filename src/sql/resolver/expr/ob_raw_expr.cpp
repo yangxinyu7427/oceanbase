@@ -4283,6 +4283,18 @@ int ObPythonUdfRawExpr::set_udf_meta_origin_input_count(int num){
   return ret;
 }
 
+int ObPythonUdfRawExpr::set_udf_meta_has_new_model_path(){
+  int ret = OB_SUCCESS;
+  udf_meta_.has_new_model_path_=true;
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_new_model_path(std::string path){
+  int ret = OB_SUCCESS;
+  udf_meta_.new_model_path_=path;
+  return ret;
+}
+
 bool ObPythonUdfRawExpr::inner_same_as(const ObRawExpr &expr,
                                        ObExprEqualCheckContext *check_context) const
 {

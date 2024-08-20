@@ -42,7 +42,6 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
 {
   int ret = OB_SUCCESS;
   trans_happened = false;
-  ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
   LOG_TRACE("Run transform ObTransformPyUDFRedundent", K(ret));
   ObSelectStmt *select_stmt = NULL;
   string onnx_model_opted_path;
@@ -59,7 +58,7 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if (OB_FAIL()){
+  else if (OB_FAIL(check_redundent_on_udfs(select_stmt->get_condition_exprs()))){
 
   }
   else{
@@ -70,7 +69,86 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
 
 }
 
+int ObTransformPyUDFRedundent::check_redundent_on_udfs(ObIArray<ObRawExpr *> &src_exprs){
+  int ret = OB_SUCCESS;
+  ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
+  if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list, src_exprs))){ 
+    LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
+  } else if(OB_FAIL(compare_with_history_exprs(python_udf_expr_list))){
+    LOG_WARN("compare_with_history_exprs fail", K(ret));
+  }
+  return ret;
+}
 
+int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list){
+  int ret = OB_SUCCESS;
+  ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
+  ObHistoryPyUdfMap &history_pyudf_map = session->get_history_pyudf_map();
+  for(int i=0;i<python_udf_expr_list.count();i++){
+    oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
+    string model_path;
+    ObString name=meta.name_;
+    if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(model_path, meta))){
+      LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+    }
+    // 与已经缓存的udf进行比较，检查是否存在冗余计算, 若存在
+    for (auto it = history_pyudf_map.begin(); it != history_pyudf_map.end(); ++it) {
+      try{
+        std::string tmp(it->second.ptr(),it->second.length());
+        std::vector<std::string> list=check_redundant(tmp, model_path);
+        if(list.size()>0){
+          // change_models(changed_model_path,output_model_path,
+          //          changed_input_model_path,list);
+          // TODO 
+          python_udf_expr_list.at(i)->set_udf_meta_has_new_model_path();
+
+          break;
+        }
+      } catch(...){
+        LOG_WARN("check_redundant fail");
+        ret=OB_ERROR;
+      }
+    }
+    // 缓存执行过的udf，以便后续优化
+    ObString path(model_path.c_str());
+    history_pyudf_map.set_refactored(name, path);
+  }
+
+  return ret;
+}
+
+int ObTransformPyUDFRedundent::get_onnx_model_path_from_python_udf_meta(string &onnx_model_path, 
+oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
+  int ret =OB_SUCCESS;
+  string pycall(python_udf_meta.pycall_.ptr());
+  std::regex pattern("onnx_path='(.*?)'");
+  std::smatch match;
+  if (std::regex_search(pycall, match, pattern)) {
+        if (match.size() > 1) {
+          onnx_model_path=match[1].str();
+          LOG_DEBUG("get model path", K(ObString(onnx_model_path.c_str())));
+        } else {
+          onnx_model_path=match[0].str();
+          LOG_DEBUG("get model path", K(ObString(onnx_model_path.c_str())));
+        }
+    } else {
+        LOG_DEBUG("get no model path");
+    }
+  return ret;
+}
+
+int ObTransformPyUDFRedundent::extract_python_udf_expr_in_condition(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObIArray<ObRawExpr *> &src_exprs)
+{
+  int ret = OB_SUCCESS;
+  for(int i=0;i<src_exprs.count();i++){
+    if(OB_FAIL(ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(python_udf_expr_list,src_exprs.at(i)))){
+      LOG_WARN("extract_all_python_udf_raw_expr_in_raw_expr fail", K(ret));
+    }
+  }
+  return ret;
+}
 
 int ObTransformPyUDFRedundent::need_transform(const common::ObIArray<ObParentDMLStmt> &parent_stmts,
   const int64_t current_level,
