@@ -137,7 +137,10 @@ public :
     ismerged_=other.ismerged_;
     merged_udf_names_=other. merged_udf_names_;
     origin_input_count_=other.origin_input_count_;
-    new_model_path_=other.new_model_path_;
+    has_new_output_model_path_=other.has_new_output_model_path_;
+    new_output_model_path_=other.new_output_model_path_;
+    has_new_input_model_path_=other.has_new_input_model_path_;
+    new_input_model_path_=other.new_input_model_path_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
@@ -150,8 +153,10 @@ public :
     ismerged_=other.ismerged_;
     merged_udf_names_=other. merged_udf_names_;
     origin_input_count_=other.origin_input_count_;
-    has_new_model_path_=other.has_new_model_path_;
-    new_model_path_=other.new_model_path_;
+    has_new_output_model_path_=other.has_new_output_model_path_;
+    new_output_model_path_=other.new_output_model_path_;
+    has_new_input_model_path_=other.has_new_input_model_path_;
+    new_input_model_path_=other.new_input_model_path_;
     return *this;
   }
 
@@ -174,8 +179,10 @@ public :
   bool ismerged_;//是否经查询内冗余消除融合
   common::ObSEArray<common::ObString, 16> merged_udf_names_; //融合的udf名
   int origin_input_count_; //初始udf的input数
-  bool has_new_model_path_;
-  std::string new_model_path_;
+  bool has_new_output_model_path_;
+  std::string new_output_model_path_;//执行的过程中可以导出要缓存的中间结果的模型地址
+  bool has_new_input_model_path_;
+  std::string new_input_model_path_;//执行的过程中可以使用已缓存的中间结果的模型地址
 };
 
 }

@@ -325,7 +325,7 @@ typedef common::hash::ObHashMap<char*, char*,
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,
                                 common::hash::NoPthreadDefendMode> ObPyUdfFunCacheMap;
 
-typedef common::hash::ObHashMap<common::ObString, common::ObString,
+typedef common::hash::ObHashMap<common::ObString, bool,
                                 common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
 
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfStrFunCacheMap*,

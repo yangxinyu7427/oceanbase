@@ -88,20 +88,35 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
     oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
     string model_path;
     ObString name=meta.name_;
+    string new_output_model_path;
+    string new_input_model_path;
     if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(model_path, meta))){
       LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
     }
-    // 与已经缓存的udf进行比较，检查是否存在冗余计算, 若存在
+    // 分配新地址复制模型
+    const char* cstr = model_path.c_str();
+    size_t length = model_path.size();
+    char* tmp = new char[length + 1];
+    std::memcpy(tmp, cstr, length + 1);
+    ObString path(tmp);
+
+    // 与所有历史udf进行比较（不一定有缓存），检查是否存在冗余计算, 若存在会先生成导出中间结果的模型
+    bool found=false;
     for (auto it = history_pyudf_map.begin(); it != history_pyudf_map.end(); ++it) {
       try{
-        std::string tmp(it->second.ptr(),it->second.length());
+        std::string tmp(it->first.ptr(),it->first.length());
         std::vector<std::string> list=check_redundant(tmp, model_path);
         if(list.size()>0){
-          // change_models(changed_model_path,output_model_path,
-          //          changed_input_model_path,list);
-          // TODO 
-          python_udf_expr_list.at(i)->set_udf_meta_has_new_model_path();
-
+          found=true;
+          change_models(model_path, new_output_model_path, new_input_model_path, list);
+          python_udf_expr_list.at(i)->set_udf_meta_has_new_output_model_path();
+          python_udf_expr_list.at(i)->set_udf_meta_new_output_model_path(new_output_model_path);
+          history_pyudf_map.set_refactored(path, true);
+          // 再检查是否已缓存，如果已缓存，就再记录使用中间结果的模型
+          if(it->second){
+            python_udf_expr_list.at(i)->set_udf_meta_has_new_input_model_path();
+            python_udf_expr_list.at(i)->set_udf_meta_new_input_model_path(new_input_model_path);
+          }
           break;
         }
       } catch(...){
@@ -109,9 +124,9 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
         ret=OB_ERROR;
       }
     }
-    // 缓存执行过的udf，以便后续优化
-    ObString path(model_path.c_str());
-    history_pyudf_map.set_refactored(name, path);
+    // 如果没有匹配的，就只记录执行过的udf
+    if(!found)
+      history_pyudf_map.set_refactored(path, false);
   }
 
   return ret;

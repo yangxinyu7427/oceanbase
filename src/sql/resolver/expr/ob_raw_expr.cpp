@@ -4283,15 +4283,27 @@ int ObPythonUdfRawExpr::set_udf_meta_origin_input_count(int num){
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta_has_new_model_path(){
+int ObPythonUdfRawExpr::set_udf_meta_has_new_output_model_path(){
   int ret = OB_SUCCESS;
-  udf_meta_.has_new_model_path_=true;
+  udf_meta_.has_new_output_model_path_=true;
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta_new_model_path(std::string path){
+int ObPythonUdfRawExpr::set_udf_meta_new_output_model_path(std::string path){
   int ret = OB_SUCCESS;
-  udf_meta_.new_model_path_=path;
+  udf_meta_.new_output_model_path_=path;
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_has_new_input_model_path(){
+  int ret = OB_SUCCESS;
+  udf_meta_.has_new_input_model_path_=true;
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_new_input_model_path(std::string path){
+  int ret = OB_SUCCESS;
+  udf_meta_.new_input_model_path_=path;
   return ret;
 }
 
