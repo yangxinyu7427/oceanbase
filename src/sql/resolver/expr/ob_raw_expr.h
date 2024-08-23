@@ -3467,6 +3467,7 @@ public:
   int set_udf_meta_origin_input_count(int num);
   int set_udf_meta_has_new_output_model_path();
   int set_udf_meta_new_output_model_path(std::string path);
+  int set_udf_meta_can_be_used_model_path(ObString can_be_used_model_path);
   int set_udf_meta_has_new_input_model_path();
   int set_udf_meta_new_input_model_path(std::string path);
   virtual bool inner_same_as(const ObRawExpr &expr,

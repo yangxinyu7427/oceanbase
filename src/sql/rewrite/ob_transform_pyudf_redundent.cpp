@@ -59,7 +59,7 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
     LOG_WARN("input preds is empty", K(ret));
   } 
   else if (OB_FAIL(check_redundent_on_udfs(select_stmt->get_condition_exprs()))){
-
+    LOG_WARN("check_redundent_on_udfs fail", K(ret));
   }
   else{
     trans_happened = true;
@@ -116,6 +116,7 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
           if(it->second){
             python_udf_expr_list.at(i)->set_udf_meta_has_new_input_model_path();
             python_udf_expr_list.at(i)->set_udf_meta_new_input_model_path(new_input_model_path);
+            python_udf_expr_list.at(i)->set_udf_meta_can_be_used_model_path(it->first);
           }
           break;
         }

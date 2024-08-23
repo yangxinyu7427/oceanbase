@@ -316,6 +316,9 @@ DEF_SESSION_TXN_ENCODER(ObTxnExtraInfoEncoder);
 typedef common::hash::ObHashMap<uint64_t, pl::ObPLPackageState *,
                                 common::hash::NoPthreadDefendMode> ObPackageStateMap;
 
+typedef common::hash::ObHashMap<char*, std::unique_ptr<std::vector<float>>,
+                                common::hash::NoPthreadDefendMode> ObSinglePyUdfRedundentCacheMap; 
+
 typedef common::hash::ObHashMap<char*, int,
                                 common::hash::NoPthreadDefendMode> ObSinglePyUdfFunCacheMap; 
 
@@ -324,6 +327,9 @@ typedef common::hash::ObHashMap<char*, char*,
 
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,
                                 common::hash::NoPthreadDefendMode> ObPyUdfFunCacheMap;
+
+typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfFunCacheMap*,
+                                common::hash::NoPthreadDefendMode> ObPyUdfRedundentCacheMap;
 
 typedef common::hash::ObHashMap<common::ObString, bool,
                                 common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
@@ -929,6 +935,7 @@ public:
   ObControlInfoEncoder &get_control_info_encoder() { return control_info_encoder_;}
   ObContextsMap &get_contexts_map() { return contexts_map_; }
   ObPyUdfFunCacheMap &get_pyudf_funcache_map() { return pyudf_funcache_map_; }
+  ObPyUdfRedundentFunCacheMap &get_pyudf_redundent_funcache_map() { return pyudf_redundent_funcache_map_; }
   ObHistoryPyUdfMap &get_history_pyudf_map() { return history_pyudf_map_; }
   ObPyUdfStrFunCacheMap &get_pyudf_str_funcache_map() { return pyudf_str_funcache_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
@@ -1141,6 +1148,7 @@ private:
   ObContextsMap contexts_map_;
 public:
   ObPyUdfFunCacheMap pyudf_funcache_map_;
+  ObPyUdfRedundentCacheMap pyudf_redundent_funcache_map_;
   ObHistoryPyUdfMap history_pyudf_map_;
   ObPyUdfStrFunCacheMap pyudf_str_funcache_map_;
 private:

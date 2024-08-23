@@ -4289,6 +4289,12 @@ int ObPythonUdfRawExpr::set_udf_meta_has_new_output_model_path(){
   return ret;
 }
 
+int ObPythonUdfRawExpr::set_udf_meta_can_be_used_model_path(ObString can_be_used_model_path){
+  int ret = OB_SUCCESS;
+  udf_meta_.can_be_used_model_path_=can_be_used_model_path;
+  return ret;
+}
+
 int ObPythonUdfRawExpr::set_udf_meta_new_output_model_path(std::string path){
   int ret = OB_SUCCESS;
   udf_meta_.new_output_model_path_=path;

@@ -109,6 +109,8 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
+    LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
   } else { 
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
