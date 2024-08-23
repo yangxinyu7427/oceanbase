@@ -4637,10 +4637,22 @@ int ObPythonUdfRawExpr::inner_deep_copy(ObIRawExprCopier &copier)
   return ret;
 }
 
-int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf)
+int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf, int batch_size)
 {
   int ret = OB_SUCCESS;
   udf_meta_.init_ = false;
+  if (OB_UNLIKELY(0 == batch_size)) {
+    udf_meta_.batch_size_const_ = false;   //batch_size动态调整
+    udf_meta_.batch_size_ = 256;       //batch_size初始值为256
+  } else {
+    if (OB_UNLIKELY(256 > batch_size) || OB_UNLIKELY(8192 < batch_size)) {
+      ret = OB_INVALID_ARGUMENT;
+      LOG_WARN("invalid predict batch_size", K(batch_size), K(ret));
+    } else {
+      udf_meta_.batch_size_const_ = true;   //batch_size固定
+      udf_meta_.batch_size_ = batch_size;   //设置batch_size值
+    }
+  }
   udf_meta_.ret_ = udf.get_ret();
   /* data from schame, deep copy maybe a better choices */
   if (OB_ISNULL(inner_alloc_)) {

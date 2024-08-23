@@ -2940,6 +2940,21 @@ MOD '(' expr ',' expr ')'
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }
+| PREDICT '(' INTNUM ')' function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $7)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $7);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $3, $5, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, $5);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
 | sys_interval_func
 {
   $$ = $1;

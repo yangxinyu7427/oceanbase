@@ -4677,7 +4677,7 @@ public:
   virtual ~ObPythonUdfRawExpr() {}
   int assign(const ObRawExpr &other) override;
   int inner_deep_copy(ObIRawExprCopier &copier) override;
-  int set_udf_meta(share::schema::ObPythonUDF &udf);
+  int set_udf_meta(share::schema::ObPythonUDF &udf, int batch_size);
   const share::schema::ObPythonUDFMeta &get_udf_meta() const { return udf_meta_; }
   virtual bool inner_same_as(const ObRawExpr &expr,
                              ObExprEqualCheckContext *check_context = NULL) const override;

@@ -124,7 +124,7 @@ class ObPythonUDFMeta
   OB_UNIS_VERSION_V(1);
 public :
   ObPythonUDFMeta() : name_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), 
-                      udf_attributes_names_(), udf_attributes_types_(), init_(false) {} 
+                      udf_attributes_names_(), udf_attributes_types_(), init_(false), batch_size_(256),batch_size_const_(true) {} 
   virtual ~ObPythonUDFMeta() = default;
 
   void assign(const ObPythonUDFMeta &other) { 
@@ -134,6 +134,8 @@ public :
     udf_attributes_names_ = other.udf_attributes_names_;
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
+    batch_size_ = other.batch_size_;
+    batch_size_const_ = other.batch_size_const_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
@@ -143,6 +145,8 @@ public :
     udf_attributes_names_ = other.udf_attributes_names_;
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
+    batch_size_ = other.batch_size_;
+    batch_size_const_ = other.batch_size_const_;
     return *this;
   }
 
@@ -151,7 +155,9 @@ public :
                K_(pycall),
                K_(udf_attributes_names),
                K_(udf_attributes_types),
-               K_(init));
+               K_(init),
+               K_(batch_size),
+               K_(batch_size_const));
 
   common::ObString name_; //函数名
   ObPythonUDF::PyUdfRetType ret_; //返回值类型
@@ -159,6 +165,8 @@ public :
   common::ObSEArray<common::ObString, 16> udf_attributes_names_; //参数名称
   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
   bool init_; //是否已初始化
+  int batch_size_;    //推理批次大小
+  bool batch_size_const_;      //batch_size是否动态调整
 };
 
 }
