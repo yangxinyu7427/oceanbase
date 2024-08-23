@@ -7645,17 +7645,16 @@ int ObRawExprResolverImpl::transform_ratio_afun_to_arg_div_sum(const ParseNode *
   return ret;
 }
 
-int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF &udf_info) 
+int ObRawExprResolverImpl::check_udf_info(const ParseNode *expr_list_node, const share::schema::ObPythonUDF &udf_info) 
 {
   int ret = OB_SUCCESS;
   //resolve expr_list_node
-  ParseNode* expr_list_node = node->children_[1];
   if (OB_ISNULL(expr_list_node) && udf_info.get_arg_num() > 0) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("param node is null", K(ret));
   } else if (T_EXPR_LIST != expr_list_node->type_) {
     ret = OB_ERR_PARSER_SYNTAX;
-    LOG_WARN("invalid paramters node", K(ret), K(node->children_[1]));
+    LOG_WARN("invalid paramters node", K(ret), K(expr_list_node));
   } else {
     int expr_arg_num = expr_list_node->num_child_;
     int arg_num = udf_info.get_arg_num();
@@ -7712,7 +7711,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     } else if (!exist) {
       ret = OB_ERR_FUNCTION_UNKNOWN;
       LOG_WARN("cannot find python udf", K(ret));
-    } else if (OB_FAIL(check_udf_info(node, udf_info))) {
+    } else if (OB_FAIL(check_udf_info(node->children_[child_num - 1], udf_info))) {
       LOG_WARN("fail to pass udf info check", K(ret));
     } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_PYTHON_UDF, func_expr))) { //create raw expr 
       LOG_WARN("fail to create raw expr", K(ret));

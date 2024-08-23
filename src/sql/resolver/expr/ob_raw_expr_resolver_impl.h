@@ -221,7 +221,7 @@ private:
   int process_xmlparse_node(const ParseNode *node, ObRawExpr *&expr);
   void get_special_func_ident_name(ObString &ident_name, const ObItemType func_type);
   int process_remote_sequence_node(const ParseNode *node, ObRawExpr *&expr);
-  int check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF &udf_info);
+  int check_udf_info(const ParseNode *expr_list_node, const share::schema::ObPythonUDF &udf_info);
   int process_python_udf_node(const ParseNode *node, ObRawExpr *&expr);
   int process_python_op_node(const ParseNode *node, ObRawExpr *&expr);
   bool is_python_udf_expr_valid_scope(ObStmtScope scope) const;
