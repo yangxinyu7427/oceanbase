@@ -135,7 +135,7 @@ public :
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
     ismerged_=other.ismerged_;
-    merged_udf_names_=other. merged_udf_names_;
+    merged_udf_names_=other.merged_udf_names_;
     origin_input_count_=other.origin_input_count_;
     has_new_output_model_path_=other.has_new_output_model_path_;
     new_output_model_path_=other.new_output_model_path_;
@@ -152,7 +152,7 @@ public :
     udf_attributes_types_ = other.udf_attributes_types_;
     init_ = other.init_;
     ismerged_=other.ismerged_;
-    merged_udf_names_=other. merged_udf_names_;
+    merged_udf_names_=other.merged_udf_names_;
     origin_input_count_=other.origin_input_count_;
     has_new_output_model_path_=other.has_new_output_model_path_;
     new_output_model_path_=other.new_output_model_path_;
