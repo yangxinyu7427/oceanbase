@@ -142,6 +142,7 @@ public :
     has_new_input_model_path_=other.has_new_input_model_path_;
     new_input_model_path_=other.new_input_model_path_;
     can_be_used_model_path_=other.can_be_used_model_path_;
+    model_path_=other.model_path_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
@@ -159,6 +160,7 @@ public :
     has_new_input_model_path_=other.has_new_input_model_path_;
     new_input_model_path_=other.new_input_model_path_;
     can_be_used_model_path_=other.can_be_used_model_path_;
+    model_path_=other.model_path_;
     return *this;
   }
 
@@ -186,6 +188,7 @@ public :
   bool has_new_input_model_path_;
   std::string new_input_model_path_;//执行的过程中可以使用已缓存的中间结果的模型地址
   common::ObString can_be_used_model_path_;//检测出的可复用的历史模型地址
+  common::ObString model_path_;//本udf对应的模型地址
 };
 
 }
