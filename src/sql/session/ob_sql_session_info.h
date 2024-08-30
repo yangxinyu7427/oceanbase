@@ -316,7 +316,7 @@ DEF_SESSION_TXN_ENCODER(ObTxnExtraInfoEncoder);
 typedef common::hash::ObHashMap<uint64_t, pl::ObPLPackageState *,
                                 common::hash::NoPthreadDefendMode> ObPackageStateMap;
 
-typedef common::hash::ObHashMap<char*, std::unique_ptr<std::vector<float>>,
+typedef common::hash::ObHashMap<char*, std::shared_ptr<std::vector<float>>,
                                 common::hash::NoPthreadDefendMode> ObSinglePyUdfRedundentCacheMap; 
 
 typedef common::hash::ObHashMap<char*, int,
@@ -935,7 +935,7 @@ public:
   ObControlInfoEncoder &get_control_info_encoder() { return control_info_encoder_;}
   ObContextsMap &get_contexts_map() { return contexts_map_; }
   ObPyUdfFunCacheMap &get_pyudf_funcache_map() { return pyudf_funcache_map_; }
-  ObPyUdfRedundentFunCacheMap &get_pyudf_redundent_funcache_map() { return pyudf_redundent_funcache_map_; }
+  ObPyUdfRedundentCacheMap &get_pyudf_redundent_funcache_map() { return pyudf_redundent_funcache_map_; }
   ObHistoryPyUdfMap &get_history_pyudf_map() { return history_pyudf_map_; }
   ObPyUdfStrFunCacheMap &get_pyudf_str_funcache_map() { return pyudf_str_funcache_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
