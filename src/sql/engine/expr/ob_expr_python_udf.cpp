@@ -1078,7 +1078,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     else
       ++real_param;
   }
-  
+  int count_mid_res=0;
+  int mid_res_cols=0;
   // 遍历构建input数组
   ObDatum *argDatum = NULL;
   if(useCache){
@@ -1183,8 +1184,11 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
               if(OB_FAIL(single_redundent_cache_map->get_refactored(tmp, mid_res))){
                 ret=OB_SUCCESS;
               }else{
+                count_mid_res++;
+                mid_res_cols=mid_res.size();
                 has_mid_result[i]=true;
                 mid_result_list[i]=mid_res;
+                real_param--;
               }
             }
           }
@@ -1218,8 +1222,11 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
               if(OB_FAIL(single_redundent_cache_map->get_refactored(tmp, mid_res))){
                 ret=OB_SUCCESS;
               }else{
+                count_mid_res++;
+                mid_res_cols=mid_res.size();
                 has_mid_result[i]=true;
                 mid_result_list[i]=mid_res;
+                real_param--;
               }
             }
           }
@@ -1331,6 +1338,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObLongTextType: {
         numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
         for (j = 0; j < batch_size; j++) {
+          // 如果要用中间结果，就直接跳过
+          if (has_mid_result[j])
+            continue;
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else {
@@ -1350,6 +1360,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObIntType: {
         numpyarray = PyArray_EMPTY(1, elements, NPY_INT32, 0);
         for (j = 0; j < batch_size; j++) {
+          // 如果要用中间结果，就直接跳过
+          if (has_mid_result[j])
+            continue;
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           //put integer into numpy array
@@ -1377,6 +1390,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         //numpyarray = PyArray_EMPTY(1, elements, NPY_FLOAT64, 0);
         double *pdouble = (double *)tmp_alloc.alloc(sizeof(double) * real_param);
         for (j = 0; j < batch_size; j++) {
+          // 如果要用中间结果，就直接跳过
+          if (has_mid_result[j])
+            continue;
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           else
@@ -1406,6 +1422,46 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       goto destruction;
     }
     arrays[i] = numpyarray;
+  }
+  // 构建使用中间结果的入参并调用和接收python函数的返回结果
+  if(use_cache_plus&&has_new_input_model_path){
+    PyObject *pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
+    PyObject *pArgs_input = PyTuple_New(1);
+    PyObject *pResult_Array_input = NULL;
+    PyObject *pResult_input = NULL;
+    npy_intp numRows = count_mid_res;
+    npy_intp numCols = mid_res_cols;
+    npy_intp dims[2] = {numRows, numCols};
+    PyObject* pArray_input = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
+    float* data_input = static_cast<float*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(pArray_input)));
+    int count=0;
+    for(int i=0;i<has_mid_result.size();i++){
+      if(has_mid_result[i]){
+        std::copy(mid_result_list[i].begin(), mid_result_list[i].end(), data_input + count * numCols);
+        count++;
+      }
+    }
+    PyTuple_SetItem(pArgs_input, 0, pArray_input);
+    pResult_Array_input = PyObject_CallObject(pFunc_input, pArgs_input);
+    if (!pResult_Array_input) {
+      process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("execute error", K(ret));
+      goto destruction;
+    }
+    bool isNumPyArray_input = PyArray_Check(pResult_Array_input);
+    if(isNumPyArray_input)
+      pResult_input = pResult_Array_input;
+    else
+      pResult_input = PyList_GetItem(pResult_Array_input, 0);
+    count=0;
+    for(int i=0;i<has_mid_result.size();i++){
+      if(has_mid_result[i]){
+        int tmp=PyLong_AsLong(
+            PyArray_GETITEM((PyArrayObject *)pResult_input, (char *)PyArray_GETPTR1((PyArrayObject *)pResult_input, count++)));
+          results[i].set_int(tmp);
+      }
+    }
   }
   gettimeofday(&t3, NULL);
   if(real_param!=0){
@@ -1438,6 +1494,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       case ObMediumTextType:
       case ObLongTextType: {
         for (int j = 0; j < batch_size && k < ret_size; j++) {
+          if (has_mid_result[j])
+            continue;
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
           ObString tmp=common::ObString(PyUnicode_AsUTF8(PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++))));
@@ -1450,9 +1508,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             std::memcpy(newStr, cstr, length + 1);
             pOutputArray=PyList_GetItem(resultarray, PyList_Size(resultarray) - 1);
             PyArrayObject* array = reinterpret_cast<PyArrayObject*>(pOutputArray);
-            float* data = static_cast<float*>(PyArray_DATA(array));
-            npy_intp size = PyArray_SIZE(array);
-            std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(data, data + size);
+            npy_intp numCols = PyArray_DIM(array, 1);
+            float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(array, k-1, 0));
+            std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(rowData, rowData + numCols);
             single_redundent_cache_map->set_refactored(newStr, vec_ptr);
           }
           // set funCache
@@ -1495,6 +1553,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
         for (int j = 0; j < batch_size && k < ret_size; j++) {
           if (my_skip.at(j) || eval_flags.at(j))
             continue;
+          if (has_mid_result[j])
+            continue;
           int tmp=PyLong_AsLong(
             PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
           results[j].set_int(tmp);
@@ -1506,9 +1566,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             std::memcpy(newStr, cstr, length + 1);
             pOutputArray=PyList_GetItem(resultarray, PyList_Size(resultarray) - 1);
             PyArrayObject* array = reinterpret_cast<PyArrayObject*>(pOutputArray);
-            float* data = static_cast<float*>(PyArray_DATA(array));
-            npy_intp size = PyArray_SIZE(array);
-            std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(data, data + size);
+            npy_intp numCols = PyArray_DIM(array, 1);
+            float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(array, k-1, 0));
+            std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(rowData, rowData + numCols);
             single_redundent_cache_map->set_refactored(newStr, vec_ptr);
           }
           // set funCache
