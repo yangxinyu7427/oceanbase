@@ -9884,6 +9884,7 @@ public:
                expr->has_flag(CNT_AGG) ||
                expr->has_flag(CNT_SET_OP) ||
                expr->has_flag(CNT_WINDOW_FUNC) ||
+               expr->has_flag(CNT_PYTHON_UDF) ||
                expr->has_flag(CNT_DYNAMIC_PARAM) ||
                expr->has_flag(CNT_SUB_QUERY)) {
       tmp_ret = first_stmt_expr_set_.exist_refactored(key);
@@ -11345,7 +11346,9 @@ int ObTransformUtils::check_fixed_expr_correlated(const ObQueryRefRawExpr &query
     LOG_WARN("failed to append subquery exprs", K(ret));
   } else if (OB_FAIL(append(fixed_exprs, stmt.get_pseudo_column_like_exprs()))) {
     LOG_WARN("failed to append pseudo column like exprs", K(ret));
-  }
+  }/* else if (OB_FAIL(append(fixed_exprs, stmt.get_python_udf_exprs()))) {
+    LOG_WARN("failed to append pseudo column like exprs", K(ret));
+  }*/
   for (int64_t i = 0; OB_SUCC(ret) && is_valid && i < fixed_exprs.count(); ++i) {
     bool is_correlated = false;
     if (OB_FAIL(is_correlated_expr(query_ref.get_exec_params(),

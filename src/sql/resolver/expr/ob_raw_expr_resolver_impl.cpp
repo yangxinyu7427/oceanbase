@@ -6624,7 +6624,8 @@ int ObRawExprResolverImpl::process_window_function_node(const ParseNode *node, O
   const static int win_function_num_child = 2;
   if (!is_win_expr_valid_scope(ctx_.current_scope_)
       || ctx_.parents_expr_info_.has_member(IS_AGG)
-      || ctx_.parents_expr_info_.has_member(IS_WINDOW_FUNC)) {
+      || ctx_.parents_expr_info_.has_member(IS_WINDOW_FUNC)
+      || ctx_.parents_expr_info_.has_member(IS_PYTHON_UDF)) {
     ret = OB_ERR_INVALID_WINDOW_FUNCTION_PLACE;
     LOG_WARN("window function is not allowed here", K(ret), K(ctx_.current_scope_), K(ctx_.parents_expr_info_));
   } else if (OB_ISNULL(node)) {
@@ -7645,17 +7646,16 @@ int ObRawExprResolverImpl::transform_ratio_afun_to_arg_div_sum(const ParseNode *
   return ret;
 }
 
-int ObRawExprResolverImpl::check_udf_info(const ParseNode *node, const share::schema::ObPythonUDF &udf_info) 
+int ObRawExprResolverImpl::check_udf_info(const ParseNode *expr_list_node, const share::schema::ObPythonUDF &udf_info) 
 {
   int ret = OB_SUCCESS;
   //resolve expr_list_node
-  ParseNode* expr_list_node = node->children_[1];
   if (OB_ISNULL(expr_list_node) && udf_info.get_arg_num() > 0) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("param node is null", K(ret));
   } else if (T_EXPR_LIST != expr_list_node->type_) {
     ret = OB_ERR_PARSER_SYNTAX;
-    LOG_WARN("invalid paramters node", K(ret), K(node->children_[1]));
+    LOG_WARN("invalid paramters node", K(ret), K(expr_list_node));
   } else {
     int expr_arg_num = expr_list_node->num_child_;
     int arg_num = udf_info.get_arg_num();
@@ -7688,14 +7688,18 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
   } else if (OB_ISNULL(node)) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(node));
-  } else if (OB_UNLIKELY(1 > node->num_child_) || OB_ISNULL(node->children_) || 
-    OB_ISNULL(node->children_[0]) || OB_ISNULL(node->children_[1]) || OB_UNLIKELY(T_EXPR_LIST != node->children_[1]->type_)) {
-    ret = OB_ERR_PARSER_SYNTAX;
-    LOG_WARN("invalid node children for python udf node", K(ret), K(node->num_child_), "node", SJ(ObParserResultPrintWrapper(*node)));
   } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
     LOG_WARN("failed to get collation", K(ret));
+  } else if (OB_UNLIKELY(1 > node->num_child_) || OB_ISNULL(node->children_)) {
+    ret = OB_ERR_PARSER_SYNTAX;
+    LOG_WARN("invalid node children for python udf node", K(ret), K(node->num_child_), "node", SJ(ObParserResultPrintWrapper(*node)));
   } else {
-    ObString name(node->children_[0]->str_len_, node->children_[0]->str_value_);
+    int child_num = node->num_child_;   //孩子个数
+    int64_t batch_size = 0;
+    if (child_num == 3) {    //若SELECT PREDICT中提供了batch_size
+      batch_size = std::stoi(node->children_[0]->str_value_);    //获取batch_size值
+    }
+    ObString name(node->children_[child_num-2]->str_len_, node->children_[child_num-2]->str_value_);
     if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
       LOG_WARN("Malloc function name failed", K(ret));
@@ -7708,21 +7712,21 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     } else if (!exist) {
       ret = OB_ERR_FUNCTION_UNKNOWN;
       LOG_WARN("cannot find python udf", K(ret));
-    } else if (OB_FAIL(check_udf_info(node, udf_info))) {
+    } else if (OB_FAIL(check_udf_info(node->children_[child_num - 1], udf_info))) {
       LOG_WARN("fail to pass udf info check", K(ret));
     } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_PYTHON_UDF, func_expr))) { //create raw expr 
       LOG_WARN("fail to create raw expr", K(ret));
     } else if (OB_ISNULL(func_expr)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("null ptr", K(ret));
-    } else if (OB_FAIL(func_expr->set_udf_meta(udf_info))) {
+    } else if (OB_FAIL(func_expr->set_udf_meta(udf_info, batch_size))) {     //传递udf_meta
       LOG_WARN("set python udf info failed", K(ret));
     } else if (udf_info.get_arg_num() > 0) {
       //resolve params
       ObRawExpr *param_expr = NULL;
-      int32_t num_child = node->children_[1]->num_child_;
+      int32_t num_child = node->children_[child_num - 1]->num_child_;
       for (int32_t i = 0; OB_SUCC(ret) && i < num_child; ++i) {
-        const ParseNode *param_node = node->children_[1]->children_[i];
+        const ParseNode *param_node = node->children_[child_num - 1]->children_[i];
         if (OB_ISNULL(param_node)) {
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("param node is null", K(ret));

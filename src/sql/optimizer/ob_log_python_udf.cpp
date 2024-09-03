@@ -20,18 +20,6 @@ int ObLogPythonUDF::get_op_exprs(ObIArray<ObRawExpr*> &all_exprs) {
 int ObLogPythonUDF::allocate_expr_post(ObAllocExprContext &ctx)
 {
   int ret = OB_SUCCESS;
-  // print logs
-  for (int64_t i = 0; OB_SUCC(ret) && i < output_exprs_.count(); i++) {
-    ObRawExpr *expr = NULL;
-    expr = output_exprs_.at(i);
-  }
-  ObLogicalOperator *op = child_.at(0);
-  if (op != NULL) {
-    for (int64_t i = 0; OB_SUCC(ret) && i < op->get_output_exprs().count(); i++) {
-      ObRawExpr *expr = NULL;
-      expr = op->get_output_exprs().at(i);
-    }
-  }
   for (int64_t i = 0; OB_SUCC(ret) && i < python_udf_exprs_.count(); i++) {
     ObRawExpr *expr = NULL;
     if (OB_ISNULL(expr = python_udf_exprs_.at(i))) {

@@ -2198,7 +2198,7 @@ int ObTransformSimplifyExpr::replace_expr_when_filter_is_false(ObRawExpr*& expr)
         expr = null_expr;
       }
     }
-  } else if (expr->has_flag(CNT_WINDOW_FUNC) || expr->has_flag(CNT_SUB_QUERY)) {
+  } else if (expr->has_flag(CNT_WINDOW_FUNC) || expr->has_flag(CNT_SUB_QUERY) || expr->has_flag(CNT_PYTHON_UDF)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("expr contains winfunc or subquery", K(expr));
   } else if (!expr->has_flag(IS_CONST_EXPR) && !expr->has_flag(IS_CONST)) {

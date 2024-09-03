@@ -46,7 +46,7 @@ public:
   int load_vector(ObEvalCtx &eval_ctx, int64_t load_size);
 
 private:
-  common::ObFIFOAllocator buf_alloc_; // for array and pointers
+  common::ObArenaAllocator buf_alloc_; // for array and pointers
   common::ObArenaAllocator tmp_alloc_; // for data copy
   common::ObFixedArray<ObExpr *, common::ObIAllocator> exprs_;
   common::ObFixedArray<ObDatum *, common::ObIAllocator> datums_copy_; // 相当于UNIFORM格式
@@ -61,7 +61,7 @@ private:
 struct ObPUInputStore
 {
 public:
-  ObPUInputStore() : alloc_(NULL), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
+  ObPUInputStore() : buf_alloc_(NULL), tmp_alloc_(), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
   ~ObPUInputStore() { free(); }
   int init(common::ObIAllocator *alloc, ObExpr *expr, int64_t length);
   int alloc_data_ptrs();
@@ -81,7 +81,8 @@ public:
   int64_t get_saved_size() {return saved_size_;}
 
 private:
-  common::ObIAllocator *alloc_; // input store allocator (FIFO allocator)
+  common::ObIAllocator *buf_alloc_; // input store allocator (FIFO allocator)
+  common::ObArenaAllocator tmp_alloc_; // for data copy
   ObExpr *expr_; // Python UDF expr
   int64_t length_; // 当前容量
   char **data_ptrs_;
@@ -95,7 +96,8 @@ public:
   ~ObPythonUDFCell() {}
   int init(ObExpr *expr, 
            int64_t batch_size, 
-           int64_t length);
+           int64_t length,
+           uint64_t tenant_id);
   int free();
   int reset(int64_t size) { return input_store_.reset(size); }
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
@@ -119,7 +121,8 @@ public:
 
 
 private:
-  common::ObFIFOAllocator alloc_; // input store allocator need to free
+  //common::ObFIFOAllocator alloc_; // input store allocator need to free
+  common::ObArenaAllocator alloc_;
   ObExpr *expr_; // python_udf_expr
   ObPUInputStore input_store_; // 不同UDF间使用同一列存在冗余缓存, 公共表达式部份本来也存在冗余
 
@@ -145,11 +148,14 @@ public:
     stored_input_cnt_(0),
     stored_output_cnt_(0),
     output_idx_(0),
-    batch_size_(256) {}
+    batch_size_(256),
+    tenant_id_(500)
+  {} 
   ~ObPUStoreController() { free(); }
   int init(int64_t batch_size,
            const common::ObIArray<ObExpr *> &udf_exprs, 
-           const common::ObIArray<ObExpr *> &input_exprs);
+           const common::ObIArray<ObExpr *> &input_exprs,
+           const uint64_t tenant_id);
   int free();
   int store(ObEvalCtx &eval_ctx, ObBatchRows &brs);
   int process();
@@ -166,7 +172,7 @@ public:
   }; 
   bool is_full() { return stored_input_cnt_ > desirable_; }
   bool is_empty() { return stored_input_cnt_ == 0; }
-  bool is_output() { return output_idx_ < stored_output_cnt_; }
+  bool can_output() { return output_idx_ < stored_output_cnt_; }
   bool end_output() { return output_idx_ == stored_output_cnt_; }
 
 private:
@@ -182,6 +188,8 @@ private:
   int64_t output_idx_;
 
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
+
+  uint64_t tenant_id_; // 租户id
 };
 
 class ObPythonUDFSpec : public ObOpSpec

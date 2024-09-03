@@ -609,7 +609,7 @@ int ObTransformQueryPushDown::check_select_item_push_down(ObSelectStmt *select_s
     can_be = true;
   } else if (view_stmt->is_scala_group_by() ||
              view_stmt->has_distinct() ||
-             view_stmt->has_python_udf() ||
+             view_stmt->has_python_udf() || 
              (view_stmt->is_recursive_union() && (!check_status || !select_offset.empty())) ||
              (view_stmt->is_set_stmt() && !view_stmt->is_recursive_union())) {
     can_be = false;
@@ -778,6 +778,7 @@ int ObTransformQueryPushDown::check_window_function_push_down(ObSelectStmt *view
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("stmt is NULL", K(view_stmt), K(ret));
   } else if (view_stmt->has_window_function() ||
+             view_stmt->has_python_udf() || //python udf的计算顺序在window后
              view_stmt->has_distinct() || 
              view_stmt->is_set_stmt() || 
              view_stmt->has_order_by() || 
@@ -892,6 +893,9 @@ int ObTransformQueryPushDown::push_down_stmt_exprs(ObSelectStmt *select_stmt,
   } else if (OB_FAIL(append(view_stmt->get_qualify_filters(),
                             select_stmt->get_qualify_filters()))) {
     LOG_WARN("append select_stmt window func filters to view stmt window func filters failed", K(ret));
+  } else if (OB_FAIL(append(view_stmt->get_python_udf_exprs(),
+                            select_stmt->get_python_udf_exprs()))) {
+    LOG_WARN("append select_stmt python udf exprs to python udf exprs failed", K(ret));
   } else {
     if (!view_stmt->is_from_pivot()) {
       view_stmt->set_from_pivot(select_stmt->is_from_pivot());
