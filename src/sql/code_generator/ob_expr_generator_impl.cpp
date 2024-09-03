@@ -1897,24 +1897,6 @@ int ObExprGeneratorImpl::visit(ObWinFunRawExpr &expr)
 int ObExprGeneratorImpl::visit_python_udf_expr(ObNonTerminalRawExpr &expr, ObExprPythonUdf *python_udf_expr_op)
 {
   int ret = OB_SUCCESS;
-  /*ObPostExprItem item;
-  item.set_accuracy(expr.get_accuracy());
-  if (OB_ISNULL(sql_expr_)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_ERROR("sql_expr_ is NULL");
-  } else if (expr.has_flag(IS_COLUMNLIZED)) {
-    int64_t idx = OB_INVALID_INDEX;
-    if (OB_FAIL(column_idx_provider_.get_idx(&expr, idx))) {
-      LOG_WARN("get index failed", K(ret));
-    } else if (OB_FAIL(item.set_column(idx))) {
-      LOG_WARN("fail to set column", K(ret), K(expr));
-    } else if (OB_FAIL(sql_expr_->add_expr_item(item, &expr))) {
-      LOG_WARN("fail to add expr item", K(ret), K(expr));
-    }
-  } else {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_ERROR("all python expr should have been generated", K(expr), K(&expr));
-  }*/
   if (OB_SUCC(ret)) {
     ObPythonUdfRawExpr &fun_sys = static_cast<ObPythonUdfRawExpr &>(expr);
     //used to check the old python udf op exist or not

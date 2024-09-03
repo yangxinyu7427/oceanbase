@@ -1314,7 +1314,8 @@ int ObWhereSubQueryPullup::check_subquery_validity(ObDMLStmt &stmt,
       } else {
         is_valid = !param->has_flag(CNT_SUB_QUERY) &&
                    !param->has_flag(CNT_AGG) &&
-                   !param->has_flag(CNT_WINDOW_FUNC);
+                   !param->has_flag(CNT_WINDOW_FUNC) &&
+                   !param->has_flag(CNT_PYTHON_UDF);
       }
     }
   }

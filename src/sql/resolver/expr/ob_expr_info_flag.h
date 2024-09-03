@@ -104,6 +104,7 @@ enum ObExprInfoFlag
   CNT_OP_PSEUDO_COLUMN,
   CNT_ASSIGN_EXPR,
   CNT_OBJ_ACCESS_EXPR,
+  CNT_PYTHON_UDF, // expression contains python udf expression
   CNT_ASSOCIATED_FLAG_END, //add CNT_xxx flag before me
 
   BE_USED, // expression has been applied
@@ -129,7 +130,7 @@ enum ObExprInfoFlag
   IS_ROWID_SIMPLE_COND, // rowid = const
   IS_ROWID_RANGE_COND,   // rowid belongs to a range
   IS_TABLE_ASSIGN, // update t1 set c1 = const
-  IS_PYTHON_UDF
+  IS_PYTHON_UDF, // expr is python udf
 };
 
 #define IS_INFO_MASK_BEGIN  IS_CONST
@@ -216,6 +217,7 @@ inline const char* get_expr_info_flag_str(const ObExprInfoFlag flag)
     case CNT_DYNAMIC_PARAM: { ret = "CNT_DYNAMIC_PARAM"; break; }
     case CNT_ENUM_OR_SET: { ret = "CNT_ENUM_OR_SET"; break; }
     case CNT_ASSIGN_EXPR: { ret = "CNT_ASSIGN_EXPR"; break; }
+    case CNT_PYTHON_UDF: { ret = "CNT_PYTHON_UDF"; break; }
     case BE_USED: { ret = "BE_USED"; break; }
     case IS_SIMPLE_COND: { ret = "IS_SIMPLE_COND"; break; }
     case IS_RANGE_COND: { ret = "IS_RANGE_COND"; break; }

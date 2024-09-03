@@ -61,7 +61,7 @@ private:
 struct ObPUInputStore
 {
 public:
-  ObPUInputStore() : alloc_(NULL), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
+  ObPUInputStore() : buf_alloc_(NULL), tmp_alloc_(), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
   ~ObPUInputStore() { free(); }
   int init(common::ObIAllocator *alloc, ObExpr *expr, int64_t length);
   int alloc_data_ptrs();
@@ -81,7 +81,8 @@ public:
   int64_t get_saved_size() {return saved_size_;}
 
 private:
-  common::ObIAllocator *alloc_; // input store allocator (FIFO allocator)
+  common::ObIAllocator *buf_alloc_; // input store allocator (FIFO allocator)
+  common::ObArenaAllocator tmp_alloc_; // for data copy
   ObExpr *expr_; // Python UDF expr
   int64_t length_; // 当前容量
   char **data_ptrs_;
@@ -171,7 +172,7 @@ public:
   }; 
   bool is_full() { return stored_input_cnt_ > desirable_; }
   bool is_empty() { return stored_input_cnt_ == 0; }
-  bool is_output() { return output_idx_ < stored_output_cnt_; }
+  bool can_output() { return output_idx_ < stored_output_cnt_; }
   bool end_output() { return output_idx_ == stored_output_cnt_; }
 
 private:

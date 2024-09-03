@@ -6624,7 +6624,8 @@ int ObRawExprResolverImpl::process_window_function_node(const ParseNode *node, O
   const static int win_function_num_child = 2;
   if (!is_win_expr_valid_scope(ctx_.current_scope_)
       || ctx_.parents_expr_info_.has_member(IS_AGG)
-      || ctx_.parents_expr_info_.has_member(IS_WINDOW_FUNC)) {
+      || ctx_.parents_expr_info_.has_member(IS_WINDOW_FUNC)
+      || ctx_.parents_expr_info_.has_member(IS_PYTHON_UDF)) {
     ret = OB_ERR_INVALID_WINDOW_FUNCTION_PLACE;
     LOG_WARN("window function is not allowed here", K(ret), K(ctx_.current_scope_), K(ctx_.parents_expr_info_));
   } else if (OB_ISNULL(node)) {

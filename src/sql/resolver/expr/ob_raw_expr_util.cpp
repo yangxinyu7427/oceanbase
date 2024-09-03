@@ -2250,6 +2250,8 @@ int ObRawExprUtils::build_check_constraint_expr(ObRawExprFactory &expr_factory,
     LOG_WARN("Specified pseudo column or operator not allowed here", K(ret), K(expr->has_flag(CNT_ROWNUM)), K(expr->has_flag(CNT_PSEUDO_COLUMN)));
   } else if (OB_UNLIKELY(expr->has_flag(CNT_WINDOW_FUNC))) {
     ret = OB_ERR_INVALID_WINDOW_FUNC_USE;
+  } else if (OB_UNLIKELY(expr->has_flag(CNT_PYTHON_UDF))) {
+    ret = OB_ERR_INVALID_PYTHON_UDF;
   }
   if (OB_SUCC(ret)) {
     if (OB_UNLIKELY(sys_vars.count() > 0)) {

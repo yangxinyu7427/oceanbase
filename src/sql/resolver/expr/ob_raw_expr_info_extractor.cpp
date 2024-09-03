@@ -627,6 +627,8 @@ int ObRawExprInfoExtractor::visit(ObPythonUdfRawExpr &expr)
     LOG_WARN("pull match info failed", K(ret));
   } else if (OB_FAIL(expr.add_flag(IS_PYTHON_UDF))) {
     LOG_WARN("add flag failed", K(ret));
+  } else if (OB_FAIL(expr.add_flag(CNT_PYTHON_UDF))) {
+    LOG_WARN("add flag failed", K(ret));
   }
   return ret;
 }
