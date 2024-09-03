@@ -45,7 +45,7 @@ public:
 
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
-  static int change_vars_in_pycall(string &pycall, string &pre);
+  static int change_vars_in_pycall(string &pycall, string pre);
 
   static int eval_test_udf(const ObExpr& expr, ObEvalCtx& ctx, ObDatum& expr_datum);
 

@@ -11,7 +11,10 @@
 #include <fstream>
 #include <sstream>
 #include <sys/syscall.h>
-
+#include <regex>
+#include <string>
+#include <map>
+#include <unordered_map>
 #include "lib/oblog/ob_log.h"
 
 #include "share/object/ob_obj_cast.h"
@@ -199,7 +202,8 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
 int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
 {
   int ret = OB_SUCCESS;
-
+  // open use_cache_plus
+  bool use_cache_plus=true;
   //runtime variables
   PyObject *pModule = NULL;
   PyObject *dic = NULL;
@@ -260,8 +264,7 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
   } else {
     LOG_DEBUG("Import python udf handler", K(ret));
   }
-  // open use_cache_plus
-  bool use_cache_plus=true;
+  
   // 如果要导出缓存结果，就修改pycall的字段并加载到python环境中去，替换pyfun
   if(use_cache_plus){
     if(udf_meta.has_new_output_model_path_){
@@ -350,7 +353,7 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
   return ret;
 }
 
-int ObExprPythonUdf::change_vars_in_pycall(string &code, string &pre){
+int ObExprPythonUdf::change_vars_in_pycall(string &code, string pre){
   int ret = OB_SUCCESS;
   std::regex global_pattern(R"(global\s+([a-zA-Z_][a-zA-Z0-9_,\s]*))");
   std::smatch match;
@@ -927,15 +930,15 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
 
   // 决定是否使用cache_plus
   bool use_cache_plus=true;
-  bool has_new_input_model_path=udf_meta_.has_new_input_model_path_;
-  bool has_new_output_model_path=udf_meta_.has_new_output_model_path_;
+  bool has_new_input_model_path=info->udf_meta_.has_new_input_model_path_;
+  bool has_new_output_model_path=info->udf_meta_.has_new_output_model_path_;
   ObPyUdfRedundentCacheMap &redundent_funcache_map = session->get_pyudf_redundent_funcache_map();
   ObSinglePyUdfRedundentCacheMap* single_redundent_cache_map;
-  ObString model_path=udf_meta_.model_path_;
+  ObString model_path=info->udf_meta_.model_path_;
   bool isRedundentFuncacheNew=false;
-  // 如果has_new_output_model_path，就检索和建立相应的map
+  // 如果has_new_output_model_path，就检索和建立与当前model path相应的map
   if(use_cache_plus&&has_new_output_model_path){
-    if(OB_FAIL(redundent_funcache_map.get(model_path,single_redundent_cache_map))){
+    if(OB_FAIL(redundent_funcache_map.get_refactored(model_path,single_redundent_cache_map))){
       if(OB_HASH_NOT_EXIST == ret){
         isRedundentFuncacheNew = true;
         single_redundent_cache_map=new ObSinglePyUdfRedundentCacheMap();
@@ -950,6 +953,18 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
       }else if(OB_HASH_EXIST == ret){
         ret = OB_SUCCESS;
       }
+    }
+  }
+  // 如果has_new_input_model_path，就检索和建立与要复用的model path相应的map
+  bool single_can_be_used_redundent_cache_map_is_found;
+  ObSinglePyUdfRedundentCacheMap* single_can_be_used_redundent_cache_map;
+  ObString can_be_used_model_path=info->udf_meta_.can_be_used_model_path_;
+  if(use_cache_plus&&has_new_input_model_path){
+    if(OB_FAIL(redundent_funcache_map.get_refactored(can_be_used_model_path,single_can_be_used_redundent_cache_map))){
+      single_can_be_used_redundent_cache_map_is_found=false;
+      ret = OB_SUCCESS;
+    }else{
+      single_can_be_used_redundent_cache_map_is_found=true;
     }
   }
   
@@ -1082,166 +1097,168 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   int mid_res_cols=0;
   // 遍历构建input数组
   ObDatum *argDatum = NULL;
-  if(useCache){
-  // 如果是mergedudf，构造input数组时只需要缓存原来udf的input列数
-  int input_num;
-  if(is_merged_udf)
-    input_num=info->udf_meta_.origin_input_count_;
-  else
-    input_num=expr.arg_cnt_;
-  
-  for(int i=0;i<input_num; i++){
-    argDatum = expr.args_[i]->locate_batch_datums(ctx);
-    int j = 0, zero = 0;
-    int *index;
-    if (!expr.args_[i]->is_const_expr()) 
-      index = &j;
-    else 
-      index = &zero;
-    switch (expr.args_[i]->datum_meta_.type_) {
-      case ObCharType:
-      case ObVarcharType:
-      case ObTinyTextType:
-      case ObTextType:
-      case ObMediumTextType:
-      case ObLongTextType: {
-        for (j = 0; j < batch_size; j++) {
-          if (my_skip.at(j) || eval_flags.at(j))
-            continue;
-          else {
-            //str in OB
-            ObString str = argDatum[*index].get_string();
-            // put str into input array(funcache)
-            input[j].append(std::string(str.ptr(), str.length()));
-          }
-        }
-        break;
-      }
-      case ObTinyIntType:
-      case ObSmallIntType:
-      case ObMediumIntType:
-      case ObInt32Type:
-      case ObIntType: {
-        for (j = 0; j < batch_size; j++) {
-          if (my_skip.at(j) || eval_flags.at(j))
-            continue;
-          //put integer into numpy array
-          if(expr.args_[i]->is_const_expr()&&!expr.args_[i]->is_batch_result()){
-            int tmp2=argDatum[0].get_int();
-            // put str into input array(funcache)
-            input[j].append(std::to_string(tmp2));
-          }else{
-            int tmp3=argDatum[j].get_int();
-            // put str into input array(funcache)
-            input[j].append(std::to_string(tmp3));
-          }
-          
-        }
-        break;
-      }
-      case ObDoubleType: {
-        for (j = 0; j < batch_size; j++) {
-          if (my_skip.at(j) || eval_flags.at(j))
-            continue;
-          else{
-            double tmp = argDatum[*index].get_double();
-            input[j].append(std::to_string(tmp));
-          }
-        }
-        break;
-      }
-      case ObNumberType: 
-      default: {
-        //error
-        ret = OB_ERR_UNEXPECTED;
-      }
-    }
-  
-  }
-  // 检查是否存在funcache,若存在就替换为缓存结果
-  // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
   std::vector<bool> has_mid_result(batch_size, false);
   std::vector<std::shared_ptr<std::vector<float>>> mid_result_list(batch_size);
-  if(!isFuncacheNew&&!is_merged_udf){
-    if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
-      for(int i=0;i<batch_size;i++){
-        if (my_skip.at(i) || eval_flags.at(i))
-          continue;
-
-        const char* cstr = input[i].c_str();
-        // 获取字符串长度
-        size_t length = input[i].size();
-        // 分配内存并复制字符串内容
-        char* tmp = new char[length + 1];
-        std::memcpy(tmp, cstr, length + 1);
-
-        char* res;
-        std::shared_ptr<std::vector<float>> mid_res;
-        if(OB_FAIL(single_str_func_map->get_refactored(tmp,res))){
-          if(OB_HASH_NOT_EXIST == ret){
-            // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
-            if(use_cache_plus&&has_new_input_model_path){
-              if(OB_FAIL(single_redundent_cache_map->get_refactored(tmp, mid_res))){
-                ret=OB_SUCCESS;
-              }else{
-                count_mid_res++;
-                mid_res_cols=mid_res.size();
-                has_mid_result[i]=true;
-                mid_result_list[i]=mid_res;
-                real_param--;
-              }
-            }
-          }
-          ret=OB_SUCCESS;
-        }else{
-            results[i].set_string(ObString(strlen(res),res));
-            my_skip.set(i);
-            eval_flags.set(i);
-            real_param--;
-        }
-        delete[] tmp;
-      }
-    }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
-      for(int i=0;i<batch_size;i++){
-        if (my_skip.at(i) || eval_flags.at(i))
-          continue;
-
-        const char* cstr = input[i].c_str();
-        // 获取字符串长度
-        size_t length = input[i].size();
-        // 分配内存并复制字符串内容
-        char* tmp = new char[length + 1];
-        std::memcpy(tmp, cstr, length + 1);
-
-        int res;
-        std::shared_ptr<std::vector<float>> mid_res;
-        if(OB_FAIL(single_func_map->get_refactored(tmp,res))){
-          if(OB_HASH_NOT_EXIST == ret){
-            // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
-            if(use_cache_plus&&has_new_input_model_path){
-              if(OB_FAIL(single_redundent_cache_map->get_refactored(tmp, mid_res))){
-                ret=OB_SUCCESS;
-              }else{
-                count_mid_res++;
-                mid_res_cols=mid_res.size();
-                has_mid_result[i]=true;
-                mid_result_list[i]=mid_res;
-                real_param--;
-              }
-            }
-          }
-          ret=OB_SUCCESS;
-        }else{
-            results[i].set_int(res);
-            my_skip.set(i);
-            eval_flags.set(i);
-            real_param--;
-        }
-        delete[] tmp;
-      }
-    }
+  if(useCache){
+    // 如果是mergedudf，构造input数组时只需要缓存原来udf的input列数
+    int input_num;
+    if(is_merged_udf)
+      input_num=info->udf_meta_.origin_input_count_;
+    else
+      input_num=expr.arg_cnt_;
     
-  }
+    for(int i=0;i<input_num; i++){
+      argDatum = expr.args_[i]->locate_batch_datums(ctx);
+      int j = 0, zero = 0;
+      int *index;
+      if (!expr.args_[i]->is_const_expr()) 
+        index = &j;
+      else 
+        index = &zero;
+      switch (expr.args_[i]->datum_meta_.type_) {
+        case ObCharType:
+        case ObVarcharType:
+        case ObTinyTextType:
+        case ObTextType:
+        case ObMediumTextType:
+        case ObLongTextType: {
+          for (j = 0; j < batch_size; j++) {
+            if (my_skip.at(j) || eval_flags.at(j))
+              continue;
+            else {
+              //str in OB
+              ObString str = argDatum[*index].get_string();
+              // put str into input array(funcache)
+              input[j].append(std::string(str.ptr(), str.length()));
+            }
+          }
+          break;
+        }
+        case ObTinyIntType:
+        case ObSmallIntType:
+        case ObMediumIntType:
+        case ObInt32Type:
+        case ObIntType: {
+          for (j = 0; j < batch_size; j++) {
+            if (my_skip.at(j) || eval_flags.at(j))
+              continue;
+            //put integer into numpy array
+            if(expr.args_[i]->is_const_expr()&&!expr.args_[i]->is_batch_result()){
+              int tmp2=argDatum[0].get_int();
+              // put str into input array(funcache)
+              input[j].append(std::to_string(tmp2));
+            }else{
+              int tmp3=argDatum[j].get_int();
+              // put str into input array(funcache)
+              input[j].append(std::to_string(tmp3));
+            }
+            
+          }
+          break;
+        }
+        case ObDoubleType: {
+          for (j = 0; j < batch_size; j++) {
+            if (my_skip.at(j) || eval_flags.at(j))
+              continue;
+            else{
+              double tmp = argDatum[*index].get_double();
+              input[j].append(std::to_string(tmp));
+            }
+          }
+          break;
+        }
+        case ObNumberType: 
+        default: {
+          //error
+          ret = OB_ERR_UNEXPECTED;
+        }
+      }
+    
+    }
+    // 检查是否存在funcache,若存在就替换为缓存结果
+    // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
+    
+    
+    if(!isFuncacheNew&&!is_merged_udf){
+      if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+        for(int i=0;i<batch_size;i++){
+          if (my_skip.at(i) || eval_flags.at(i))
+            continue;
+
+          const char* cstr = input[i].c_str();
+          // 获取字符串长度
+          size_t length = input[i].size();
+          // 分配内存并复制字符串内容
+          char* tmp = new char[length + 1];
+          std::memcpy(tmp, cstr, length + 1);
+
+          char* res;
+          std::shared_ptr<std::vector<float>> mid_res;
+          if(OB_FAIL(single_str_func_map->get_refactored(tmp,res))){
+            if(OB_HASH_NOT_EXIST == ret){
+              // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
+              if(use_cache_plus&&has_new_input_model_path&&single_can_be_used_redundent_cache_map_is_found){
+                if(OB_FAIL(single_can_be_used_redundent_cache_map->get_refactored(tmp, mid_res))){
+                  ret=OB_SUCCESS;
+                }else{
+                  count_mid_res++;
+                  mid_res_cols=mid_res->size();
+                  has_mid_result[i]=true;
+                  mid_result_list[i]=mid_res;
+                  real_param--;
+                }
+              }
+            }
+            ret=OB_SUCCESS;
+          }else{
+              results[i].set_string(ObString(strlen(res),res));
+              my_skip.set(i);
+              eval_flags.set(i);
+              real_param--;
+          }
+          delete[] tmp;
+        }
+      }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+        for(int i=0;i<batch_size;i++){
+          if (my_skip.at(i) || eval_flags.at(i))
+            continue;
+
+          const char* cstr = input[i].c_str();
+          // 获取字符串长度
+          size_t length = input[i].size();
+          // 分配内存并复制字符串内容
+          char* tmp = new char[length + 1];
+          std::memcpy(tmp, cstr, length + 1);
+
+          int res;
+          std::shared_ptr<std::vector<float>> mid_res;
+          if(OB_FAIL(single_func_map->get_refactored(tmp,res))){
+            if(OB_HASH_NOT_EXIST == ret){
+              // 如果没有udf级别的缓存结果，就尝试查找是否存在中间结果
+              if(use_cache_plus&&has_new_input_model_path&&single_can_be_used_redundent_cache_map_is_found){
+                if(OB_FAIL(single_can_be_used_redundent_cache_map->get_refactored(tmp, mid_res))){
+                  ret=OB_SUCCESS;
+                }else{
+                  count_mid_res++;
+                  mid_res_cols=mid_res->size();
+                  has_mid_result[i]=true;
+                  mid_result_list[i]=mid_res;
+                  real_param--;
+                }
+              }
+            }
+            ret=OB_SUCCESS;
+          }else{
+              results[i].set_int(res);
+              my_skip.set(i);
+              eval_flags.set(i);
+              real_param--;
+          }
+          delete[] tmp;
+        }
+      }
+      
+    }
 
   }
   //Ensure GIL
@@ -1424,7 +1441,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     arrays[i] = numpyarray;
   }
   // 构建使用中间结果的入参并调用和接收python函数的返回结果
-  if(use_cache_plus&&has_new_input_model_path){
+  if(use_cache_plus&&has_new_input_model_path&&count_mid_res>0){
     PyObject *pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
     PyObject *pArgs_input = PyTuple_New(1);
     PyObject *pResult_Array_input = NULL;
@@ -1437,7 +1454,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     int count=0;
     for(int i=0;i<has_mid_result.size();i++){
       if(has_mid_result[i]){
-        std::copy(mid_result_list[i].begin(), mid_result_list[i].end(), data_input + count * numCols);
+        std::copy(mid_result_list[i]->begin(), mid_result_list[i]->end(), data_input + count * numCols);
         count++;
       }
     }
