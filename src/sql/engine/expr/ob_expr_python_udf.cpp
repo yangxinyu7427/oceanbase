@@ -282,6 +282,7 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
       // 替换global变量名
       change_vars_in_pycall(pycall_output, "output");
       const char* pycall_output_c = pycall_output.c_str();
+      ObString tmpObString(pycall_output.size(),pycall_output.c_str());
       // 初始化pycall
       v = PyRun_StringFlags(pycall_output_c, Py_file_input, dic, dic, NULL); // test pycall
       if(OB_ISNULL(v)) {
@@ -321,6 +322,7 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
       // 替换global变量名
       change_vars_in_pycall(pycall_input, "input");
       const char* pycall_input_c = pycall_input.c_str();
+      ObString tmpObString(pycall_input.size(),pycall_input.c_str());
       // 初始化pycall
       v = PyRun_StringFlags(pycall_input_c, Py_file_input, dic, dic, NULL); // test pycall
       if(OB_ISNULL(v)) {
@@ -355,11 +357,11 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
 
 int ObExprPythonUdf::change_vars_in_pycall(string &code, string pre){
   int ret = OB_SUCCESS;
-  std::regex global_pattern(R"(global\s+([a-zA-Z_][a-zA-Z0-9_,\s]*))");
+  std::regex global_pattern(R"(global\s+([^\n]+))");
   std::smatch match;
   if (std::regex_search(code, match, global_pattern)) {
-      // 提取匹配到的变量名字符串并去除空白符
-      std::string global_vars = match[1];
+      // Extract matched variable names and remove spaces
+      std::string global_vars = match[1].str();
       global_vars.erase(std::remove(global_vars.begin(), global_vars.end(), ' '), global_vars.end());
       std::vector<std::string> vars;
       std::string delimiter = ",";
@@ -371,17 +373,19 @@ int ObExprPythonUdf::change_vars_in_pycall(string &code, string pre){
       }
       vars.push_back(global_vars);
 
-      // 创建替换规则，将每个变量名后添加 "output"
+      // Create replacement rules
       std::unordered_map<std::string, std::string> replacements;
       for (const auto& var : vars) {
           replacements[var] = var + pre;
       }
 
-      // 全局替换代码中的变量名
-      for (const auto& [old_name, new_name] : replacements) {
+      // Replace variable names in the code
+      for (const auto& pair : replacements) {
+          const auto& old_name = pair.first;
+          const auto& new_name = pair.second;
           code = std::regex_replace(code, std::regex("\\b" + old_name + "\\b"), new_name);
       }
-    }
+  }
   return ret;
 }
 
