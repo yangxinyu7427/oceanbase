@@ -321,8 +321,11 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
       pycall_input = std::regex_replace(pycall_input, pattern, exchanged_onnx_path);
       // 替换global变量名
       change_vars_in_pycall(pycall_input, "input");
+      // 替换入参
+      std::regex pattern2(R"(elem: .*)");
+      std::string replacement = "elem: args[0]";
+      pycall_input = std::regex_replace(pycall_input, pattern2, replacement);
       const char* pycall_input_c = pycall_input.c_str();
-      ObString tmpObString(pycall_input.size(),pycall_input.c_str());
       // 初始化pycall
       v = PyRun_StringFlags(pycall_input_c, Py_file_input, dic, dic, NULL); // test pycall
       if(OB_ISNULL(v)) {
@@ -908,9 +911,9 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr.extra_info_);
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
-  std::string pyfun_handler = name.append("_pyfun");
-  std::string pyfun_handler_output = name.append("_output_pyfun");
-  std::string pyfun_handler_input = name.append("_input_pyfun");
+  std::string pyfun_handler = name+"_pyfun";
+  std::string pyfun_handler_output = name+"_output_pyfun";
+  std::string pyfun_handler_input = name+"_input_pyfun";
   bool is_merged_udf=info->udf_meta_.ismerged_;
   common::ObSEArray<common::ObString, 16> merged_udf_names_list=info->udf_meta_.merged_udf_names_;
   // 加载对应的funcache
