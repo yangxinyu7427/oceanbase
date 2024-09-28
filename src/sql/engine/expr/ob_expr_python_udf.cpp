@@ -904,6 +904,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
 
   // 开始统计时间
   struct timeval t1, t2, t3, t4, t5, t6;
+  struct timeval t7, t8, t9, t10;
   double timeuse;
   gettimeofday(&t1, NULL);
 
@@ -917,7 +918,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   bool is_merged_udf=info->udf_meta_.ismerged_;
   common::ObSEArray<common::ObString, 16> merged_udf_names_list=info->udf_meta_.merged_udf_names_;
   // 加载对应的funcache
-  bool useCache=true;
+  bool useCache=false;
   bool isFuncacheNew=false;
   ObSQLSessionInfo* session=ctx.exec_ctx_.get_my_session();
   ObPythonUDF::PyUdfRetType ret_type=info->udf_meta_.ret_;
@@ -1106,7 +1107,8 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   ObDatum *argDatum = NULL;
   std::vector<bool> has_mid_result(batch_size, false);
   std::vector<std::shared_ptr<std::vector<float>>> mid_result_list(batch_size);
-  if(useCache){
+  gettimeofday(&t7, NULL);
+  if(useCache||use_cache_plus){
     // 如果是mergedudf，构造input数组时只需要缓存原来udf的input列数
     int input_num;
     if(is_merged_udf)
@@ -1268,6 +1270,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     }
 
   }
+  gettimeofday(&t8, NULL);
   //Ensure GIL
   bool nStatus = PyGILState_Check();
   PyGILState_STATE gstate;
@@ -1303,6 +1306,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   PyObject *numpyarray = NULL;
   PyObject *resultarray = NULL;
   PyObject *pOutputArray = NULL;
+  PyArrayObject* array = NULL;
   //PyObject **arrays = (PyObject **)ctx.tmp_alloc_.alloc(sizeof(PyObject *) * expr.arg_cnt_);
   for(int i = 0; i < expr.arg_cnt_; i++)
     arrays[i] = NULL;
@@ -1486,6 +1490,14 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
           results[i].set_int(tmp);
       }
     }
+    // Release Python objects
+    Py_XDECREF(pFunc_input);
+    //Py_XDECREF(pArgs_input);
+    Py_XDECREF(pArray_input);
+    Py_XDECREF(pResult_Array_input);
+    //if (!isNumPyArray_input) {
+    //    Py_XDECREF(pResult_input);
+    //}
   }
   gettimeofday(&t3, NULL);
   if(real_param!=0){
@@ -1531,7 +1543,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             char* newStr = new char[length + 1];
             std::memcpy(newStr, cstr, length + 1);
             pOutputArray=PyList_GetItem(resultarray, PyList_Size(resultarray) - 1);
-            PyArrayObject* array = reinterpret_cast<PyArrayObject*>(pOutputArray);
+            array = reinterpret_cast<PyArrayObject*>(pOutputArray);
             npy_intp numCols = PyArray_DIM(array, 1);
             float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(array, k-1, 0));
             std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(rowData, rowData + numCols);
@@ -1583,18 +1595,20 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
             PyArray_GETITEM((PyArrayObject *)pResult, (char *)PyArray_GETPTR1((PyArrayObject *)pResult, k++)));
           results[j].set_int(tmp);
           // 获取要缓存的中间结果，这里默认中间结果为float32类型的numpy数组，并且是结果数组的最后一列
+          gettimeofday(&t9, NULL);
           if(use_cache_plus&&has_new_output_model_path){
             const char* cstr = input[j].c_str();
             size_t length = input[j].size();
             char* newStr = new char[length + 1];
             std::memcpy(newStr, cstr, length + 1);
             pOutputArray=PyList_GetItem(resultarray, PyList_Size(resultarray) - 1);
-            PyArrayObject* array = reinterpret_cast<PyArrayObject*>(pOutputArray);
+            array = reinterpret_cast<PyArrayObject*>(pOutputArray);
             npy_intp numCols = PyArray_DIM(array, 1);
             float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(array, k-1, 0));
             std::shared_ptr<std::vector<float>> vec_ptr = std::make_shared<std::vector<float>>(rowData, rowData + numCols);
             single_redundent_cache_map->set_refactored(newStr, vec_ptr);
           }
+          gettimeofday(&t10, NULL);
           // set funCache
           if(useCache){
             if(!is_merged_udf){
@@ -1647,7 +1661,6 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
     }
   }
   gettimeofday(&t5, NULL);
-  
 
   //释放资源
   destruction:
@@ -1674,7 +1687,6 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   // }else{
   //   Py_XDECREF(resultarray);
   // }
-
   Py_XDECREF(resultarray);
   // if(pOutputArray != NULL) {
   //   PyArray_XDECREF((PyArrayObject *)pOutputArray);
@@ -1682,8 +1694,7 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   // }
   // Py_XDECREF(resultarray);
 
-  // //PyGC_Enable();
-  // //PyGC_Collect();
+  PyGC_Collect();
   
   //release GIL
   if(nStatus)
@@ -1734,25 +1745,31 @@ int ObExprPythonUdf::eval_test_udf_batch(const ObExpr &expr, ObEvalCtx &ctx,
   }
   
   // 插桩 记录运行时间
-  /*double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
-  std::string file_name("/home/test/log/");
+  double inference_time = (t4.tv_sec - t3.tv_sec) * 1000 + (double)(t4.tv_usec - t3.tv_usec) / 1000;
+  std::string file_name("/home/");
   file_name.append(std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()));
   file_name.append(".log");
   std::fstream f;
   f.open(file_name, std::ios::out | std::ios::app); // 追加写入
-  if (start_query)
+  if (start_query){
     f << "Start a new Query!" << std::endl;
-  f << "inference batch size: " << real_param << std::endl;
+    info->count=0;
+  }
+  info->count+=real_param+count_mid_res;
+  f << "total size: " << info->count << std::endl;
+  f << "inference batch size: " << real_param+count_mid_res << std::endl;
   f << "execution time: " << timeuse/1000 << " ms" << std::endl;
   f << "pre process time: " << (t2.tv_sec - t1.tv_sec) * 1000 + (double)(t2.tv_usec - t1.tv_usec) / 1000 << " ms" << std::endl;
   f << "ob_py transformation time: " << (t3.tv_sec - t2.tv_sec) * 1000 + (double)(t3.tv_usec - t2.tv_usec) / 1000 << " ms" << std::endl;
   f << "inference time: " << inference_time << " ms" << std::endl;
   f << "py_ob transformation time: " << (t5.tv_sec - t4.tv_sec) * 1000 + (double)(t5.tv_usec - t4.tv_usec) / 1000 << " ms" << std::endl;
   f << "after process time: " << (t6.tv_sec - t5.tv_sec) * 1000 + (double)(t6.tv_usec - t5.tv_usec) / 1000 << " ms" << std::endl;
+  f << "make input time: " << (t8.tv_sec - t7.tv_sec) * 1000 + (double)(t8.tv_usec - t7.tv_usec) / 1000 << " ms" << std::endl;
+  f << "transformation mid res time: " << (t10.tv_sec - t9.tv_sec) * 1000 + (double)(t10.tv_usec - t9.tv_usec) / 1000 << " ms" << std::endl;
   f << "tuples per second: " << tps << std::endl;
   f << "tps* : " << info->tps_s << std::endl;
   f << std::endl;
-  f.close();*/
+  f.close();
   return ret;
 }
 

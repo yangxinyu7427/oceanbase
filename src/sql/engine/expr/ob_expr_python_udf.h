@@ -88,6 +88,7 @@ public:
   int round;
   int round_limit; // rounds of stoping batch size motification
   int delta; // delta batch size
+  int count;
 };
 } /* namespace sql */
 } /* namespace oceanbase */

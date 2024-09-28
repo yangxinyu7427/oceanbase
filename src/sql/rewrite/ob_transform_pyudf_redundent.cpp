@@ -107,18 +107,20 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
         ObString tmpObstring=it->first;
         std::vector<std::string> list=check_redundant(tmp, model_path);
         if(list.size()>0){
-          found=true;
           change_models(model_path, new_output_model_path, new_input_model_path, list);
-          python_udf_expr_list.at(i)->set_udf_meta_has_new_output_model_path();
-          python_udf_expr_list.at(i)->set_udf_meta_new_output_model_path(new_output_model_path);
-          python_udf_expr_list.at(i)->set_udf_meta_model_path(path);
-          // 再检查是否已缓存，如果已缓存，就再记录使用中间结果的模型
+          //这里先暂定为如果有已缓存的结果了，就先不导出结果。。。
           if(it->second){
             python_udf_expr_list.at(i)->set_udf_meta_has_new_input_model_path();
             python_udf_expr_list.at(i)->set_udf_meta_new_input_model_path(new_input_model_path);
             python_udf_expr_list.at(i)->set_udf_meta_can_be_used_model_path(it->first);
             break;
           }
+          found=true;
+          python_udf_expr_list.at(i)->set_udf_meta_has_new_output_model_path();
+          python_udf_expr_list.at(i)->set_udf_meta_new_output_model_path(new_output_model_path);
+          python_udf_expr_list.at(i)->set_udf_meta_model_path(path);
+          // 再检查是否已缓存，如果已缓存，就再记录使用中间结果的模型
+          
         }
       } catch(...){
         LOG_WARN("check_redundant fail");

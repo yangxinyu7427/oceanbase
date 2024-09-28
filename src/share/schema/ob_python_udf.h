@@ -124,7 +124,8 @@ class ObPythonUDFMeta
   OB_UNIS_VERSION_V(1);
 public :
   ObPythonUDFMeta() : name_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), 
-                      udf_attributes_names_(), udf_attributes_types_(), init_(false), ismerged_(false), merged_udf_names_(), origin_input_count_(0) {} 
+                      udf_attributes_names_(), udf_attributes_types_(), init_(false), ismerged_(false), 
+                      merged_udf_names_(), origin_input_count_(0), has_new_output_model_path_(false), has_new_input_model_path_(false) {} 
   virtual ~ObPythonUDFMeta() = default;
 
   void assign(const ObPythonUDFMeta &other) { 
