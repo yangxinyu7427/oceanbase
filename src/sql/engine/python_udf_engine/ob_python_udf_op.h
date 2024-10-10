@@ -213,7 +213,8 @@ public:
 
   ~ObPythonUDFOp();
 
-  static int find_predict_size(ObExpr *expr, int32_t &predict_size);
+  static int init_udfs(const common::ObIArray<ObExpr *> &udf_exprs);
+  static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
   virtual int inner_open() override;
   virtual int inner_close() override;
@@ -223,12 +224,14 @@ public:
   virtual void destroy() override;
 
 private:
-  //int find_predict_size(ObExpr *expr, int32_t &predict_size);
+  int find_predict_size(ObExpr *expr, int32_t &predict_size);
   int clear_calc_exprs_evaluated_flags();
 
 private:
   int predict_size_; //每次python udf计算的元组数
   ObPUStoreController controller_;
+
+  void* _save; //for Python Interpreter Thread State
 };
 
 } // end namespace sql

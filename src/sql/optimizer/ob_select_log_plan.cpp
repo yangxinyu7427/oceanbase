@@ -4448,8 +4448,9 @@ int ObSelectLogPlan::allocate_plan_top()
       }
     }
     
+    bool generate_predict_operator = true;
     // step. allocate 'python udf' if needed
-    if (OB_SUCC(ret) && select_stmt->has_python_udf()) {
+    if (OB_SUCC(ret) && select_stmt->has_python_udf() && generate_predict_operator) {
       if (OB_FAIL(candi_allocate_python_udf())) {
         LOG_WARN("failed to allocate python udf", K(ret));
       } else {

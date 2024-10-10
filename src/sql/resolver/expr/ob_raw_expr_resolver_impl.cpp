@@ -7721,7 +7721,9 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
       LOG_WARN("null ptr", K(ret));
     } else if (OB_FAIL(func_expr->set_udf_meta(udf_info, batch_size))) {     //传递udf_meta
       LOG_WARN("set python udf info failed", K(ret));
-    } else if (udf_info.get_arg_num() > 0) {
+    } else if (udf_info.get_arg_num() != node->children_[child_num - 1]->num_child_) {
+      LOG_WARN("invalid udf arg nums", K(ret));
+    } else {
       //resolve params
       ObRawExpr *param_expr = NULL;
       int32_t num_child = node->children_[child_num - 1]->num_child_;
@@ -7735,7 +7737,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
         } else if (OB_FAIL(SMART_CALL(recursive_resolve(param_node, param_expr)))) {
           LOG_WARN("fail to recursive resolve udf parameters", K(ret), K(param_node));
         } else if (OB_FAIL(ctx_.parents_expr_info_.del_member(IS_PYTHON_UDF))) {
-          LOG_WARN("failed to add member to parent exprs info.", K(ret));
+          LOG_WARN("failed to del member to parent exprs info.", K(ret));
         } else if (OB_FAIL(func_expr->add_param_expr(param_expr))) {
           LOG_WARN("fail to add param expr", K(ret), K(param_expr));
         }
