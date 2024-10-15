@@ -6,6 +6,8 @@
 #include <regex>
 #include <string>
 #include <map>
+#include <cstdlib>
+#include <time.h>
 #include "sql/rewrite/ob_transform_pyudf_merge.h"
 #include "sql/rewrite/ob_stmt_comparer.h"
 #include "sql/rewrite/ob_transform_utils.h"
@@ -210,6 +212,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   ObPythonUdfRawExpr* python_udf_expr=static_cast<ObPythonUdfRawExpr*>(expr);
   python_udf_expr->set_udf_meta_merged_udf_name_list(merged_udf_name_list);
   python_udf_expr->set_udf_meta_origin_input_count(udf_input_count);
+  python_udf_expr->set_udf_meta_opted_model_path(out_path);
   expr=python_udf_expr;
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
@@ -534,7 +537,8 @@ int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
 {
   int ret = OB_SUCCESS;
   ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
-  out_path=opted_model_path;
+  //生成优化后的onnx模型的地址
+  out_path="/root/onnx_output/"+std::to_string((int)time(0))+".onnx";
   if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list, src_exprs))){
     LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
   } else if(OB_FAIL(merge_onnx_model_from_python_udf_expr_list(out_path, python_udf_expr_list))){
@@ -609,6 +613,10 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
       // 第一次取前两个model
       string path1=model_path_list.at(i);
       string pre1=prefix_list.at(i);
+      //这里记录一下前缀，方便后续查询间冗余消除匹配
+      ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
+      ObMergedUDFPrefixMap &history_pyudf_map = session->get_merged_udf_pre_map();
+      history_pyudf_map.set_refactored(out_path, pre1);
       i++;
       string path2=model_path_list.at(i);
       string pre2=prefix_list.at(i);

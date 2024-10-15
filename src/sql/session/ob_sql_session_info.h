@@ -299,6 +299,13 @@ public:
   static const int16_t CONINFO_BY_SESS = 0xC078;
 };
 
+// 用坐标法来存储稀疏数组
+struct SparseElement {
+    size_t index;
+    float value;
+    size_t size;
+};
+
 #define DEF_SESSION_TXN_ENCODER(CLS)                                    \
 class CLS final : public ObSessInfoEncoder {                            \
 public:                                                                 \
@@ -333,6 +340,9 @@ typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfRedundentCacheMap
 
 typedef common::hash::ObHashMap<common::ObString, bool,
                                 common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
+
+typedef common::hash::ObHashMap<std::string, std::string,
+                                common::hash::NoPthreadDefendMode> ObMergedUDFPrefixMap;
 
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfStrFunCacheMap*,
                                 common::hash::NoPthreadDefendMode> ObPyUdfStrFunCacheMap;
@@ -937,6 +947,7 @@ public:
   ObPyUdfFunCacheMap &get_pyudf_funcache_map() { return pyudf_funcache_map_; }
   ObPyUdfRedundentCacheMap &get_pyudf_redundent_funcache_map() { return pyudf_redundent_funcache_map_; }
   ObHistoryPyUdfMap &get_history_pyudf_map() { return history_pyudf_map_; }
+  ObMergedUDFPrefixMap &get_merged_udf_pre_map() { return merged_udf_pre_map_; }
   ObPyUdfStrFunCacheMap &get_pyudf_str_funcache_map() { return pyudf_str_funcache_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
   int update_sess_sync_info(const SessionSyncInfoType sess_sync_info_type,
@@ -1150,6 +1161,7 @@ public:
   ObPyUdfFunCacheMap pyudf_funcache_map_;
   ObPyUdfRedundentCacheMap pyudf_redundent_funcache_map_;
   ObHistoryPyUdfMap history_pyudf_map_;
+  ObMergedUDFPrefixMap merged_udf_pre_map_;
   ObPyUdfStrFunCacheMap pyudf_str_funcache_map_;
 private:
   int64_t curr_session_context_size_;

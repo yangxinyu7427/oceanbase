@@ -143,6 +143,7 @@ public :
     has_new_input_model_path_=other.has_new_input_model_path_;
     new_input_model_path_=other.new_input_model_path_;
     can_be_used_model_path_=other.can_be_used_model_path_;
+    opted_model_path_=other.opted_model_path_;
     model_path_=other.model_path_;
   }
 
@@ -161,6 +162,7 @@ public :
     has_new_input_model_path_=other.has_new_input_model_path_;
     new_input_model_path_=other.new_input_model_path_;
     can_be_used_model_path_=other.can_be_used_model_path_;
+    opted_model_path_=other.opted_model_path_;
     model_path_=other.model_path_;
     return *this;
   }
@@ -182,6 +184,7 @@ public :
   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
   bool init_; //是否已初始化
   bool ismerged_;//是否经查询内冗余消除融合
+  std::string opted_model_path_;//经查询内冗余消除策略优化后的模型地址
   common::ObSEArray<common::ObString, 16> merged_udf_names_; //融合的udf名
   int origin_input_count_; //初始udf的input数
   bool has_new_output_model_path_;

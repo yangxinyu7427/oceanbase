@@ -4313,6 +4313,12 @@ int ObPythonUdfRawExpr::set_udf_meta_has_new_input_model_path(){
   return ret;
 }
 
+int ObPythonUdfRawExpr::set_udf_meta_opted_model_path(std::string opted_model_path){
+  int ret = OB_SUCCESS;
+  udf_meta_.opted_model_path_=opted_model_path;
+  return ret;
+}
+
 int ObPythonUdfRawExpr::set_udf_meta_new_input_model_path(std::string path){
   int ret = OB_SUCCESS;
   udf_meta_.new_input_model_path_=path;
