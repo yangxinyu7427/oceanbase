@@ -341,7 +341,7 @@ typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfRedundentCacheMap
 typedef common::hash::ObHashMap<common::ObString, bool,
                                 common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
 
-typedef common::hash::ObHashMap<std::string, std::string,
+typedef common::hash::ObHashMap<common::ObString, std::string,
                                 common::hash::NoPthreadDefendMode> ObMergedUDFPrefixMap;
 
 typedef common::hash::ObHashMap<common::ObString, ObSinglePyUdfStrFunCacheMap*,

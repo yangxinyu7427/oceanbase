@@ -83,6 +83,7 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
   int ret = OB_SUCCESS;
   ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
   ObHistoryPyUdfMap &history_pyudf_map = session->get_history_pyudf_map();
+  ObMergedUDFPrefixMap &merged_udf_pre_map=session->get_merged_udf_pre_map();
   for(int i=0;i<python_udf_expr_list.count();i++){
     oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
     string model_path;
@@ -104,11 +105,32 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
     for (auto it = history_pyudf_map.begin(); it != history_pyudf_map.end(); ++it) {
       try{
         std::string tmp(it->first.ptr(),it->first.length());
-        ObString tmpObstring=it->first;
-        std::vector<std::string> list=check_redundant(tmp, model_path);
+        //ObString tmpObstring=it->first;
+        std::string new_model_prefix="/root/onnx_output/model_prefix.onnx";
+        std::string prefix;
+        std::vector<std::string> list;
+        //被匹配的模型是否需要添加前缀，如果被匹配的模型就是优化后的模型，那么就不需要添加前缀
+        bool is_model_prefixed=false;
+        ObString tmpObstring(tmp.c_str());
+        if(OB_FAIL(merged_udf_pre_map.get_refactored(tmpObstring, prefix))){
+          //这里缓存的是正常模型，但如果待匹配的是优化后的模型，就需要给缓存的模型添加前缀
+          add_prefix_on_model(tmp, new_model_prefix, prefix);
+          list=check_redundant(new_model_prefix, model_path);
+          ret =OB_SUCCESS;
+        }else{
+          //这里注意如果缓存的是查询内冗余消除策略优化后的模型，需要给待匹配的模型加上前缀
+          add_prefix_on_model(model_path, new_model_prefix, prefix);
+          list=check_redundant(tmp, new_model_prefix);
+          is_model_prefixed=true;
+        }
+        
         if(list.size()>0){
-          change_models(model_path, new_output_model_path, new_input_model_path, list);
-          //这里先暂定为如果有已缓存的结果了，就先不导出结果。。。
+          if(is_model_prefixed){
+            change_models(new_model_prefix, new_output_model_path, new_input_model_path, list);
+          }else{
+            change_models(model_path, new_output_model_path, new_input_model_path, list);
+          }
+          //这里先暂定为如果有已缓存的结果了，就先不导出结果了。。。
           if(it->second){
             python_udf_expr_list.at(i)->set_udf_meta_has_new_input_model_path();
             python_udf_expr_list.at(i)->set_udf_meta_new_input_model_path(new_input_model_path);

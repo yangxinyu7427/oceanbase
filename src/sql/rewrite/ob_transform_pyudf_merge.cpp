@@ -615,8 +615,10 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
       string pre1=prefix_list.at(i);
       //这里记录一下前缀，方便后续查询间冗余消除匹配
       ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
-      ObMergedUDFPrefixMap &history_pyudf_map = session->get_merged_udf_pre_map();
-      history_pyudf_map.set_refactored(out_path, pre1);
+      ObMergedUDFPrefixMap &merged_udf_pre_map = session->get_merged_udf_pre_map();
+      ObString tmpObString(out_path.c_str());
+      string *tmppre1=new string(pre1);
+      merged_udf_pre_map.set_refactored(tmpObString, *tmppre1);
       i++;
       string path2=model_path_list.at(i);
       string pre2=prefix_list.at(i);
