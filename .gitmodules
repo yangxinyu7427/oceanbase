@@ -1,0 +1,3 @@
+[submodule "src/sql/rewrite/onnx_optimizer"]
+	path = src/sql/rewrite/onnx_optimizer
+	url = https://github.com/yangxinyu7427/onnx_optimizer_C.git
