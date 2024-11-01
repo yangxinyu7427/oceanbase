@@ -1253,6 +1253,7 @@ ob_set_subtarget(ob_sql rewrite
   rewrite/ob_transform_expr_pullup.cpp
   rewrite/ob_transformer_impl.cpp
   rewrite/ob_transform_dblink.cpp
+  rewrite/ob_transform_pyudf_merge.cpp
   rewrite/ob_union_find.cpp
 )
 
@@ -1297,6 +1298,9 @@ endif()
 target_link_libraries(ob_sql PUBLIC python_lib)
 
 target_link_libraries(ob_sql PUBLIC ob_base)
+
+add_subdirectory(rewrite/onnx_optimizer)
+target_link_libraries(ob_sql PUBLIC optimize_c_api)
 
 add_library(ob_sql_static
   STATIC

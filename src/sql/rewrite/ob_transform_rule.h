@@ -174,6 +174,7 @@ enum TRANSFORM_TYPE {
   COUNT_TO_EXISTS               ,
   SELECT_EXPR_PULLUP            ,
   PROCESS_DBLINK                ,
+  PYUDF_MERGE                   ,
   TRANSFORM_TYPE_COUNT_PLUS_ONE ,
 };
 
