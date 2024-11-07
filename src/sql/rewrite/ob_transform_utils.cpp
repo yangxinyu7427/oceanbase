@@ -13186,7 +13186,7 @@ int ObTransformUtils::extract_python_udf_exprs(
   int32_t i = 0;
   while (OB_SUCC(ret) && i < src_exprs.count()) {
     expr = src_exprs.at(i);
-    if(expr_contain_type(expr, T_FUN_SYS_PYTHON_UDF)) {
+    if(expr_contain_type(expr, T_FUN_PYTHON_UDF)) {
       dst_exprs.push_back(expr);
       src_exprs.remove(i);
     } else {
@@ -13221,7 +13221,7 @@ int ObTransformUtils::count_python_udf_num(ObRawExpr *expr)
   if(OB_ISNULL(expr)){
     return 0;
   } 
-  if(expr->get_expr_type()==T_FUN_SYS_PYTHON_UDF){
+  if(expr->get_expr_type()==T_FUN_PYTHON_UDF){
     count++;
   } 
   for(int i=0;i<expr->get_param_count();i++){
@@ -13240,7 +13240,7 @@ int ObTransformUtils::extract_python_udf_exprs_idx_in_condition(
   int64_t i = 0;
   while (OB_SUCC(ret) && i < src_exprs.count()) {
     expr = src_exprs.at(i);
-    if(expr_contain_type(expr, T_FUN_SYS_PYTHON_UDF)) {
+    if(expr_contain_type(expr, T_FUN_PYTHON_UDF)) {
       idx_list.push_back(i);
     }
     i++;
@@ -13258,7 +13258,7 @@ int ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(
     return 0;
   }
   ObPythonUdfRawExpr *python_udf_expr=NULL;
-  if(src_expr->get_expr_type() == T_FUN_SYS_PYTHON_UDF){
+  if(src_expr->get_expr_type() == T_FUN_PYTHON_UDF){
 
     if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
       // 进行expr转换

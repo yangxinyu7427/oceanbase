@@ -120,7 +120,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   // 遍历表达式树，找到所有包含python udf的表达式树的根节点(maybe只有and连接的情况)
   ObSEArray<ObRawExpr *, 4> exprs_contain_python_udf_list;
   for(int i=0;i<src_exprs.count();i++){
-    if(ObTransformUtils::expr_contain_type(src_exprs.at(i), T_FUN_SYS_PYTHON_UDF)) {
+    if(ObTransformUtils::expr_contain_type(src_exprs.at(i), T_FUN_PYTHON_UDF)) {
         exprs_contain_python_udf_list.push_back(src_exprs.at(i));
         src_exprs.remove(i);
         i--;
@@ -234,7 +234,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
 int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_expr, string& out_path, std::map<string,int>& countMap, ObRawExpr*& expr_opted, int& udf_input_count, int& level_count){
   int ret = OB_SUCCESS;
   // 终止条件
-  if(src_expr->get_expr_type() == T_FUN_SYS_PYTHON_UDF){
+  if(src_expr->get_expr_type() == T_FUN_PYTHON_UDF){
     ObPythonUdfRawExpr* python_udf_expr;
     if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
       LOG_WARN("convert expr to ObPythonUdfRawExpr fail", K(ret));
@@ -613,10 +613,10 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
       string pre1=prefix_list.at(i);
       //这里记录一下前缀，方便后续查询间冗余消除匹配
       ObSQLSessionInfo* session=ctx_->exec_ctx_->get_my_session();
-      ObMergedUDFPrefixMap &merged_udf_pre_map = session->get_merged_udf_pre_map();
+      //ObMergedUDFPrefixMap &merged_udf_pre_map = session->get_merged_udf_pre_map();
       ObString tmpObString(out_path.c_str());
       string *tmppre1=new string(pre1);
-      merged_udf_pre_map.set_refactored(tmpObString, *tmppre1);
+      //merged_udf_pre_map.set_refactored(tmpObString, *tmppre1);
       i++;
       string path2=model_path_list.at(i);
       string pre2=prefix_list.at(i);

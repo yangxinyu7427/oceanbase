@@ -1360,6 +1360,8 @@ int ObPUStoreController::process()
     for (ObPythonUDFCell* cell = cells_list_.get_first(); 
         cell != header && OB_SUCC(ret); 
         cell = cell->get_next()) {
+      // todo 要是走缓存的话，应该修改每个cell的input_store_，这就可能导致
+      // cell->get_store_size() != stored_input_cnt_不成立
       if (cell->get_store_size() != stored_input_cnt_) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Unsaved input rows.", K(ret));
