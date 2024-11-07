@@ -13,7 +13,7 @@ using namespace common;
 namespace sql
 {
 
-static bool without_batch_control_ = true; // 是否不进行batch size控制
+static bool without_batch_control_ = false; // 是否不进行batch size控制
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
                     udf_exprs_,
