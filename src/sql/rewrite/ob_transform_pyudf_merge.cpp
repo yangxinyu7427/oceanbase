@@ -81,9 +81,9 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), onnx_model_opted_path, merged_udf_name_list))){
+  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), onnx_model_opted_path, merged_udf_name_list))){
+  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(optimize_on_merged_onnx_model(onnx_model_opted_path))){
     LOG_WARN("optimize_on_merged_model fail", K(ret));
@@ -110,6 +110,7 @@ int ObTransformPyUDFMerge::optimize_on_merged_onnx_model(string& out_path)
 
 int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   ObIArray<ObRawExpr *> &src_exprs,
+  ObSelectStmt * stmt,
   string& out_path,
   ObIArray<ObString> &merged_udf_name_list)
 {
@@ -215,6 +216,8 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
   }
+  // 在stmt中添加opted expr
+  stmt->add_python_udf_expr(python_udf_expr);
   // 构建bool expr
   ObRawExpr *bool_expr = NULL;
   ObRawExpr *equal_expr = NULL;
@@ -530,6 +533,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
 
 int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
   ObIArray<ObRawExpr *> &src_exprs,
+  ObSelectStmt * stmt,
   string& out_path,
   ObIArray<ObString> &merged_udf_name_list)
 {
@@ -551,6 +555,8 @@ int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
 
     ObString name=ObString(tmpstring.length(),tmp);
     merged_udf_name_list.push_back(name);
+    // 在stmt中删除被融合的udf
+    stmt->remove_python_udf_expr(python_udf_expr_list.at(i));
   }
   return ret;
 }
