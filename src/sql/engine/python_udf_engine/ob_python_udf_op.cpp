@@ -13,7 +13,7 @@ using namespace common;
 namespace sql
 {
 
-static bool without_batch_control_ = false; // 是否不进行batch size控制
+static bool with_batch_control_ = true; // 是否进行batch size控制
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
                     udf_exprs_,
@@ -152,10 +152,10 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
   struct timeval t1, t2;
   gettimeofday(&t1, NULL);
   
-  if (!without_batch_control_) {
+  if (with_batch_control_) {
     if (OB_SUCC(ret) && !controller_.can_output()) {
       clear_evaluated_flag();
-      controller_.resize(controller_.get_desirable());
+      controller_.resize(controller_.get_desirable() * 2);
       const ObBatchRows *child_brs = nullptr;
       while (OB_SUCC(ret) && !brs_.end_ && !controller_.is_full()) { // while loop直至缓存填满
         if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
@@ -198,6 +198,12 @@ int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
   if (OB_FAIL(ret) || OB_FAIL(controller_.restore(eval_ctx_, brs_, max_row_cnt))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Restore output batchrows failed.", K(ret));
+  } else {
+    // reset all spec filters
+    FOREACH_CNT_X(e, MY_SPEC.filters_, OB_SUCC(ret)) {
+      (*e)->clear_evaluated_flag(eval_ctx_);
+      (*e)->get_eval_info(eval_ctx_).clear_evaluated_flag();
+    }
   }
   gettimeofday(&t2, NULL);
   double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec);
@@ -1043,7 +1049,6 @@ int ObPythonUDFCell::do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, 
       LOG_WARN("Unsupported result type.", K(ret));
   }
   expr_->init_vector_for_write(eval_ctx, format, batch_size_);
-  //}
   ObIVector *vector = expr_->get_vector(eval_ctx);
   PyArrayObject *result_store = reinterpret_cast<PyArrayObject *>(result_store_);
   // 构造vector并赋回expr_
@@ -1065,8 +1070,6 @@ int ObPythonUDFCell::do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, 
     case ObMediumIntType:
     case ObInt32Type:
     case ObIntType: {
-      //VectorFormat format = VEC_FIXED;
-      //expr_->init_vector_for_write(eval_ctx, format, batch_size_);
       for (int i = 0; i < output_size; ++i) {
         vector->set_int(i, PyLong_AsLong(
           PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + i))));
@@ -1363,10 +1366,10 @@ int ObPUStoreController::process()
       if (cell->get_store_size() != stored_input_cnt_) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Unsaved input rows.", K(ret));
-      } else if (!without_batch_control_ && OB_FAIL(cell->do_process())) {
+      } else if (with_batch_control_ && OB_FAIL(cell->do_process())) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Do Python UDF Cell process udf failed.", K(ret));
-      } else if (without_batch_control_ && OB_FAIL(cell->do_process_all())) {  // without predict size control
+      } else if (!with_batch_control_ && OB_FAIL(cell->do_process_all())) {  // without predict size control
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Do Python UDF Cell process all udf failed.", K(ret));
       } else if (cell->get_result_size() != stored_input_cnt_){
