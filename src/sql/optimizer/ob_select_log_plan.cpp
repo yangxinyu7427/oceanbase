@@ -4363,7 +4363,7 @@ int ObSelectLogPlan::allocate_link_scan_as_top(ObLogicalOperator *&old_top)
 // 1. 生成log plan tree, 包括Join/TableScan/SubplanScan/Sort/Material算子
 // 2. 分配top算子，包括Count/Group By/SubPlanFilter/Window Sort/Distinct/Order By
 //                     Limit/Late Materialization/Select Into
-//                     Predict for python udfs
+//                     Predict Operator for python udfs
 // 3. 选出最终代价最小的plan
 int ObSelectLogPlan::generate_raw_plan_for_plain_select()
 {
