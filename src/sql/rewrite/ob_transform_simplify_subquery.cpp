@@ -251,6 +251,7 @@ int ObTransformSimplifySubquery::is_subquery_to_expr_valid(const ObSelectStmt *s
              // && !stmt->has_subquery()
              && 0 == stmt->get_aggr_item_size()
              && 0 == stmt->get_window_func_count()
+             && 0 == stmt->get_python_udf_count()
              && 0 == stmt->get_condition_size()
              && 0 == stmt->get_having_expr_size()
              && !stmt->has_limit()
@@ -2262,6 +2263,7 @@ int ObTransformSimplifySubquery::check_stmt_can_trans_as_exists(ObSelectStmt *st
   } else if (stmt->is_contains_assignment() ||
              stmt->is_hierarchical_query() ||
              stmt->has_window_function() ||
+             stmt->has_python_udf() ||
              stmt->has_rollup() ||
              stmt->is_values_table_query()) {
     LOG_TRACE("stmt not support trans in as exists", K(stmt->is_contains_assignment()),
@@ -2519,7 +2521,8 @@ int ObTransformSimplifySubquery::empty_table_subquery_can_be_eliminated_in_exist
              ref_stmt->has_having() ||
              ref_stmt->is_hierarchical_query() ||
              ref_stmt->has_sequence() ||
-             ref_stmt->has_window_function()) {
+             ref_stmt->has_window_function() ||
+             ref_stmt->has_python_udf()) {
     is_valid = false;
   } else {
     is_valid = true;

@@ -61,7 +61,7 @@ private:
 struct ObPUInputStore
 {
 public:
-  ObPUInputStore() : alloc_(NULL), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
+  ObPUInputStore() : buf_alloc_(NULL), tmp_alloc_(), expr_(NULL), length_(0), data_ptrs_(NULL), saved_size_(0), inited_(false) {}
   ~ObPUInputStore() { free(); }
   int init(common::ObIAllocator *alloc, ObExpr *expr, int64_t length);
   int alloc_data_ptrs();
@@ -81,7 +81,8 @@ public:
   int64_t get_saved_size() {return saved_size_;}
 
 private:
-  common::ObIAllocator *alloc_; // input store allocator (FIFO allocator)
+  common::ObIAllocator *buf_alloc_; // input store allocator (FIFO allocator)
+  common::ObArenaAllocator tmp_alloc_; // for data copy
   ObExpr *expr_; // Python UDF expr
   int64_t length_; // 当前容量
   char **data_ptrs_;
@@ -171,7 +172,7 @@ public:
   }; 
   bool is_full() { return stored_input_cnt_ > desirable_; }
   bool is_empty() { return stored_input_cnt_ == 0; }
-  bool is_output() { return output_idx_ < stored_output_cnt_; }
+  bool can_output() { return output_idx_ < stored_output_cnt_; }
   bool end_output() { return output_idx_ == stored_output_cnt_; }
 
 private:
@@ -212,7 +213,8 @@ public:
 
   ~ObPythonUDFOp();
 
-  static int find_predict_size(ObExpr *expr, int32_t &predict_size);
+  static int init_udfs(const common::ObIArray<ObExpr *> &udf_exprs);
+  static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
   virtual int inner_open() override;
   virtual int inner_close() override;
@@ -222,12 +224,14 @@ public:
   virtual void destroy() override;
 
 private:
-  //int find_predict_size(ObExpr *expr, int32_t &predict_size);
+  int find_predict_size(ObExpr *expr, int32_t &predict_size);
   int clear_calc_exprs_evaluated_flags();
 
 private:
   int predict_size_; //每次python udf计算的元组数
   ObPUStoreController controller_;
+
+  void* _save; //for Python Interpreter Thread State
 };
 
 } // end namespace sql

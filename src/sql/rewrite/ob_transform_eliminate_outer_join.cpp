@@ -684,7 +684,8 @@ int ObTransformEliminateOuterJoin::get_extra_condition_from_parent(ObIArray<ObPa
           LOG_WARN("get unexpected null", K(ret));
         } else if (select_expr->has_flag(CNT_AGG) ||
                    select_expr->has_flag(CNT_WINDOW_FUNC) ||
-                   select_expr->has_flag(CNT_SUB_QUERY)) {
+                   select_expr->has_flag(CNT_SUB_QUERY) ||
+                   select_expr->has_flag(CNT_PYTHON_UDF)) {
           // do nothing
         } else if (OB_FAIL(ObTransformUtils::has_null_reject_condition(all_conditions,
                                                                        col,
