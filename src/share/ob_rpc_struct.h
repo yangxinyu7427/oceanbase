@@ -76,6 +76,7 @@
 #include "share/location_cache/ob_location_update_task.h"
 
 #include "share/schema/ob_python_udf.h"
+#include "share/schema/ob_udf_model.h"
 
 namespace oceanbase
 {
@@ -6585,6 +6586,38 @@ struct ObDropPythonUdfArg : public ObDDLArg
 public:
   ObDropPythonUdfArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), name_(), if_exist_(false) {}
   virtual ~ObDropPythonUdfArg() {}
+
+  bool is_valid() const {
+    return !name_.empty();
+  }
+  TO_STRING_KV(K_(tenant_id), K_(name));
+
+  uint64_t tenant_id_;
+  common::ObString name_;
+  bool if_exist_;
+};
+
+struct ObCreateUdfModelArg : public ObDDLArg
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObCreateUdfModelArg(): ObDDLArg(), udf_model_() {}
+  virtual ~ObCreateUdfModelArg() {}
+
+  bool is_valid() const {
+    return !udf_model_.get_model_name_str().empty();
+  }
+  TO_STRING_KV(K_(udf_model));
+
+  share::schema::ObUdfModel udf_model_;
+};
+
+struct ObDropUdfModelArg : public ObDDLArg
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObDropUdfModelArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), name_(), if_exist_(false) {}
+  virtual ~ObDropUdfModelArg() {}
 
   bool is_valid() const {
     return !name_.empty();

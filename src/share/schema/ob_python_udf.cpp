@@ -132,6 +132,7 @@ ObPythonUDF& ObPythonUDF::operator= (const ObPythonUDF &other) {
 void ObPythonUDF::reset()
 {
   tenant_id_ = OB_INVALID_ID;
+  udf_id_ = OB_INVALID_ID;
   name_.reset();
   arg_names_.reset();
   arg_types_.reset();

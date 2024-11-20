@@ -2861,6 +2861,9 @@ public:
   static int all_python_udf_schema(share::schema::ObTableSchema &table_schema);
   static int all_python_udf_aux_lob_meta_schema(share::schema::ObTableSchema &table_schema);
   static int all_python_udf_aux_lob_piece_schema(share::schema::ObTableSchema &table_schema);
+  static int all_udf_model_schema(share::schema::ObTableSchema &table_schema);
+  static int all_udf_model_aux_lob_meta_schema(share::schema::ObTableSchema &table_schema);
+  static int all_udf_model_aux_lob_piece_schema(share::schema::ObTableSchema &table_schema);
 
 private:
   DISALLOW_COPY_AND_ASSIGN(ObInnerTableSchema);
@@ -3159,6 +3162,7 @@ const schema_create_func sys_table_schema_creators [] = {
   ObInnerTableSchema::all_trusted_root_certificate_schema,
   ObInnerTableSchema::all_tenant_snapshot_ls_replica_history_schema,
   ObInnerTableSchema::all_python_udf_schema,
+  ObInnerTableSchema::all_udf_model_schema,
   NULL,};
 
 const schema_create_func virtual_table_schema_creators [] = {
@@ -7061,6 +7065,9 @@ const uint64_t tenant_space_tables [] = {
   OB_ALL_PYTHON_UDF_TID,
   OB_ALL_PYTHON_UDF_AUX_LOB_META_TID,
   OB_ALL_PYTHON_UDF_AUX_LOB_PIECE_TID,
+  OB_ALL_UDF_MODEL_TID,
+  OB_ALL_UDF_MODEL_AUX_LOB_META_TID,
+  OB_ALL_UDF_MODEL_AUX_LOB_PIECE_TID,
   };
 
 const uint64_t all_ora_mapping_virtual_table_org_tables [] = {
@@ -9520,6 +9527,9 @@ const char* const tenant_space_table_names [] = {
   OB_ALL_PYTHON_UDF_TNAME,
   OB_ALL_PYTHON_UDF_AUX_LOB_META_TNAME,
   OB_ALL_PYTHON_UDF_AUX_LOB_PIECE_TNAME,
+  OB_ALL_UDF_MODEL_TNAME,
+  OB_ALL_UDF_MODEL_AUX_LOB_META_TNAME,
+  OB_ALL_UDF_MODEL_AUX_LOB_PIECE_TNAME,
   };
 
 const uint64_t only_rs_vtables [] = {
@@ -12268,6 +12278,13 @@ LOBMapping const lob_aux_table_mappings [] = {
     ObInnerTableSchema::all_python_udf_aux_lob_piece_schema
   },
 
+  {
+    OB_ALL_UDF_MODEL_TID,
+    OB_ALL_UDF_MODEL_AUX_LOB_META_TID,
+    OB_ALL_UDF_MODEL_AUX_LOB_PIECE_TID,
+    ObInnerTableSchema::all_udf_model_aux_lob_meta_schema,
+    ObInnerTableSchema::all_udf_model_aux_lob_piece_schema
+  },
 };
 
 static inline bool get_sys_table_lob_aux_table_id(const uint64_t tid, uint64_t& meta_tid, uint64_t& piece_tid)

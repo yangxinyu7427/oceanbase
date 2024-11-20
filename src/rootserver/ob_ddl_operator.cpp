@@ -9616,6 +9616,63 @@ int ObDDLOperator::drop_python_udf(const uint64_t tenant_id,
 }
 //----End of functions for managing python udf----
 
+//----Functions for managing model---- IMBridge_Metadata
+int ObDDLOperator::create_udf_model(share::schema::ObUdfModel &model_info,
+                                    common::ObMySQLTransaction &trans,
+                                    const common::ObString *ddl_stmt_str/*=NULL*/)
+{
+  int ret = OB_SUCCESS;
+  uint64_t new_model_id = OB_INVALID_ID;
+  const uint64_t tenant_id = model_info.get_tenant_id();
+  int64_t new_schema_version = OB_INVALID_VERSION;
+  ObSchemaService *schema_service = schema_service_.get_schema_service();
+  if (OB_ISNULL(schema_service)) {
+    ret = OB_ERR_SYS;
+    LOG_ERROR("schema_service must exist", K(ret));
+  } else if (OB_FAIL(schema_service->fetch_new_udf_model_id(tenant_id, new_model_id))) {
+    LOG_WARN("failed to fetch new_model_id", K(tenant_id), K(ret));
+  } 
+  else if (OB_FAIL(schema_service_.gen_new_schema_version(tenant_id, new_schema_version))) {
+    LOG_WARN("fail to gen new schema_version", K(ret), K(tenant_id));
+  } 
+  else {
+    model_info.set_model_id(new_model_id);
+    model_info.set_schema_version(new_schema_version);
+    if (OB_FAIL(schema_service->get_udf_model_sql_service().insert_udf_model(model_info, &trans, ddl_stmt_str))) {
+      LOG_WARN("insert udf model info failed", K(model_info.get_model_name_str()), K(ret));
+    }
+  }
+  return ret;
+}
+
+int ObDDLOperator::drop_udf_model(const uint64_t tenant_id,
+                                  const common::ObString &name,
+                                  common::ObMySQLTransaction &trans,
+                                  const common::ObString *ddl_stmt_str/*=NULL*/)
+{
+  int ret = OB_SUCCESS;
+  int64_t new_schema_version = OB_INVALID_VERSION;
+  ObSchemaService *schema_service = schema_service_.get_schema_service();
+  if (OB_UNLIKELY(OB_INVALID_ID == tenant_id)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid arguments", K(tenant_id), K(ret));
+  } else if (OB_ISNULL(schema_service)) {
+    ret = OB_ERR_SYS;
+    LOG_ERROR("schema_service must exist", K(ret));
+  } else if (OB_FAIL(schema_service_.gen_new_schema_version(tenant_id, new_schema_version))) {
+    LOG_WARN("fail to gen new schema_version", K(ret), K(tenant_id));
+  } else if (OB_FAIL(schema_service->get_udf_model_sql_service().delete_udf_model(
+                     tenant_id,
+                     name,
+                     new_schema_version,
+                     &trans,
+                     ddl_stmt_str))) {
+    LOG_WARN("drop udf model failed", K(tenant_id), K(name), K(ret));
+  } else {/*do nothing*/}
+  return ret;
+}
+//----End of functions for managing model----
+
 int ObDDLOperator::insert_ori_schema_version(
     ObMySQLTransaction &trans,
     const uint64_t tenant_id,

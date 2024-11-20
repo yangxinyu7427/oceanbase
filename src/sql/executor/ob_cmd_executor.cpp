@@ -66,6 +66,8 @@
 #include "sql/resolver/dcl/ob_drop_role_stmt.h"
 #include "sql/resolver/ddl/ob_create_python_udf_stmt.h"
 #include "sql/resolver/ddl/ob_drop_python_udf_stmt.h"
+#include "sql/resolver/ddl/ob_create_udf_model_stmt.h"
+#include "sql/resolver/ddl/ob_drop_udf_model_stmt.h"
 #include "sql/resolver/dcl/ob_alter_user_profile_stmt.h"
 #include "sql/resolver/dcl/ob_alter_user_primary_zone_stmt.h"
 #include "sql/resolver/tcl/ob_start_trans_stmt.h"
@@ -165,6 +167,7 @@
 #include "sql/engine/cmd/ob_audit_executor.h"
 #endif
 #include "sql/engine/cmd/ob_python_udf_executor.h"
+#include "sql/engine/cmd/ob_udf_model_executor.h"
 
 namespace oceanbase
 {
@@ -813,6 +816,14 @@ int ObCmdExecutor::execute(ObExecContext &ctx, ObICmd &cmd)
       }
       case stmt::T_DROP_PYTHON_UDF: {
         DEFINE_EXECUTE_CMD(ObDropPythonUdfStmt, ObDropPythonUdfExecutor);
+        break;
+      }
+      case stmt::T_CREATE_UDF_MODEL: {
+        DEFINE_EXECUTE_CMD(ObCreateUdfModelStmt, ObCreateUdfModelExecutor);
+        break;
+      }
+      case stmt::T_DROP_UDF_MODEL: {
+        DEFINE_EXECUTE_CMD(ObDropUdfModelStmt, ObDropUdfModelExecutor);
         break;
       }
       case stmt::T_CREATE_SEQUENCE: {

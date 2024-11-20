@@ -2438,6 +2438,13 @@ typedef enum ObItemType
   T_PYTHON_CODE_TYPE,
   T_PYTHON_CODE,
   T_FILE_PATH,
+  T_CREATE_UDF_MODEL,
+  T_DROP_UDF_MODEL,
+  T_METADATA_LIST,
+  T_MODEL_METADATA,
+  T_FRAMEWORK,
+  T_TYPE,
+  T_MODEL_LOCATION,
 
   T_MAX //Attention: add a new type before T_MAX
 } ObItemType;

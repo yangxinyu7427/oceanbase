@@ -10694,6 +10694,13 @@ OB_SERIALIZE_MEMBER((ObDropPythonUdfArg, ObDDLArg),
                      name_,
                      if_exist_);
 
+OB_SERIALIZE_MEMBER((ObCreateUdfModelArg, ObDDLArg),
+                     udf_model_);
+OB_SERIALIZE_MEMBER((ObDropUdfModelArg, ObDDLArg),
+                     tenant_id_,
+                     name_,
+                     if_exist_);
+
 int ObCloneResourcePoolArg::init(
     const ObString &pool_name,
     const ObString &unit_config_name,

@@ -576,7 +576,16 @@ int ObMultiTenant::init(ObAddr myaddr,
   }
 
   //initialize Python Intepreter
-  Py_InitializeEx(!Py_IsInitialized());
+  {
+    SpinWLockGuard guard(lock_);
+      if (!Py_IsInitialized()) {
+        Py_InitializeEx(0);
+        PyImport_ImportModule("dycacher");
+        PyImport_ImportModule("numpy");
+        PyImport_ImportModule("torch");
+        // PyImport_ImportModule("tensorflow");
+    }
+  }
   _save = PyEval_SaveThread();
 
   if (OB_SUCC(ret)) {
