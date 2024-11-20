@@ -574,6 +574,11 @@ public:
   int drop_python_udf(const obrpc::ObDropPythonUdfArg &arg);
   //----End of functions for managing Python UDF----
 
+  //----Functions for managing Model---- IMBridge Metadata
+  int create_udf_model(const obrpc::ObCreateUdfModelArg &arg);
+  int drop_udf_model(const obrpc::ObDropUdfModelArg &arg);
+  //----End of functions for managing Model
+
   //----Functions for managing routines----
   int create_routine(const obrpc::ObCreateRoutineArg &arg);
   int drop_routine(const obrpc::ObDropRoutineArg &arg);

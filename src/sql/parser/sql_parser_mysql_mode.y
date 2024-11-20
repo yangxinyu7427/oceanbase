@@ -283,7 +283,7 @@ END_P SET_VAR DELIMITER
         EXTENDED_NOADDR EXTENT_SIZE EXTRACT EXCEPT EXPIRED ENCODING EMPTY_FIELD_AS_NULL EXTERNAL
 
         FAILOVER FAST FAULTS FIELDS FILEX FILE_PATH FINAL_COUNT FIRST FIRST_VALUE FIXED FLUSH FOLLOWER FORMAT
-        FOUND FREEZE FREQUENCY FUNCTION FOLLOWING FLASHBACK FULL FRAGMENTATION FROZEN FILE_ID
+        FOUND FRAMEWORK FREEZE FREQUENCY FUNCTION FOLLOWING FLASHBACK FULL FRAGMENTATION FROZEN FILE_ID
         FIELD_OPTIONALLY_ENCLOSED_BY FIELD_DELIMITER
 
         GENERAL GEOMETRY GEOMCOLLECTION GEOMETRYCOLLECTION GET_FORMAT GLOBAL GRANTS GROUP_CONCAT GROUPING GTS
@@ -310,7 +310,7 @@ END_P SET_VAR DELIMITER
         MASTER_SSL_CRL MASTER_SSL_CRLPATH MASTER_SSL_KEY MASTER_USER MAX MAX_CONNECTIONS_PER_HOUR MAX_CPU
         LOG_DISK_SIZE MAX_IOPS MEMORY_SIZE MAX_QUERIES_PER_HOUR MAX_ROWS MAX_SIZE
         MAX_UPDATES_PER_HOUR MAX_USER_CONNECTIONS MEDIUM MEMORY MEMTABLE MESSAGE_TEXT META MICROSECOND
-        MIGRATE MIN MIN_CPU MIN_IOPS MIN_MAX MINOR MIN_ROWS MINUS MINUTE MODE MODEL MODIFY MONTH MOVE
+        MIGRATE MIN MIN_CPU MIN_IOPS MIN_MAX MINOR MIN_ROWS MINUS MINUTE MODE MODEL MODEL_LOCATION MODIFY MONTH MOVE
         MULTILINESTRING MULTIPOINT MULTIPOLYGON MUTEX MYSQL_ERRNO MIGRATION MAX_USED_PART_ID MAXIMIZE
         MATERIALIZED MEMBER MEMSTORE_PERCENT MINVALUE MY_NAME
 
@@ -537,8 +537,11 @@ END_P SET_VAR DELIMITER
 %type <node> id_dot_id id_dot_id_dot_id
 
 /*IMBridge Metadata*/ 
+/*python udf*/
 %type <node> create_python_udf_stmt drop_python_udf_stmt
 %type <node> function_element_list function_element param_name param_type python_code_type
+%type <node> create_udf_model_stmt drop_udf_model_stmt
+%type <node> model_metadata_list model_metadata_element_list model_metadata_element
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -597,6 +600,8 @@ stmt:
   | drop_function_stmt      { $$ = $1; check_question_mark($$, result); }
   | create_python_udf_stmt  { $$ = $1; check_question_mark($$, result); }
   | drop_python_udf_stmt    { $$ = $1; check_question_mark($$, result); }
+  | create_udf_model_stmt   { $$ = $1; check_question_mark($$, result); }
+  | drop_udf_model_stmt     { $$ = $1; check_question_mark($$, result); }
   | create_table_like_stmt  { $$ = $1; check_question_mark($$, result); }
   | create_database_stmt    { $$ = $1; check_question_mark($$, result); }
   | drop_database_stmt      { $$ = $1; check_question_mark($$, result); }
@@ -5115,6 +5120,74 @@ python_code_type:
 FILE_PATH STRING_VALUE
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_FILE_PATH, 1, $2);
+}
+;
+
+create_udf_model_stmt:
+CREATE MODEL opt_if_exists NAME_OB WITH model_metadata_list
+{
+  ParseNode *model_metadata_node = NULL;
+  merge_nodes(model_metadata_node, result, T_METADATA_LIST, $6);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_UDF_MODEL, 3, 
+                           $3,                             /* udf name */
+                           $4,                             /* model name */
+                           model_metadata_node);               /* python code type */
+}
+;
+
+drop_udf_model_stmt:
+DROP MODEL opt_if_exists NAME_OB
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_UDF_MODEL, 2, $3, $4);
+}
+;
+
+model_metadata_list:
+'(' FRAMEWORK STRING_VALUE ',' TYPE STRING_VALUE ',' MODEL_LOCATION STRING_VALUE ')'
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 3, $3, $6, $9);
+}
+|
+'(' STRING_VALUE ',' STRING_VALUE ',' STRING_VALUE ')'
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 3, $2, $4, $6);
+}
+| 
+'(' model_metadata_element_list ')'
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 1, $2);
+}
+;
+
+model_metadata_element_list:
+model_metadata_element
+{
+  $$ = $1;
+}
+| 
+model_metadata_element_list ',' model_metadata_element
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_LINK_NODE, 2, $1, $3);
+}
+;
+
+model_metadata_element:
+FRAMEWORK STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_FRAMEWORK, 1, $2);
+  $$->value_ = 1;
+}
+|
+TYPE STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_TYPE, 1, $2);
+  $$->value_ = 2;
+}
+|
+MODEL_LOCATION STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_LOCATION, 1, $2);  
+  $$->value_ = 3;
 }
 ;
 
@@ -20002,6 +20075,7 @@ ACCOUNT
 |       FROZEN
 |       FOUND
 |       FRAGMENTATION
+|       FRAMEWORK
 |       FREEZE
 |       FREQUENCY
 |       FUNCTION
@@ -20145,6 +20219,7 @@ ACCOUNT
 |       MINUS
 |       MODE
 |       MODEL
+|       MODEL_LOCATION
 |       MODIFY
 |       MONTH
 |       MOVE

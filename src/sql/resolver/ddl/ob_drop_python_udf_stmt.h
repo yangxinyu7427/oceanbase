@@ -10,8 +10,8 @@
  * See the Mulan PubL v2 for more details.
  */
 
-#ifndef _OB_DROP_MODEL_STMT_H
-#define _OB_DROP_MODEL_STMT_H 1
+#ifndef _OB_DROP_UDF_MODEL_STMT_H
+#define _OB_DROP_UDF_MODEL_STMT_H 1
 
 namespace oceanbase
 {

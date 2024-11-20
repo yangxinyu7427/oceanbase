@@ -263,6 +263,7 @@ ObSchemaServiceSQLImpl::ObSchemaServiceSQLImpl()
       profile_service_(*this),
       audit_service_(*this),
       python_udf_service_(*this),
+      udf_model_service_(*this),
       rw_lock_(common::ObLatchIds::SCHEMA_REFRESH_INFO_LOCK),
       last_operation_tenant_id_(OB_INVALID_TENANT_ID),
       sequence_id_(OB_INVALID_ID),
@@ -3006,6 +3007,7 @@ FETCH_NEW_SCHEMA_ID(RLS_POLICY, rls_policy);
 FETCH_NEW_SCHEMA_ID(RLS_GROUP, rls_group);
 FETCH_NEW_SCHEMA_ID(RLS_CONTEXT, rls_context);
 FETCH_NEW_SCHEMA_ID(PYTHON_UDF, python_udf);
+FETCH_NEW_SCHEMA_ID(UDF_MODEL, udf_model);
 
 #undef FETCH_NEW_SCHEMA_ID
 

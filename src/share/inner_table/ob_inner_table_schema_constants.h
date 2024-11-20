@@ -5167,6 +5167,13 @@ const char *const OB_ALL_PYTHON_UDF_TNAME = "__all_python_udf";
 const char *const OB_ALL_PYTHON_UDF_AUX_LOB_META_TNAME = "__all_python_udf_aux_lob_meta";
 const char *const OB_ALL_PYTHON_UDF_AUX_LOB_PIECE_TNAME = "__all_python_udf_aux_lob_piece";
 
+const uint64_t OB_ALL_UDF_MODEL_TID = 519; // "__all_udf_model"
+const uint64_t OB_ALL_UDF_MODEL_AUX_LOB_META_TID = 50519; // "__all_udf_model_aux_lob_meta"
+const uint64_t OB_ALL_UDF_MODEL_AUX_LOB_PIECE_TID = 60519; // "__all_udf_model_aux_lob_piece"
+const char *const OB_ALL_UDF_MODEL_TNAME = "__all_udf_model";
+const char *const OB_ALL_UDF_MODEL_AUX_LOB_META_TNAME = "__all_udf_model_aux_lob_meta";
+const char *const OB_ALL_UDF_MODEL_AUX_LOB_PIECE_TNAME = "__all_udf_model_aux_lob_piece";
+
 // initial data for __all_privilege
 struct PrivilegeRow {
   const char *privilege_;

@@ -842,7 +842,7 @@ public:
                                  const common::ObString *ddl_stmt_str/*=NULL*/);
   //----End of functions for managing UDF----
 
-  //----Functions for managing model---- IMBridge_Metadata
+  //----Functions for managing python udf---- IMBridge_Metadata
   int create_python_udf(share::schema::ObPythonUDF &PythonUdf_info,
                         common::ObMySQLTransaction &trans,
                         const common::ObString *ddl_stmt_str/*=NULL*/);
@@ -850,6 +850,16 @@ public:
                       const common::ObString &name,
                       common::ObMySQLTransaction &trans,
                       const common::ObString *ddl_stmt_str/*=NULL*/);
+  //----End of functions for managing python udf----
+
+  //----Functions for managing model---- IMBridge_Metadata
+  int create_udf_model(share::schema::ObUdfModel &model_info,
+                       common::ObMySQLTransaction &trans,
+                       const common::ObString *ddl_stmt_str/*=NULL*/);
+  int drop_udf_model(const uint64_t tenant_id,
+                     const common::ObString &name,
+                     common::ObMySQLTransaction &trans,
+                     const common::ObString *ddl_stmt_str/*=NULL*/);
   //----End of functions for managing model----
 
   //----Functions for label security----
