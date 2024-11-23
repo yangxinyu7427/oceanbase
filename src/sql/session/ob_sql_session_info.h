@@ -46,6 +46,7 @@
 #include "sql/ob_optimizer_trace_impl.h"
 #include "sql/monitor/flt/ob_flt_span_mgr.h"
 #include "storage/tx/ob_tx_free_route.h"
+#include "sql/session/python_udf_cache_impl.cpp"
 
 namespace oceanbase
 {
@@ -1176,6 +1177,7 @@ public:
   ObSequenceCurrvalEncoder &get_sequence_currval_encoder() { return sequence_currval_encoder_; }
   ObQueryInfoEncoder &get_query_info_encoder() { return query_info_encoder_; }
   ObContextsMap &get_contexts_map() { return contexts_map_; }
+  PyUDFCache &get_pyudf_cache(){ return pyudf_cache_;  }
   ObSequenceCurrvalMap &get_sequence_currval_map() { return sequence_currval_map_; }
   ObDBlinkSequenceIdMap  &get_dblink_sequence_id_map() { return dblink_sequence_id_map_; }
   void set_current_dblink_sequence_id(int64_t id) { current_dblink_sequence_id_ = id; }
@@ -1435,6 +1437,8 @@ private:
   ObDBlinkSequenceIdMap dblink_sequence_id_map_;
   ObContextsMap contexts_map_;
   int64_t curr_session_context_size_;
+public:
+  PyUDFCache pyudf_cache_;
 
   pl::ObPLContext *pl_context_;
   CursorCache pl_cursor_cache_;

@@ -57,6 +57,7 @@ namespace sql{
         CacheMapForInt cache_map_for_int_;
         CacheMapForString cache_map_for_string_;
         std::unordered_set<std::string> udf_list;
+    public:
         // 创建缓存
         int create(){
             int ret = OB_SUCCESS;
@@ -67,6 +68,44 @@ namespace sql{
                 ObModIds::OB_HASH_NODE)){
                 LOG_WARN("create cache_map_for_string failed", K(ret));
             }
+            return ret;
+        }
+
+        bool find_cache_for_cell(const common::ObString& udf_name){
+            std::string udf_str(udf_name.ptr(),udf_name.length());
+            if(udf_list.find(udf_str)==udf_list.end()){
+                return false;
+            }
+            return true;
+        }
+
+        int create_cache_for_cell_for_int(const common::ObString& udf_name){
+            int ret = OB_SUCCESS;
+            std::string udf_str(udf_name.ptr(),udf_name.length());
+            PyUdfCacheMapForInt *cache_map=new PyUdfCacheMapForInt();
+            if(OB_FAIL(cache_map->create(hash::cal_next_prime(500000),
+                                              ObModIds::OB_HASH_BUCKET,
+                                              ObModIds::OB_HASH_NODE))){
+                LOG_WARN("new_cache_map create fail", K(ret));
+            }else if(OB_FAIL(cache_map_for_int_.set_refactored(udf_name, cache_map))){
+                LOG_WARN("cache_map_for_int set fail", K(ret));
+            }
+            udf_list.insert(udf_str);
+            return ret;
+        }
+
+        int create_cache_for_cell_for_str(const common::ObString& udf_name){
+            int ret = OB_SUCCESS;
+            std::string udf_str(udf_name.ptr(),udf_name.length());
+            PyUdfCacheMapForString *cache_map=new PyUdfCacheMapForString();
+            if(OB_FAIL(cache_map->create(hash::cal_next_prime(500000),
+                                              ObModIds::OB_HASH_BUCKET,
+                                              ObModIds::OB_HASH_NODE))){
+                LOG_WARN("new_cache_map create fail", K(ret));
+            }else if(OB_FAIL(cache_map_for_string_.set_refactored(udf_name, cache_map))){
+                LOG_WARN("cache_map_for_int set fail", K(ret));
+            }
+            udf_list.insert(udf_str);
             return ret;
         }
 
@@ -141,6 +180,7 @@ namespace sql{
                     LOG_WARN("cache_map_for_int set fail", K(ret));
                 }
                 udf_list.insert(udf_str);
+                return OB_PYUDF_CACHE_NOT_EXIST;
             }else{
                 // 有缓存就直接拿出来
                 if(OB_FAIL(cache_map_for_int_.get_refactored(udf_name, cache_map))){
@@ -169,6 +209,7 @@ namespace sql{
                     LOG_WARN("cache_map_for_string set fail", K(ret));
                 }
                 udf_list.insert(udf_str);
+                return OB_PYUDF_CACHE_NOT_EXIST;
             }else{
                 // 有缓存就直接拿出来
                 if(OB_FAIL(cache_map_for_string_.get_refactored(udf_name, cache_map))){

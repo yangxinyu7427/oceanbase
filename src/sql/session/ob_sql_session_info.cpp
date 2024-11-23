@@ -239,7 +239,10 @@ int ObSQLSessionInfo::init(uint32_t sessid, uint64_t proxy_sessid,
              OB_FAIL(contexts_map_.create(hash::cal_next_prime(32),
                                           ObMemAttr(orig_tenant_id_, "ContextsMap")))) {
     LOG_WARN("create contexts map failed", K(ret));
-  } else {
+  } else if(!is_acquire_from_pool() &&OB_FAIL(pyudf_cache_.create())){
+    LOG_WARN("create contexts map failed", K(ret));
+  }
+  else {
     curr_session_context_size_ = 0;
     if (is_obproxy_mode()) {
       sess_create_time_ = sess_create_time;

@@ -102,6 +102,7 @@ public:
   int reset(int64_t size) { return input_store_.reset(size); }
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
   int do_process(); // do real processing
+  int do_process_with_cache(); // do processing with udf cache
   int do_process_all(); // process all saved store at one time
   int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
@@ -109,8 +110,10 @@ public:
 
   //计算过程  
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size); // wrap all args
+  int wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size] with cache
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size]
   int eval(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
+  int eval_with_cache(PyObject *pArgs, int64_t eval_size); // do python udf evaluation with cache
   int modify_desirable(timeval &start, timeval &end, int64_t eval_size);
   int reset_input_store() { return input_store_.reset(); }
 
@@ -118,7 +121,7 @@ public:
   int get_desirable() { return desirable_; }
   int get_store_size() { return input_store_.get_saved_size(); }
   int get_result_size() { return result_size_; }
-
+  ObExpr * get_expr() { return expr_; }
 
 private:
   //common::ObFIFOAllocator alloc_; // input store allocator need to free
@@ -190,6 +193,13 @@ private:
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
 
   uint64_t tenant_id_; // 租户id
+
+  // 用于缓存的变量
+  std::vector<bool> cells_can_use_cache; // 有缓存记录的cell
+  std::vector<std::vector<int>> cells_cached_res_for_int; // int类型的已缓存结果
+  std::vector<std::vector<std::string>> cells_cached_res_for_str; // string类型的已缓存结果
+  std::vector<std::vector<std::string>> input_list_for_cells; // 每个cell的input列表 
+  std::vector<std::vector<bool>> cells_cached_res_bit_vector; // 每个cell的可用缓存标识数组
 };
 
 class ObPythonUDFSpec : public ObOpSpec
