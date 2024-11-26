@@ -80,15 +80,13 @@ int ObUdfModelSqlService::add_udf_model(common::ObISQLClient &sql_client,
   } else {
       LOG_WARN("=========beginning to append sql======== ", K(ret));
       SQL_COL_APPEND_VALUE(sql, values, ObSchemaUtils::get_extract_tenant_id(
-                                        exec_tenant_id, model_info.get_tenant_id()), "tenant_id", "%lu");
+                           exec_tenant_id, model_info.get_tenant_id()), "tenant_id", "%lu");
       SQL_COL_APPEND_VALUE(sql, values, ObSchemaUtils::get_extract_schema_id(
-                                        exec_tenant_id, model_info.get_model_id()), "model_id", "%lu");
+                           exec_tenant_id, model_info.get_model_id()), "model_id", "%lu");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_model_name(),
                                       model_info.get_model_name_str().length(), "model_name");
-      SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_model_type(),
-                                      model_info.get_model_type_str().length(), "model_type");
-      SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_framework(),
-                                      model_info.get_framework_str().length(), "framework");
+      SQL_COL_APPEND_VALUE(sql, values, model_info.get_framework(), "framework", "%d");
+      SQL_COL_APPEND_VALUE(sql, values, model_info.get_model_type(), "model_type", "%d");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_model_path(),
                                       model_info.get_model_path_str().length(), "model_path");
       SQL_COL_APPEND_VALUE(sql, values, model_info.get_schema_version(), "schema_version", "%ld");
@@ -145,7 +143,7 @@ int ObUdfModelSqlService::delete_udf_model(const uint64_t tenant_id,
     // delete from __all_func
     //系统表
     std::string table_name = "__all_udf_model";
-    if (FAILEDx(sql.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND name='%s'",
+    if (FAILEDx(sql.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND model_name='%s'",
                                table_name.c_str(),
                                ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
                                name.ptr()))) {

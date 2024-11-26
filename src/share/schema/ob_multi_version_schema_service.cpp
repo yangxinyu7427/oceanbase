@@ -5347,8 +5347,8 @@ int ObMultiVersionSchemaService::fill_udf_model_schema(const uint64_t tenant_id,
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, model_name, model_info);
   //EXTRACT_INT_FIELD_MYSQL(result, "is_deleted", is_deleted, bool);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL_WITH_TENANT_ID(result, model_id, model_info, tenant_id);
-  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, model_type, model_info);
-  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, framework, model_info);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, framework, model_info, int);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, model_type, model_info, int);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, model_path, model_info);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, schema_version, model_info, uint64_t);
   return ret;

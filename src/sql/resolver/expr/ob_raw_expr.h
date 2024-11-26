@@ -45,6 +45,7 @@
 #include "sql/engine/expr/ob_expr_join_filter.h"
 #include "sql/engine/expr/ob_expr_calc_partition_id.h"
 #include "sql/resolver/dml/ob_raw_expr_sets.h"
+#include "share/schema/ob_udf_model.h"
 namespace oceanbase
 {
 namespace share

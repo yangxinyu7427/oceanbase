@@ -30,9 +30,25 @@ class ObUdfModel : public ObSchema
 {
     OB_UNIS_VERSION_V(1);
 
-
 public:
-    ObUdfModel() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), framework_(), model_path_(), schema_version_(common::OB_INVALID_VERSION) 
+    //枚举计算结果后返回值类型
+    enum ModelFrameworkType {
+        INVALID_FRAMEWORK_TYPE,
+        ONNX,
+        SKLEARN,
+        PYTORCH,
+        UNSUPPORTED
+    };
+
+    enum ModelType {
+        INVALID_MODEL_TYPE,
+        DECISION_TREE
+    };
+    
+public:
+    ObUdfModel() : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), 
+                   model_name_(), model_type_(ModelType::INVALID_MODEL_TYPE), framework_(ModelFrameworkType::INVALID_FRAMEWORK_TYPE), 
+                   model_path_(), schema_version_(common::OB_INVALID_VERSION) 
                     { reset(); };
     explicit ObUdfModel(common::ObIAllocator *allocator);
     ObUdfModel(const ObUdfModel &src_schema);
@@ -47,8 +63,10 @@ public:
     inline void set_tenant_id(const uint64_t id) { tenant_id_ = id; }
     inline void set_model_id(const uint64_t id) { model_id_ = id; }
     inline int set_model_name(const common::ObString &model_name) { return deep_copy_str(model_name, model_name_); }
-    inline int set_model_type(const common::ObString &model_type) { return deep_copy_str(model_type, model_type_); }
-    inline int set_framework(const common::ObString &framework) { return deep_copy_str(framework, framework_); }
+    inline void set_model_type(const enum ModelType model_type) { model_type_ = model_type; }
+    inline void set_model_type(const int model_type) { model_type_ = ModelType(model_type); }
+    inline void set_framework(const enum ModelFrameworkType framework_type) { framework_ = framework_type; }
+    inline void set_framework(const int framework_type) { framework_ = ModelFrameworkType(framework_type); }
     inline int set_model_path(const common::ObString &model_path) { return deep_copy_str(model_path, model_path_); }
     inline void set_schema_version(int64_t version) { schema_version_ = version; }
 
@@ -57,10 +75,8 @@ public:
     inline uint64_t get_model_id() const { return model_id_; }
     inline const char *get_model_name() const { return extract_str(model_name_); }
     inline const common::ObString &get_model_name_str() const { return model_name_; }
-    inline const char *get_model_type() const { return extract_str(model_type_); }
-    inline const common::ObString &get_model_type_str() const { return model_type_; }
-    inline const char *get_framework() const { return extract_str(framework_); }
-    inline const common::ObString &get_framework_str() const { return framework_; }
+    inline enum ModelType get_model_type() const { return model_type_; }
+    inline enum ModelFrameworkType get_framework() const { return framework_; }
     inline const char *get_model_path() const { return extract_str(model_path_); }
     inline const common::ObString &get_model_path_str() const { return model_path_; }  
     inline int64_t get_schema_version() const { return schema_version_; }
@@ -80,8 +96,8 @@ public:
     uint64_t tenant_id_;
     uint64_t model_id_;
     common::ObString model_name_;
-    common::ObString model_type_;   //model type(lr,rf)
-    common::ObString framework_;    //model framework(onnx,sklearn)
+    enum ModelType model_type_;   //model type(lr,rf)
+    enum ModelFrameworkType framework_;    //model framework(onnx,sklearn)
     common::ObString model_path_;   //model path
     // common::ObString model_data_;   //model data
     int64_t schema_version_; //the last modify timestamp of this version
@@ -89,55 +105,39 @@ public:
 
 /////////////////////////////////////////////
 
-// class ObPythonUDFMeta
-// {
-//   OB_UNIS_VERSION_V(1);
-// public :
-//   ObPythonUDFMeta() : name_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), pycall_(), 
-//                       udf_attributes_names_(), udf_attributes_types_(), init_(false), batch_size_(256),batch_size_const_(true) {} 
-//   virtual ~ObPythonUDFMeta() = default;
+class ObUdfModelMeta
+{
+  OB_UNIS_VERSION_V(1);
+public :
+  ObUdfModelMeta() : model_name_(), framework_(ObUdfModel::ModelFrameworkType::INVALID_FRAMEWORK_TYPE), 
+                     model_type_(ObUdfModel::ModelType::INVALID_MODEL_TYPE), model_path_() {} 
+  virtual ~ObUdfModelMeta() = default;
 
-//   void assign(const ObPythonUDFMeta &other) { 
-//     name_ = other.name_;
-//     ret_ = other.ret_;
-//     pycall_ = other.pycall_;
-//     udf_attributes_names_ = other.udf_attributes_names_;
-//     udf_attributes_types_ = other.udf_attributes_types_;
-//     init_ = other.init_;
-//     batch_size_ = other.batch_size_;
-//     batch_size_const_ = other.batch_size_const_;
-//   }
+  void assign(const ObUdfModelMeta &other) { 
+    model_name_ = other.model_name_;
+    framework_ = other.framework_;
+    model_type_ = other.model_type_;
+    model_path_ = other.model_path_;
+  }
 
-//   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
-//     name_ = other.name_;
-//     ret_ = other.ret_;
-//     pycall_ = other.pycall_;
-//     udf_attributes_names_ = other.udf_attributes_names_;
-//     udf_attributes_types_ = other.udf_attributes_types_;
-//     init_ = other.init_;
-//     batch_size_ = other.batch_size_;
-//     batch_size_const_ = other.batch_size_const_;
-//     return *this;
-//   }
+  ObUdfModelMeta &operator=(const class ObUdfModelMeta &other) {
+    model_name_ = other.model_name_;
+    framework_ = other.framework_;
+    model_type_ = other.model_type_;
+    model_path_ = other.model_path_;
+    return *this;
+  }
 
-//   TO_STRING_KV(K_(name),
-//                K_(ret),
-//                K_(pycall),
-//                K_(udf_attributes_names),
-//                K_(udf_attributes_types),
-//                K_(init),
-//                K_(batch_size),
-//                K_(batch_size_const));
+  TO_STRING_KV(K_(model_name),
+               K_(framework),
+               K_(model_type),
+               K_(model_path));
 
-//   common::ObString name_; //函数名
-//   ObPythonUDF::PyUdfRetType ret_; //返回值类型
-//   common::ObString pycall_; //code
-//   common::ObSEArray<common::ObString, 16> udf_attributes_names_; //参数名称
-//   common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> udf_attributes_types_; //参数类型
-//   bool init_; //是否已初始化
-//   int batch_size_;    //推理批次大小
-//   bool batch_size_const_;      //batch_size是否动态调整
-// };
+  common::ObString model_name_; //模型名称
+  ObUdfModel::ModelFrameworkType framework_;  //模型框架
+  ObUdfModel::ModelType model_type_; //模型类型
+  common::ObString model_path_; //模型路径
+};
 
 }
 }

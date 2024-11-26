@@ -58,17 +58,30 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
         } else {    //解析模型元数据信息
             //get model_metadata_node
             ParseNode *model_metadata_node = model_metadata_list_node->children_[0];
-            ObString framework,model_type,model_path;
             //get framework
             ParseNode *framework_node = model_metadata_node->children_[0];
-            framework = ObString(framework_node->str_len_, framework_node->str_value_);
-            //set framwork
-            create_udf_model_arg.udf_model_.set_framework(framework);       
+            const char* framework = framework_node->str_value_;
+            //修改比较
+            //set framework
+            if (std::strcmp(framework, "ONNX") == 0){
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::ONNX);
+            } else if (std::strcmp(framework, "SKLEARN") == 0) {
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::SKLEARN);
+            } else if (std::strcmp(framework, "PYTORCH") == 0) {
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::PYTORCH);
+            } else {
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::UNSUPPORTED);
+            }
             //get model type
             ParseNode *model_type_node = model_metadata_node->children_[1];
-            model_type = ObString(model_type_node->str_len_, model_type_node->str_value_);
-            //set model_type
-            create_udf_model_arg.udf_model_.set_model_type(model_type);     
+            //set model_type          
+            const char* model_type = model_type_node->str_value_;
+            if (std::strcmp(model_type, "decision_tree") == 0){
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::DECISION_TREE);
+            } else {
+                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::UNSUPPORTED);
+            }
+            ObString model_path;
             //get model path
             ParseNode *model_path_node = model_metadata_node->children_[2];
             model_path = ObString(model_path_node->str_len_, model_path_node->str_value_);

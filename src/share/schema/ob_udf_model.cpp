@@ -49,13 +49,11 @@ ObUdfModel& ObUdfModel::operator=(const ObUdfModel &other) {
     error_ret_ = other.error_ret_;
     tenant_id_ = other.tenant_id_;
     model_id_ = other.model_id_;
+    framework_ = other.framework_;
+    model_type_ = other.model_type_;
     schema_version_ = other.schema_version_;
     if (OB_FAIL(deep_copy_str(other.model_name_, model_name_))) {
       LOG_WARN("Fail to deep copy model name", K(ret));
-    } else if (OB_FAIL(deep_copy_str(other.model_type_, model_type_))) {
-      LOG_WARN("Fail to deep copy model type", K(ret));
-    } else if (OB_FAIL(deep_copy_str(other.framework_, framework_))) {
-      LOG_WARN("Fail to deep copy framework", K(ret));
     } else if (OB_FAIL(deep_copy_str(other.model_path_, model_path_))) {
       LOG_WARN("Fail to deep copy model path", K(ret));
     }
@@ -71,8 +69,8 @@ void ObUdfModel::reset()
   tenant_id_ = OB_INVALID_ID;
   model_id_ = OB_INVALID_ID;
   model_name_.reset();
-  model_type_.reset();
-  framework_.reset();
+  framework_ = ModelFrameworkType::INVALID_FRAMEWORK_TYPE;
+  model_type_ = ModelType::INVALID_MODEL_TYPE;
   model_path_.reset();
   ObSchema::reset();
 }
@@ -85,6 +83,12 @@ OB_SERIALIZE_MEMBER(ObUdfModel,
                     framework_,
                     model_path_,
                     schema_version_);
+
+OB_SERIALIZE_MEMBER(ObUdfModelMeta,
+                    model_name_,
+                    framework_,
+                    model_type_,
+                    model_path_);
 
 }// end schema
 }// end share

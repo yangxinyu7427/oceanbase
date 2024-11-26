@@ -541,7 +541,7 @@ END_P SET_VAR DELIMITER
 %type <node> create_python_udf_stmt drop_python_udf_stmt
 %type <node> function_element_list function_element param_name param_type python_code_type
 %type <node> create_udf_model_stmt drop_udf_model_stmt
-%type <node> model_metadata_list model_metadata_element_list model_metadata_element
+%type <node> model_metadata_list model_metadata_element_list model_metadata_element predict_python_udf_element
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -2930,35 +2930,9 @@ MOD '(' expr ',' expr ')'
   malloc_non_terminal_node(udf_node, result->malloc_pool_, T_FUN_UDF, 4, $3, params, id_node->children_[0], NULL);
   store_pl_ref_object_symbol(udf_node, result, REF_FUNC);
 }
-| PREDICT function_name '(' opt_expr_as_list ')'
+| predict_python_udf_element
 {
-  if (NULL != $4)
-  {
-    ParseNode *params = NULL;
-    merge_nodes(params, result, T_EXPR_LIST, $4);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $2, params);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-  else
-  {
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 1, $2);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-}
-| PREDICT '(' INTNUM ')' function_name '(' opt_expr_as_list ')'
-{
-  if (NULL != $7)
-  {
-    ParseNode *params = NULL;
-    merge_nodes(params, result, T_EXPR_LIST, $7);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $3, $5, params);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-  else
-  {
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, $5);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
+  $$ = $1;
 }
 | sys_interval_func
 {
@@ -3085,6 +3059,58 @@ MOD '(' expr ',' expr ')'
 | GEOMCOLLECTION '(' ')'
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_GEOMCOLLECTION, 1, NULL);
+}
+;
+
+predict_python_udf_element:
+PREDICT function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $4)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $4);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $2, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 1, $2);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PREDICT '(' INTNUM ')' function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $7)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $7);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $3, $5, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, $5);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PREDICT function_name USING MODEL NAME_OB '(' opt_expr_as_list ')'
+{
+  if (NULL != $7)
+  {
+    ParseNode *params = NULL;
+    ParseNode *model_node = NULL;
+    merge_nodes(model_node, result, T_MODEL_NAME, $5);
+    merge_nodes(params, result, T_EXPR_LIST, $7);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $2, model_node, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    ParseNode *model_node = NULL;
+    merge_nodes(model_node, result, T_MODEL_NAME, $5);  
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, model_node);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
 }
 ;
 
@@ -5131,7 +5157,7 @@ CREATE MODEL opt_if_exists NAME_OB WITH model_metadata_list
   malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_UDF_MODEL, 3, 
                            $3,                             /* udf name */
                            $4,                             /* model name */
-                           model_metadata_node);               /* python code type */
+                           model_metadata_node);           /* python code type */
 }
 ;
 
@@ -5146,11 +5172,6 @@ model_metadata_list:
 '(' FRAMEWORK STRING_VALUE ',' TYPE STRING_VALUE ',' MODEL_LOCATION STRING_VALUE ')'
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 3, $3, $6, $9);
-}
-|
-'(' STRING_VALUE ',' STRING_VALUE ',' STRING_VALUE ')'
-{
-  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 3, $2, $4, $6);
 }
 | 
 '(' model_metadata_element_list ')'

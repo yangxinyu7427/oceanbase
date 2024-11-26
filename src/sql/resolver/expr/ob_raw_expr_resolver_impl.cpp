@@ -35,6 +35,7 @@
 #include "sql/resolver/dml/ob_del_upd_stmt.h"
 #include "deps/oblib/src/lib/json_type/ob_json_path.h"
 #include "share/resource_manager/ob_resource_manager.h"
+#include "share/schema/ob_udf_model.h"
 
 namespace oceanbase
 {
@@ -7695,11 +7696,30 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
   } else {
     int child_num = node->num_child_;   //孩子个数
     int64_t batch_size = 0;
-    if (child_num == 3) {    //若SELECT PREDICT中提供了batch_size
-      batch_size = std::stoi(node->children_[0]->str_value_);    //获取batch_size值
+    if (child_num == 3) {
+      if (node->children_[1]->type_ == T_MODEL_NAME) {   //若SELECT PREDICT中指定了model_name
+        share::schema::ObUdfModel model_info;
+        ObString model_name;
+        ObString name(node->children_[1]->str_len_, node->children_[1]->str_value_);
+        if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, model_name))) {
+          ret = OB_ALLOCATE_MEMORY_FAILED;
+          LOG_WARN("Malloc function name failed", K(ret));
+        } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {
+        } else if (OB_FAIL(ctx_.schema_checker_->get_udf_model_info(ctx_.session_info_->get_effective_tenant_id(),
+                                                                    model_name,
+                                                                    model_info,
+                                                                    exist))) {
+          LOG_WARN("failed to resolve udf model", K(ret));
+        } else if (!exist) {
+          ret = OB_ERR_FUNCTION_UNKNOWN;
+          LOG_WARN("cannot find udf model", K(ret));
+        } 
+      } else {    //指定了batch_size值
+        batch_size = std::stoi(node->children_[0]->str_value_);    //获取batch_size值
+      }
     }
-    ObString name(node->children_[child_num-2]->str_len_, node->children_[child_num-2]->str_value_);
-    if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
+    ObString name1(node->children_[child_num-2]->str_len_, node->children_[child_num-2]->str_value_);
+    if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name1, udf_name))) {
       ret = OB_ALLOCATE_MEMORY_FAILED;
       LOG_WARN("Malloc function name failed", K(ret));
     } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {

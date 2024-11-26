@@ -956,12 +956,12 @@ int ObInnerTableSchema::all_udf_model_schema(ObTableSchema &table_schema)
   }
 
   if (OB_SUCC(ret)) {
-    ADD_COLUMN_SCHEMA("model_type", //column_name
+    ADD_COLUMN_SCHEMA("framework", //column_name
       ++column_id, //column_id
       0, //rowkey_id
       0, //index_id
       0, //part_key_pos
-      ObTextType, //column_type
+      ObIntType, //column_type
       CS_TYPE_INVALID, //column_collation_type
       OB_MAX_TEXT_LENGTH, //column_length
       -1, //column_precision
@@ -971,12 +971,12 @@ int ObInnerTableSchema::all_udf_model_schema(ObTableSchema &table_schema)
   }
 
   if (OB_SUCC(ret)) {
-    ADD_COLUMN_SCHEMA("framework", //column_name
+    ADD_COLUMN_SCHEMA("model_type", //column_name
       ++column_id, //column_id
       0, //rowkey_id
       0, //index_id
       0, //part_key_pos
-      ObTextType, //column_type
+      ObIntType, //column_type
       CS_TYPE_INVALID, //column_collation_type
       OB_MAX_TEXT_LENGTH, //column_length
       -1, //column_precision

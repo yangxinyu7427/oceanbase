@@ -20,3 +20,8 @@ target_link_libraries(objit
   INTERFACE
   -lrt -ldl -lpthread -lm
 )
+
+add_executable(my_main main.cpp)
+
+target_link_libraries(my_main PUBLIC objit)
+target_link_libraries(my_main PUBLIC python_lib ob_malloc ${link_malloc_hook})

@@ -24,6 +24,7 @@
 #include "share/schema/ob_outline_mgr.h"
 #include "share/schema/ob_udt_mgr.h"
 #include "share/schema/ob_python_udf.h"
+#include "share/schema/ob_udf_model.h"
 
 namespace oceanbase
 {
@@ -753,6 +754,10 @@ public:
                           const common::ObString &name,
                           ObPythonUDF &udf_info,
                           bool &exist);
+  int get_udf_model_info(const uint64_t tenant_id,
+                         const common::ObString &model_name,
+                         ObUdfModel &model_info,
+                         bool &exist);
 
   // udt
   int check_udt_exist(uint64_t tenant_id, uint64_t database_id,

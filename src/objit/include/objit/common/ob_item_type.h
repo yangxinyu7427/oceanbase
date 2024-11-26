@@ -2445,6 +2445,7 @@ typedef enum ObItemType
   T_FRAMEWORK,
   T_TYPE,
   T_MODEL_LOCATION,
+  T_MODEL_NAME,
 
   T_MAX //Attention: add a new type before T_MAX
 } ObItemType;

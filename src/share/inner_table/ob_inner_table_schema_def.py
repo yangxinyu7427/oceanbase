@@ -6963,8 +6963,8 @@ def_table_schema(
 
     normal_columns = [
       ('model_id', 'int'),
-      ('model_type', 'text:OB_MAX_TEXT_LENGTH', 'false'),
-      ('framework', 'text:OB_MAX_TEXT_LENGTH', 'false'),
+      ('framework', 'int'),
+      ('model_type', 'int'),
       ('model_path', 'text:OB_MAX_TEXT_LENGTH', 'false'),
       ('schema_version', 'int'),
     ],
