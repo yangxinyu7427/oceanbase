@@ -1109,6 +1109,10 @@ int ObTransformViewMerge::do_view_merge(ObDMLStmt *parent_stmt,
               OB_FAIL(append(static_cast<ObSelectStmt *>(parent_stmt)->get_sample_infos(),
                              child_stmt->get_sample_infos()))) {
       LOG_WARN("failed to append exprs", K(ret));
+    } else if (parent_stmt->is_select_stmt() &&
+              OB_FAIL(append(static_cast<ObSelectStmt *>(parent_stmt)->get_python_udf_exprs(),
+                             child_stmt->get_python_udf_exprs()))) {
+      LOG_WARN("failed to append python udf exprs", K(ret));
     } else if (OB_FAIL(ObTransformUtils::pull_up_subquery(parent_stmt, child_stmt))) {
       LOG_WARN("failed to pull up subquery", K(ret));
     } else if (OB_FAIL(parent_stmt->remove_from_item(table_item->table_id_))) {

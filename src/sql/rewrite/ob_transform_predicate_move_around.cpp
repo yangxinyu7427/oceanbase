@@ -3371,7 +3371,8 @@ int ObTransformPredicateMoveAround::extract_generalized_column(ObRawExpr *expr,
           LOG_WARN("param expr is null", K(ret), K(param));
         } else if (!param->has_flag(CNT_COLUMN) &&
                    !param->has_flag(CNT_AGG) &&
-                   !param->has_flag(CNT_WINDOW_FUNC)) {
+                   !param->has_flag(CNT_WINDOW_FUNC) &&
+                   !param->has_flag(CNT_PYTHON_UDF)) {
           // do nothing
         } else if (OB_FAIL(queue.push_back(param))) {
           LOG_WARN("failed to push back param expr", K(ret));
