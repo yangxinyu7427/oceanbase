@@ -1931,6 +1931,24 @@ int ObSchemaChecker::get_python_udf_info(uint64_t tenant_id,
   return ret;
 }
 
+int ObSchemaChecker::get_udf_model_info(uint64_t tenant_id,
+                                        const common::ObString &model_name,
+                                        share::schema::ObUdfModel &model_info,
+                                        bool &exist)
+{
+  int ret = OB_SUCCESS;
+  if (OB_INVALID_ID == tenant_id || model_name.empty()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(model_name));
+  } else if (OB_ISNULL(schema_mgr_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("invalid argument", K(ret), K(schema_mgr_));
+  } else if (OB_FAIL(schema_mgr_->get_udf_model_info(tenant_id, model_name, model_info, exist))) {
+    LOG_WARN("failed to get udf model schema", K(ret));
+  }
+  return ret;
+}
+
 int ObSchemaChecker::check_sequence_exist_with_name(const uint64_t tenant_id,
                                                     const uint64_t database_id,
                                                     const common::ObString &sequence_name,

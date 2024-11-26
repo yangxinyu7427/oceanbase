@@ -23,6 +23,7 @@
 #include "share/schema/ob_dblink_mgr.h"
 #include "share/schema/ob_udt_info.h"
 #include "share/schema/ob_trigger_info.h"
+#include "share/schema/ob_udf_model.h"
 
 #define PRIV_CHECK_FLAG_NORMAL     0
 #define PRIV_CHECK_FLAG_DISABLE    1
@@ -388,6 +389,10 @@ public:
                           const common::ObString &udf_name,
                           share::schema::ObPythonUDF &udf_info,
                           bool &exist);
+  int get_udf_model_info(uint64_t tenant_id,
+                         const common::ObString &model_name,
+                         share::schema::ObUdfModel &model_info,
+                         bool &exist);                        
   int check_sequence_exist_with_name(const uint64_t tenant_id,
                                      const uint64_t database_id,
                                      const common::ObString &sequence_name,

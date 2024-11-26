@@ -7890,6 +7890,18 @@ int ObSchemaGetterGuard::get_python_udf_info(const uint64_t tenant_id,
   return ret;
 }
 
+int ObSchemaGetterGuard::get_udf_model_info(const uint64_t tenant_id,
+                                            const common::ObString &model_name,
+                                            share::schema::ObUdfModel &model_info,
+                                            bool &exist)
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(schema_service_->get_udf_model_info(tenant_id, model_name, model_info, exist))) {
+    LOG_WARN("failed to get udf model schema", K(ret));
+  }
+  return ret;
+}
+
 // This function return indexes which are in unavaliable status
 // It's used in the following scenes:
 // 1. Schedule unavaliable indexes build tasks in primary cluster.
