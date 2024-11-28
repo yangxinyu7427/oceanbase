@@ -26,7 +26,7 @@
 using namespace oceanbase::sql;
 using namespace oceanbase::common;
 
-string opted_model_path="/root/onnx_output/model_opted.onnx";
+//string opted_model_path="/root/onnx_output/model_opted.onnx";
 std::map<ObItemType, string> predicate_map={
   {T_OP_OR,"Or"},
   {T_OP_AND,"And"},

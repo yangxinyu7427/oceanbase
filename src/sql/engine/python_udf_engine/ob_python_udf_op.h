@@ -146,6 +146,7 @@ private:
   // 运算结果暂存
   int result_size_;
   void *result_store_;
+  std::vector<void *> merged_udf_res_list;
 };
 typedef common::ObDList<ObPythonUDFCell> PythonUDFCellList;
 
