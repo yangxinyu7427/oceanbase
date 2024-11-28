@@ -45,6 +45,8 @@ public:
 
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
+  static int import_model_udf(const share::schema::ObPythonUDFMeta &udf_meta);
+
   static int eval_python_udf(EVAL_FUNC_ARG_DECL);
 
   static int eval_python_udf_batch(BATCH_EVAL_FUNC_ARG_DECL);

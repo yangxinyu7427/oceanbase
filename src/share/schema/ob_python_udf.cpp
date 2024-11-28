@@ -26,15 +26,15 @@ namespace schema
 {
 
 ObPythonUDF::ObPythonUDF(common::ObIAllocator *allocator)
-    : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), model_name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+    : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
+      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();
 }
 
 ObPythonUDF::ObPythonUDF(const ObPythonUDF &src_schema)
-    : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), model_name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
+      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
 {
   reset();
   *this = src_schema;
@@ -60,7 +60,7 @@ int ObPythonUDF::get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_
   return ret;
 }
 
-int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 16> &udf_attributes_types) const {
+int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &udf_attributes_types) const {
   int ret = OB_SUCCESS;
   udf_attributes_types.reuse();
   char* arg_types_str = const_cast<char*>(get_arg_types());
@@ -68,13 +68,13 @@ int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUDF::PyUdfRetType, 
   std::string token;
   while (std::getline(ss, token, ',')) {
     if (token == "STRING") {
-      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::STRING);
+      udf_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::STRING);
     } else if (token == "INTEGER") {
-      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::INTEGER);
+      udf_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::INTEGER);
     } else if (token == "REAL") {
-      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::REAL);
+      udf_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::REAL);
     } else if (token == "DECIMAL") {
-      udf_attributes_types.push_back(ObPythonUDF::PyUdfRetType::DECIMAL);
+      udf_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::DECIMAL);
     }
   }
   if(udf_attributes_types.count() != arg_num_) {
@@ -136,7 +136,7 @@ void ObPythonUDF::reset()
   name_.reset();
   arg_names_.reset();
   arg_types_.reset();
-  ret_ = PyUdfRetType::UDF_UNINITIAL;
+  ret_ = ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL;
   pycall_.reset();
   ObSchema::reset();
 }
@@ -159,7 +159,100 @@ OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     udf_attributes_types_,
                     init_,
                     batch_size_,
-                    batch_size_const_);
+                    batch_size_const_,
+                    model_type_,
+                    udf_model_meta_);
+
+
+/////////////////////////////////////////////
+
+ObUdfModel::ObUdfModel(common::ObIAllocator *allocator)
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), 
+      framework_(), model_path_(), arg_num_(0), arg_names_(), arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), 
+      schema_version_(common::OB_INVALID_VERSION) 
+{
+  reset();
+}
+
+ObUdfModel::ObUdfModel(const ObUdfModel &src_schema)
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), 
+      framework_(), model_path_(), arg_num_(0), arg_names_(), arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL),
+      schema_version_(common::OB_INVALID_VERSION) 
+{
+  reset();
+  *this = src_schema;
+}
+
+ObUdfModel::~ObUdfModel()
+{
+}
+
+ObUdfModel& ObUdfModel::operator=(const ObUdfModel &other) {
+  if (this != &other) {
+    reset();
+    int ret = OB_SUCCESS;
+    error_ret_ = other.error_ret_;
+    tenant_id_ = other.tenant_id_;
+    model_id_ = other.model_id_;
+    framework_ = other.framework_;
+    model_type_ = other.model_type_;
+    arg_num_ = other.arg_num_;
+    ret_ = other.ret_;
+    schema_version_ = other.schema_version_;
+    if (OB_FAIL(deep_copy_str(other.model_name_, model_name_))) {
+      LOG_WARN("Fail to deep copy model name", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.model_path_, model_path_))) {
+      LOG_WARN("Fail to deep copy model path", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.arg_names_, arg_names_))) {
+      LOG_WARN("Fail to deep copy arg names", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.arg_types_, arg_types_))) {
+      LOG_WARN("Fail to deep copy arg types", K(ret));
+    } 
+    if (OB_FAIL(ret)) {
+      error_ret_ = ret;
+    }
+  }
+  return *this;
+}
+
+void ObUdfModel::reset()
+{
+  tenant_id_ = OB_INVALID_ID;
+  model_id_ = OB_INVALID_ID;
+  model_name_.reset();
+  framework_ = ObPythonUdfEnumType::ModelFrameworkType::INVALID_FRAMEWORK_TYPE;
+  model_type_ = ObPythonUdfEnumType::ModelType::INVALID_MODEL_TYPE;
+  model_path_.reset();  
+  arg_names_.reset();
+  arg_types_.reset();
+  ret_ = ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL;
+  ObSchema::reset();
+}
+
+OB_SERIALIZE_MEMBER(ObUdfModel,
+				            tenant_id_,
+                    model_id_,
+                    model_name_,
+                    model_type_,
+                    framework_,
+                    model_path_,
+                    arg_num_,
+                    arg_names_,
+                    arg_types_,
+				            ret_,
+                    schema_version_);
+
+OB_SERIALIZE_MEMBER(ObUdfModelMeta,
+                    model_name_,
+                    framework_,
+                    model_type_,
+                    model_path_,
+                    model_attributes_names_,
+                    model_attributes_types_,
+                    ret_);
+
+
+
 
 }// end schema
 }// end share

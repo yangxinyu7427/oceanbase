@@ -76,7 +76,6 @@
 #include "share/location_cache/ob_location_update_task.h"
 
 #include "share/schema/ob_python_udf.h"
-#include "share/schema/ob_udf_model.h"
 
 namespace oceanbase
 {

@@ -23,7 +23,6 @@
 #include "share/schema/ob_dblink_mgr.h"
 #include "share/schema/ob_udt_info.h"
 #include "share/schema/ob_trigger_info.h"
-#include "share/schema/ob_udf_model.h"
 
 #define PRIV_CHECK_FLAG_NORMAL     0
 #define PRIV_CHECK_FLAG_DISABLE    1
