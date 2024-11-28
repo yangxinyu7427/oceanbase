@@ -501,7 +501,8 @@ typedef enum ObItemType
   T_FUN_SYS_AUDIT_LOG_SET_USER = 771,
   T_FUN_SYS_AUDIT_LOG_REMOVE_USER = 772,
   T_FUN_SYS_PASSWORD = 773,
-  T_FUN_PYTHON_UDF = 777, // ob_item_type register   //IMBridge_Expr
+  T_FUN_PYTHON_UDF = 777,
+  T_FUN_UDF_MODEL = 778, // ob_item_type register   //IMBridge_Expr
   ///< @note add new mysql only function type before this line
   T_MYSQL_ONLY_SYS_MAX_OP = 800,
 
@@ -2445,8 +2446,6 @@ typedef enum ObItemType
   T_FRAMEWORK,
   T_TYPE,
   T_MODEL_LOCATION,
-  T_MODEL_NAME,
-
   T_MAX //Attention: add a new type before T_MAX
 } ObItemType;
 

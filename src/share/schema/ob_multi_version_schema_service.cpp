@@ -5350,6 +5350,10 @@ int ObMultiVersionSchemaService::fill_udf_model_schema(const uint64_t tenant_id,
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, framework, model_info, int);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, model_type, model_info, int);
   EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, model_path, model_info);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, arg_num, model_info, int);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_names, model_info);
+  EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(result, arg_types, model_info);
+  EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, ret, model_info, int);
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, schema_version, model_info, uint64_t);
   return ret;
   }
