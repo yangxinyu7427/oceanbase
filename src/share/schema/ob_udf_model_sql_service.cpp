@@ -89,6 +89,12 @@ int ObUdfModelSqlService::add_udf_model(common::ObISQLClient &sql_client,
       SQL_COL_APPEND_VALUE(sql, values, model_info.get_model_type(), "model_type", "%d");
       SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_model_path(),
                                       model_info.get_model_path_str().length(), "model_path");
+      SQL_COL_APPEND_VALUE(sql, values, model_info.get_arg_num(), "arg_num", "%d");
+      SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_arg_names(),
+                                      model_info.get_arg_names_str().length(), "arg_names");
+      SQL_COL_APPEND_ESCAPE_STR_VALUE(sql, values, model_info.get_arg_types(),
+                                      model_info.get_arg_types_str().length(), "arg_types");
+      SQL_COL_APPEND_VALUE(sql, values, model_info.get_ret(), "ret", "%d");
       SQL_COL_APPEND_VALUE(sql, values, model_info.get_schema_version(), "schema_version", "%ld");
       
       if (OB_SUCC(ret)) {

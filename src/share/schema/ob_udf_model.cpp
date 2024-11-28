@@ -26,13 +26,17 @@ namespace schema
 {
 
 ObUdfModel::ObUdfModel(common::ObIAllocator *allocator)
-    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), framework_(), model_path_(), schema_version_(common::OB_INVALID_VERSION) 
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), 
+      framework_(), model_path_(), arg_num_(0), arg_names_(), arg_types_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL), 
+      schema_version_(common::OB_INVALID_VERSION) 
 {
   reset();
 }
 
 ObUdfModel::ObUdfModel(const ObUdfModel &src_schema)
-    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), framework_(), model_path_(), schema_version_(common::OB_INVALID_VERSION) 
+    : ObSchema(), tenant_id_(common::OB_INVALID_ID), model_id_(common::OB_INVALID_ID), model_name_(), model_type_(), 
+      framework_(), model_path_(), arg_num_(0), arg_names_(), arg_types_(), ret_(ObPythonUDF::PyUdfRetType::UDF_UNINITIAL),
+      schema_version_(common::OB_INVALID_VERSION) 
 {
   reset();
   *this = src_schema;
@@ -51,12 +55,18 @@ ObUdfModel& ObUdfModel::operator=(const ObUdfModel &other) {
     model_id_ = other.model_id_;
     framework_ = other.framework_;
     model_type_ = other.model_type_;
+    arg_num_ = other.arg_num_;
+    ret_ = other.ret_;
     schema_version_ = other.schema_version_;
     if (OB_FAIL(deep_copy_str(other.model_name_, model_name_))) {
       LOG_WARN("Fail to deep copy model name", K(ret));
     } else if (OB_FAIL(deep_copy_str(other.model_path_, model_path_))) {
       LOG_WARN("Fail to deep copy model path", K(ret));
-    }
+    } else if (OB_FAIL(deep_copy_str(other.arg_names_, arg_names_))) {
+      LOG_WARN("Fail to deep copy arg names", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.arg_types_, arg_types_))) {
+      LOG_WARN("Fail to deep copy arg types", K(ret));
+    } 
     if (OB_FAIL(ret)) {
       error_ret_ = ret;
     }
@@ -71,7 +81,10 @@ void ObUdfModel::reset()
   model_name_.reset();
   framework_ = ModelFrameworkType::INVALID_FRAMEWORK_TYPE;
   model_type_ = ModelType::INVALID_MODEL_TYPE;
-  model_path_.reset();
+  model_path_.reset();  
+  arg_names_.reset();
+  arg_types_.reset();
+  ret_ = ObPythonUDF::PyUdfRetType::UDF_UNINITIAL;
   ObSchema::reset();
 }
 
@@ -82,13 +95,20 @@ OB_SERIALIZE_MEMBER(ObUdfModel,
                     model_type_,
                     framework_,
                     model_path_,
+                    arg_num_,
+                    arg_names_,
+                    arg_types_,
+				            ret_,
                     schema_version_);
 
 OB_SERIALIZE_MEMBER(ObUdfModelMeta,
                     model_name_,
                     framework_,
                     model_type_,
-                    model_path_);
+                    model_path_,
+                    model_attributes_names_,
+                    model_attributes_types_,
+                    ret_);
 
 }// end schema
 }// end share

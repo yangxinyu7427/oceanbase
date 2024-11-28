@@ -6966,6 +6966,10 @@ def_table_schema(
       ('framework', 'int'),
       ('model_type', 'int'),
       ('model_path', 'text:OB_MAX_TEXT_LENGTH', 'false'),
+      ('ret', 'int'),
+      ('arg_num', 'int'),
+      ('arg_names', 'varchar:OB_MAX_SYS_PARAM_INFO_LENGTH', 'false'),
+      ('arg_types', 'varchar:OB_MAX_SYS_PARAM_INFO_LENGTH', 'false'),
       ('schema_version', 'int'),
     ],
 )

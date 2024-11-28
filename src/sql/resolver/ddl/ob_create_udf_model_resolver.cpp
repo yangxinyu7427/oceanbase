@@ -28,7 +28,7 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
     ParseNode *create_udf_model_node = const_cast<ParseNode*>(&parse_tree);
     if (OB_ISNULL(create_udf_model_node)
         || T_CREATE_UDF_MODEL != create_udf_model_node->type_
-        || 3 != create_udf_model_node->num_child_         //语法树根节点的孩子数不正确
+        || 1 > create_udf_model_node->num_child_         //语法树根节点的孩子数不正确
         || OB_ISNULL(create_udf_model_node->children_)) {
       ret = OB_INVALID_ARGUMENT;
       SQL_RESV_LOG(WARN, "invalid argument.", K(ret));
@@ -47,47 +47,119 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
         model_name = ObString(relation_node->str_len_, relation_node->str_value_);
         //set model name
         create_udf_model_arg.udf_model_.set_model_name(model_name);
+        //resolve model param
+        ParseNode *function_element_list_node = create_udf_model_node->children_[2];
+        //set arg_num
+        int arg_num = function_element_list_node->num_child_;
+        create_udf_model_arg.udf_model_.set_arg_num(arg_num);
+        std::string arg_names = "";
+        std::string arg_types = "";
+        for (int32_t i = 0; i < arg_num; ++i) {
+          //T_PARAM_DEFINITION
+          ParseNode *element = function_element_list_node->children_[i];
+          //T_IDENT
+          ParseNode *arg_name_node = element->children_[0];
+          //get arg_name
+          const char* arg_name = arg_name_node->str_value_;
+          arg_names += arg_name;
+          if (i != arg_num - 1) arg_names += ",";
+          //get arg type
+          ParseNode *type_node = element->children_[1];
+          switch (type_node->value_) {
+              case 1:
+                arg_types += "STRING";
+                break;
+              case 2:
+                arg_types += "INTEGER";
+                break;
+              case 3:
+                arg_types += "REAL";
+                break;
+              case 4:
+                arg_types += "DECIMAL";
+                break;       
+          }
+          if (i != arg_num - 1) arg_types += ",";
+        }
+        //set arg_names
+        create_udf_model_arg.udf_model_.set_arg_names(common::ObString(arg_names.length(),arg_names.c_str()));
+        //set arg_types
+        create_udf_model_arg.udf_model_.set_arg_types(common::ObString(arg_types.length(),arg_types.c_str()));
+        //set return type
+        switch (create_udf_model_node->children_[3]->value_) {
+          case 1:
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::STRING);
+            break;
+          case 2:
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::INTEGER);
+            break;
+          case 3:
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::REAL);
+            break;
+          case 4:
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::DECIMAL);
+            break;
+        }
         //resolve model metadata list
-        ParseNode *model_metadata_list_node = create_udf_model_node->children_[2];
+        ParseNode *model_metadata_list_node = create_udf_model_node->children_[4];
         if (OB_ISNULL(model_metadata_list_node)
             || T_METADATA_LIST != model_metadata_list_node->type_
-            || 1 != model_metadata_list_node->num_child_         //模型元数据节点的孩子数不正确
-            || OB_ISNULL(model_metadata_list_node->children_)) {
+            || 3 < model_metadata_list_node->num_child_) {
           ret = OB_INVALID_ARGUMENT;
           SQL_RESV_LOG(WARN, "invalid argument.", K(ret));
         } else {    //解析模型元数据信息
             //get model_metadata_node
-            ParseNode *model_metadata_node = model_metadata_list_node->children_[0];
-            //get framework
-            ParseNode *framework_node = model_metadata_node->children_[0];
-            const char* framework = framework_node->str_value_;
-            //修改比较
+            int model_metadata_num = model_metadata_list_node->num_child_;
+            std::string framework, model_type;
+            ObString model_path;
+            if (model_metadata_num > 0) {
+              for (int i = 0; i < model_metadata_num; i++) {
+                ParseNode *model_metadata_node = model_metadata_list_node->children_[i];
+                switch (model_metadata_node->value_) {
+                  case 1:{
+                    //get framework
+                    ParseNode *framework_node = model_metadata_node->children_[0];
+                    framework = framework_node->str_value_;
+                    break;
+                  }
+                  case 2:{
+                    //get model type
+                    ParseNode *model_type_node = model_metadata_node->children_[0];
+                    model_type = model_type_node->str_value_;
+                    break;
+                  }
+                  case 3:{
+                    //get model path
+                    ParseNode *model_path_node = model_metadata_node->children_[0];
+                    model_path = ObString(model_path_node->str_len_, model_path_node->str_value_);
+                    break;       
+                  }
+                }
+              }
+            }
+            //转为大写
+            std::transform(framework.begin(), framework.end(), framework.begin(), ::toupper);
+            std::transform(model_type.begin(), model_type.end(), model_type.begin(), ::toupper);
             //set framework
-            if (std::strcmp(framework, "ONNX") == 0){
+            if (framework == "ONNX"){
                 create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::ONNX);
-            } else if (std::strcmp(framework, "SKLEARN") == 0) {
+            } else if (framework == "SKLEARN") {
                 create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::SKLEARN);
-            } else if (std::strcmp(framework, "PYTORCH") == 0) {
+            } else if (framework == "PYTORCH") {
                 create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::PYTORCH);
             } else {
                 create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::UNSUPPORTED);
             }
-            //get model type
-            ParseNode *model_type_node = model_metadata_node->children_[1];
             //set model_type          
-            const char* model_type = model_type_node->str_value_;
-            if (std::strcmp(model_type, "decision_tree") == 0){
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::DECISION_TREE);
+            if (model_type == "DESISION_TREE"){
+                create_udf_model_arg.udf_model_.set_model_type(schema::ObUdfModel::DECISION_TREE);
             } else {
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::UNSUPPORTED);
+                create_udf_model_arg.udf_model_.set_model_type(schema::ObUdfModel::UNSUPPORTED);
             }
-            ObString model_path;
-            //get model path
-            ParseNode *model_path_node = model_metadata_node->children_[2];
-            model_path = ObString(model_path_node->str_len_, model_path_node->str_value_);
             //set model_path
             create_udf_model_arg.udf_model_.set_model_path(model_path);     
         }
+
         //set tenant_id
         create_udf_model_arg.udf_model_.set_tenant_id(params_.session_info_->get_effective_tenant_id());
       }
