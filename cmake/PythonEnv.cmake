@@ -12,4 +12,4 @@ target_include_directories(
   "${PYTHON_LIB_DIR}"
   "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/core/include/")
 target_link_libraries(python_lib INTERFACE
-    -L/usr/local/python311/lib -lpython3.11 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic)
+    -L${PYTHON_LIB_DIR} -lpython3.11 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic)

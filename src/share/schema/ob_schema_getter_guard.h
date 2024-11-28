@@ -24,7 +24,6 @@
 #include "share/schema/ob_outline_mgr.h"
 #include "share/schema/ob_udt_mgr.h"
 #include "share/schema/ob_python_udf.h"
-#include "share/schema/ob_udf_model.h"
 
 namespace oceanbase
 {

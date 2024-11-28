@@ -88,16 +88,16 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
         //set return type
         switch (create_udf_model_node->children_[3]->value_) {
           case 1:
-            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::STRING);
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::STRING);
             break;
           case 2:
-            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::INTEGER);
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER);
             break;
           case 3:
-            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::REAL);
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::REAL);
             break;
           case 4:
-            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUDF::DECIMAL);
+            create_udf_model_arg.udf_model_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::DECIMAL);
             break;
         }
         //resolve model metadata list
@@ -142,19 +142,19 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
             std::transform(model_type.begin(), model_type.end(), model_type.begin(), ::toupper);
             //set framework
             if (framework == "ONNX"){
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::ONNX);
+                create_udf_model_arg.udf_model_.set_framework(schema::ObPythonUdfEnumType::ModelFrameworkType::ONNX);
             } else if (framework == "SKLEARN") {
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::SKLEARN);
+                create_udf_model_arg.udf_model_.set_framework(schema::ObPythonUdfEnumType::ModelFrameworkType::SKLEARN);
             } else if (framework == "PYTORCH") {
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::PYTORCH);
+                create_udf_model_arg.udf_model_.set_framework(schema::ObPythonUdfEnumType::ModelFrameworkType::PYTORCH);
             } else {
-                create_udf_model_arg.udf_model_.set_framework(schema::ObUdfModel::UNSUPPORTED);
+                create_udf_model_arg.udf_model_.set_framework(schema::ObPythonUdfEnumType::ModelFrameworkType::UNSUPPORTED);
             }
             //set model_type          
             if (model_type == "DESISION_TREE"){
-                create_udf_model_arg.udf_model_.set_model_type(schema::ObUdfModel::DECISION_TREE);
+                create_udf_model_arg.udf_model_.set_model_type(schema::ObPythonUdfEnumType::ModelType::DECISION_TREE);
             } else {
-                create_udf_model_arg.udf_model_.set_model_type(schema::ObUdfModel::UNSUPPORTED);
+                create_udf_model_arg.udf_model_.set_model_type(schema::ObPythonUdfEnumType::ModelType::INVALID_MODEL_TYPE);
             }
             //set model_path
             create_udf_model_arg.udf_model_.set_model_path(model_path);     

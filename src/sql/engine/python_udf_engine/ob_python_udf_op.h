@@ -111,6 +111,7 @@ public:
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size); // wrap all args
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size]
   int eval(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
+  int eval_model_udf(PyObject *pArgs, int64_t eval_size); // do python single model udf evaluation
   int modify_desirable(timeval &start, timeval &end, int64_t eval_size);
   int reset_input_store() { return input_store_.reset(); }
 
@@ -124,6 +125,7 @@ private:
   //common::ObFIFOAllocator alloc_; // input store allocator need to free
   common::ObArenaAllocator alloc_;
   ObExpr *expr_; // python_udf_expr
+  //ExprFixedArray redunant_exprs_; // 使用同一python udf且输入列相同, 存在冗余，等待后续实现
   ObPUInputStore input_store_; // 不同UDF间使用同一列存在冗余缓存, 公共表达式部份本来也存在冗余
 
   // 运行时参数... 

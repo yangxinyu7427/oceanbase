@@ -196,16 +196,16 @@ int ObCreatePythonUdfResolver::resolve(const ParseNode &parse_tree)
             //set return type
             switch (create_python_udf_node->children_[2]->value_) {
                 case 1:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::STRING);
+                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::STRING);
                     break;
                 case 2:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::INTEGER);
+                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER);
                     break;
                 case 3:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::REAL);
+                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::REAL);
                     break;
                 case 4:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::DECIMAL);
+                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::DECIMAL);
                     break;
             }
         } 
@@ -215,14 +215,14 @@ int ObCreatePythonUdfResolver::resolve(const ParseNode &parse_tree)
             ObString model_name = ObString(model_name_node->str_len_, model_name_node->str_value_);
             // ret = resolve_model_path(model_name_node, create_python_udf_arg);
             //set model_name
-            create_python_udf_arg.python_udf_.set_model_name(model_name);
+            //create_python_udf_arg.python_udf_.set_model_name(model_name);
         }
         // resolve pycall 
         // T_PYTHON_CODE_TYPE
         ParseNode *pycall_node = create_python_udf_node->children_[children_num - 1];
         ret = resolve_pycall(pycall_node, create_python_udf_arg);
         //set tenant_id
-        create_python_udf_arg.python_udf_.set_tenant_id(params_.session_info_->get_effective_tenant_id());
+        //create_python_udf_arg.python_udf_.set_tenant_id(params_.session_info_->get_effective_tenant_id());
       }
     }            
     return ret;
