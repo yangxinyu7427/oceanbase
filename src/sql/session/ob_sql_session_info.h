@@ -443,6 +443,12 @@ DEF_SESSION_TXN_ENCODER(ObTxnExtraInfoEncoder);
 
 #undef DEF_SESSION_TXN_ENCODER
 
+typedef common::hash::ObHashMap<common::ObString, bool,
+                                common::hash::NoPthreadDefendMode> ObHistoryPyUdfMap;
+
+typedef common::hash::ObHashMap<common::ObString, std::string,
+                                common::hash::NoPthreadDefendMode> ObMergedUDFPrefixMap;
+
 typedef common::hash::ObHashMap<uint64_t, pl::ObPLPackageState *,
                                 common::hash::NoPthreadDefendMode> ObPackageStateMap;
 typedef common::hash::ObHashMap<uint64_t, share::ObSequenceValue,
@@ -1184,6 +1190,8 @@ public:
   int64_t get_current_dblink_sequence_id() const { return current_dblink_sequence_id_; }
   void set_client_non_standard(bool client_non_standard) { client_non_standard_ = client_non_standard; }
   bool client_non_standard() { return client_non_standard_; }
+  ObHistoryPyUdfMap &get_history_pyudf_map() { return history_pyudf_map_; }
+  ObMergedUDFPrefixMap &get_merged_udf_pre_map() { return merged_udf_pre_map_; }
   int get_mem_ctx_alloc(common::ObIAllocator *&alloc);
   int update_sess_sync_info(const SessionSyncInfoType sess_sync_info_type,
                                 const char *buf, const int64_t length, int64_t &pos);
@@ -1435,6 +1443,8 @@ private:
   ObPackageStateMap package_state_map_;
   ObSequenceCurrvalMap sequence_currval_map_;
   ObDBlinkSequenceIdMap dblink_sequence_id_map_;
+  ObHistoryPyUdfMap history_pyudf_map_;
+  ObMergedUDFPrefixMap merged_udf_pre_map_;
   ObContextsMap contexts_map_;
   int64_t curr_session_context_size_;
 public:
