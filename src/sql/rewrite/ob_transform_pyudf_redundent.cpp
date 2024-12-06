@@ -136,12 +136,11 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
             python_udf_expr_list.at(i)->set_udf_meta_can_be_used_model_path(it->first);
             break;
           }
+          // 记录导出中间结果的模型
           found=true;
           python_udf_expr_list.at(i)->set_udf_meta_has_new_output_model_path();
           python_udf_expr_list.at(i)->set_udf_meta_new_output_model_path(new_output_model_path);
           python_udf_expr_list.at(i)->set_udf_meta_model_path(path);
-          // 再检查是否已缓存，如果已缓存，就再记录使用中间结果的模型
-          
         }
       } catch(...){
         LOG_WARN("check_redundant fail");

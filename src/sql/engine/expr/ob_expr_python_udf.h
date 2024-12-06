@@ -43,6 +43,8 @@ public:
                                 
   int init_udf(const common::ObIArray<ObRawExpr*> &param_exprs);
 
+  static int change_vars_in_pycall(string &pycall, string pre);
+
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
   static int eval_python_udf(EVAL_FUNC_ARG_DECL);

@@ -102,24 +102,26 @@ public:
   int reset(int64_t size) { return input_store_.reset(size); }
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
   int do_process(); // do real processing
-  int do_process_with_cache(std::vector<bool>& bit_vector); // do processing with udf cache
-  int do_process_all_with_cache(std::vector<bool>& bit_vector);
+  int do_process_with_mid_res_cache(int count_mid_res, int count_cols, std::vector<bool>& mid_res_bit_vector, std::vector<float*>& mid_res_vector, 
+  std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str);
+  int do_process_with_cache(int count_mid_res, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector); // do processing with udf cache
+  int do_process_all_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
   int do_process_all(); // process all saved store at one time
   int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
 
   int do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
   int do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
 
   //计算过程  
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size); // wrap all args
   int wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx, 
-  int64_t& real_eval_size, int64_t desirable_eval_size, std::vector<bool> &cached_bit_vector); // warp args in [idx, idx + predict_size] with cache
+  int64_t& real_eval_size, int64_t desirable_eval_size, std::vector<bool> &cached_bit_vector, std::vector<bool>& mid_res_bit_vector); // warp args in [idx, idx + predict_size] with cache
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size]
   int eval(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
   int eval_with_cache(PyObject *pArgs, int64_t eval_size); // do python udf evaluation with cache
@@ -147,6 +149,7 @@ private:
   int result_size_;
   void *result_store_;
   std::vector<void *> merged_udf_res_list;
+  void *mid_result_store_;
 };
 typedef common::ObDList<ObPythonUDFCell> PythonUDFCellList;
 
@@ -212,9 +215,13 @@ private:
   std::vector<int> cells_can_use_cache; // 有缓存记录的cell
   std::vector<std::vector<int>> cells_cached_res_for_int; // int类型的已缓存结果
   std::vector<std::vector<std::string>> cells_cached_res_for_str; // string类型的已缓存结果
-  std::vector<std::vector<double>> cells_cached_res_for_double; // string类型的已缓存结果
+  std::vector<std::vector<double>> cells_cached_res_for_double; // double类型的已缓存结果
+  std::vector<std::vector<float*>> cells_cached_res_for_mid_result; // 已缓存的中间结果
   std::vector<std::vector<std::string>> input_list_for_cells; // 每个cell的input列表 
   std::vector<std::vector<bool>> cells_cached_res_bit_vector; // 每个cell的可用缓存标识数组
+  std::vector<std::vector<bool>> cells_cached_mid_res_bit_vector; // 每个cell的可用缓存标识数组
+  int count_cached_mid_res;
+  int mid_res_cols_count;
 };
 
 class ObPythonUDFSpec : public ObOpSpec

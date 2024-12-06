@@ -52,6 +52,9 @@ namespace sql{
         typedef common::hash::ObHashMap<char*, double, 
             common::hash::NoPthreadDefendMode> PyUdfCacheMapForDouble;
 
+        typedef common::hash::ObHashMap<char*, float*, 
+            common::hash::NoPthreadDefendMode> PyUdfCacheMapForMidResult;
+
         typedef common::hash::ObHashMap<common::ObString, PyUdfCacheMapForString*, 
             common::hash::NoPthreadDefendMode> CacheMapForString;
 
@@ -60,11 +63,17 @@ namespace sql{
 
         typedef common::hash::ObHashMap<common::ObString, PyUdfCacheMapForDouble*, 
             common::hash::NoPthreadDefendMode> CacheMapForDouble;
+
+        typedef common::hash::ObHashMap<common::ObString, PyUdfCacheMapForMidResult*, 
+            common::hash::NoPthreadDefendMode> CacheMapForMidResult;
         
         CacheMapForInt cache_map_for_int_;
         CacheMapForDouble cache_map_for_double_;
         CacheMapForString cache_map_for_string_;
+        CacheMapForMidResult cache_map_for_mid_result_;
         std::unordered_set<std::string> udf_list;
+        std::unordered_set<std::string> path_list;
+        std::unordered_map<std::string,int> mid_res_col_count_map;
     public:
         // 创建缓存
         int create(){
@@ -78,8 +87,19 @@ namespace sql{
             }else if(cache_map_for_double_.create(hash::cal_next_prime(32), ObModIds::OB_HASH_BUCKET, 
                 ObModIds::OB_HASH_NODE)){
                 //LOG_WARN("create cache_map_for_string failed", K(ret));
+            }else if(cache_map_for_mid_result_.create(hash::cal_next_prime(32), ObModIds::OB_HASH_BUCKET, 
+                ObModIds::OB_HASH_NODE)){
+                //LOG_WARN("create cache_map_for_string failed", K(ret));
             }
             return ret;
+        }
+
+        bool find_fine_cache_for_model_path(const common::ObString& model_path){
+            std::string path_str(model_path.ptr(), model_path.length());
+            if(path_list.find(path_str)==path_list.end()){
+                return false;
+            }
+            return true;
         }
 
         bool find_cache_for_cell(const common::ObString& udf_name){
@@ -88,6 +108,21 @@ namespace sql{
                 return false;
             }
             return true;
+        }
+
+        int create_cache_for_model_path(const common::ObString& model_path){
+            int ret = OB_SUCCESS;
+            std::string model_str(model_path.ptr(),model_path.length());
+            PyUdfCacheMapForMidResult *cache_map=new PyUdfCacheMapForMidResult();
+            if(OB_FAIL(cache_map->create(hash::cal_next_prime(500000),
+                                              ObModIds::OB_HASH_BUCKET,
+                                              ObModIds::OB_HASH_NODE))){
+                //LOG_WARN("new_cache_map create fail", K(ret));
+            }else if(OB_FAIL(cache_map_for_mid_result_.set_refactored(model_path, cache_map))){
+                //LOG_WARN("cache_map_for_int set fail", K(ret));
+            }
+            path_list.insert(model_str);
+            return ret;
         }
 
         int create_cache_for_cell_for_int(const common::ObString& udf_name){
@@ -152,6 +187,23 @@ namespace sql{
             return ret;
         }
 
+        int set_mid_result(const common::ObString& model_path, string& key, float* value){
+            int ret = OB_SUCCESS;
+            PyUdfCacheMapForMidResult *cache_map;
+            // 有缓存就直接拿出来
+            if(OB_FAIL(cache_map_for_mid_result_.get_refactored(model_path, cache_map))){
+                //LOG_WARN("cache_map_for_int get fail", K(ret));
+            }
+            // 将数据存入map
+            size_t length = key.size();
+            char* newKey = new char[length + 1];
+            std::memcpy(newKey, key.c_str(), length + 1);
+            if(OB_FAIL(cache_map->set_refactored(newKey, value))){
+                //LOG_WARN("cache_map set fail", K(ret));
+            }
+            return ret;
+        }
+
         int set_double(const common::ObString& udf_name, string& key, double value){
             int ret = OB_SUCCESS;
             PyUdfCacheMapForDouble *cache_map;
@@ -181,6 +233,20 @@ namespace sql{
             char* newKey = new char[length + 1];
             std::memcpy(newKey, key.c_str(), length + 1);
             if(OB_FAIL(cache_map->set_refactored(newKey, std::make_shared<std::string>(value)))){
+                //LOG_WARN("cache_map set fail", K(ret));
+            }
+            return ret;
+        }
+
+        int get_mid_result(const common::ObString& model_path, char* key, float* value){
+            int ret = OB_SUCCESS;
+            PyUdfCacheMapForMidResult *cache_map;
+            // 有缓存就直接拿出来
+            if(OB_FAIL(cache_map_for_mid_result_.get_refactored(model_path, cache_map))){
+                //LOG_WARN("cache_map_for_int get fail", K(ret));
+            }
+            // 将数据从map中取出
+            if(OB_FAIL(cache_map->get_refactored(key, value))){
                 //LOG_WARN("cache_map set fail", K(ret));
             }
             return ret;
