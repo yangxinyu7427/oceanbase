@@ -27,14 +27,16 @@ namespace schema
 
 ObPythonUDF::ObPythonUDF(common::ObIAllocator *allocator)
     : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION),
+      isModelSpecific_(false), model_num_(0), udf_model_names_(), udf_model_()
 {
   reset();
 }
 
 ObPythonUDF::ObPythonUDF(const ObPythonUDF &src_schema)
     : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), arg_types_(),
-      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION)
+      ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION),
+      isModelSpecific_(false), model_num_(0), udf_model_names_(), udf_model_()
 {
   reset();
   *this = src_schema;
@@ -84,6 +86,30 @@ int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfR
   return ret;
 }
 
+int ObPythonUDF::get_udf_model_names_arr(common::ObSEArray<common::ObString, 16> &udf_model_names) const {
+  int ret = OB_SUCCESS;
+  udf_model_names.reuse();
+  char* udf_model_names_str = const_cast<char*>(get_model_names());
+  std::istringstream ss(udf_model_names_str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+      udf_model_names.push_back(common::ObString(token.length(),token.c_str()));
+  }
+  if(udf_model_names.count() != model_num_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to resolve udf model names string", K(ret));
+  }
+  return ret;
+}
+
+int ObPythonUDF::insert_udf_model_info(ObUdfModel &model_info) {
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(udf_model_.push_back(model_info))) {
+    LOG_WARN("fail to insert udf model info", K(ret)); 
+  }
+  return ret;
+}
+
 int ObPythonUDF::check_pycall() const {
   int ret = OB_SUCCESS;
   const char* python_code = get_pycall();
@@ -113,6 +139,8 @@ ObPythonUDF& ObPythonUDF::operator= (const ObPythonUDF &other) {
     arg_num_ = other.arg_num_;
     schema_version_ = other.schema_version_;
     ret_ = other.ret_;
+    model_num_ = other.model_num_;
+    isModelSpecific_ = other.isModelSpecific_;
     if (OB_FAIL(deep_copy_str(other.name_, name_))) {
       LOG_WARN("Fail to deep copy name", K(ret));
     } else if (OB_FAIL(deep_copy_str(other.arg_names_, arg_names_))) {
@@ -121,7 +149,10 @@ ObPythonUDF& ObPythonUDF::operator= (const ObPythonUDF &other) {
       LOG_WARN("Fail to deep copy arg types", K(ret));
     } else if (OB_FAIL(deep_copy_str(other.pycall_, pycall_))) {
       LOG_WARN("Fail to deep copy pycall", K(ret));
+    } else if (OB_FAIL(deep_copy_str(other.udf_model_names_, udf_model_names_))) {
+      LOG_WARN("Fail to deep copy udf model names", K(ret));
     }
+    LOG_WARN("get into ObPythonUDF::operator=", K(ret), K(model_num_));
     if (OB_FAIL(ret)) {
       error_ret_ = ret;
     }
@@ -135,9 +166,14 @@ void ObPythonUDF::reset()
   udf_id_ = OB_INVALID_ID;
   name_.reset();
   arg_names_.reset();
+  arg_num_ = 0;
   arg_types_.reset();
   ret_ = ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL;
   pycall_.reset();
+  isModelSpecific_ = false;
+  model_num_ = 0;
+  udf_model_names_.reset();
+  udf_model_.reset();
   ObSchema::reset();
 }
 
@@ -149,7 +185,11 @@ OB_SERIALIZE_MEMBER(ObPythonUDF,
                     arg_names_,
                     arg_types_,
 				            ret_,
-                    pycall_);
+                    pycall_,
+                    model_num_,
+                    isModelSpecific_,
+                    udf_model_names_,
+                    udf_model_);
 
 OB_SERIALIZE_MEMBER(ObPythonUDFMeta,
                     name_,

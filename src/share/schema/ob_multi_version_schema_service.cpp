@@ -5186,16 +5186,38 @@ int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
   LOG_WARN("get_python_udf_info", K(ret));
   ObISQLClient &sql_client = *sql_proxy_;
   exist = false;
+  bool udf_model_map_exist = false; 
   if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
   } else {
+      //检查与udf关联的model元信息是否存在并获取
+      if (OB_FAIL(get_udf_model_map_info(tenant_id, udf_name, udf_info, udf_model_map_exist))) {
+        LOG_WARN("fail to get udf model map info", K(ret));
+      } else if (udf_model_map_exist == true) {
+        int model_num = udf_info.get_model_num();
+        common::ObSEArray<common::ObString, 16> udf_model_names;
+        if (OB_FAIL(udf_info.get_udf_model_names_arr(udf_model_names))){ 
+          LOG_WARN("fail to insert udf model names", K(udf_info.get_udf_model_names_str()), K(ret));
+        }
+        //获取与udf关联的每个model的元信息
+        for (int i = 0; i < model_num; i++) {
+          common::ObString model_name = udf_model_names.at(i);
+          share::schema::ObUdfModel model_info;
+          bool model_exist = false;
+          if (OB_FAIL(get_udf_model_info(tenant_id, model_name, model_info, model_exist))) {
+            LOG_WARN("fail to get udf model info", K(ret));
+          } else if (OB_FAIL(udf_info.insert_udf_model_info(model_info))) {
+            LOG_WARN("fail to insert udf model info", K(ret));
+          }
+        }     
+      }
       SMART_VAR(ObMySQLProxy::MySQLResult, res) {
       common::sqlclient::ObMySQLResult *result = NULL;
       ObSqlString sql;
       //系统表__all_python_udf
-      const char *const TABLE_NAME = "__all_python_udf";
-      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", TABLE_NAME, udf_name.length(), udf_name.ptr()))) {
+      const char *const python_udf_table = "__all_python_udf";
+      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE name = '%.*s'", python_udf_table, udf_name.length(), udf_name.ptr()))) {
         LOG_WARN("append sql failed", K(ret));
       } 
       if (OB_SUCC(ret)) {
@@ -5208,14 +5230,14 @@ int ObMultiVersionSchemaService::get_python_udf_info(const uint64_t tenant_id,
           while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
             exist = true;
             if (OB_FAIL(fill_python_udf_schema(tenant_id, *result, udf_info))) {
-              LOG_WARN("failed to retrieve model", K(ret));
+              LOG_WARN("failed to retrieve python udf schema", K(ret));
             }
           }
           if (ret != OB_ITER_END) {
-            LOG_WARN("fail to get all model schema. iter quit. ", K(ret));
+            LOG_WARN("fail to get all python udf schema. iter quit. ", K(ret));
           } else {
             ret = OB_SUCCESS;
-            LOG_WARN("retrieve model schemas succeed", K(tenant_id));
+            LOG_WARN("retrieve python udf schema succeed", K(tenant_id));
           }
         }
       }
@@ -5357,6 +5379,53 @@ int ObMultiVersionSchemaService::fill_udf_model_schema(const uint64_t tenant_id,
   EXTRACT_INT_FIELD_TO_CLASS_MYSQL(result, schema_version, model_info, uint64_t);
   return ret;
   }
+
+int ObMultiVersionSchemaService::get_udf_model_map_info(const uint64_t tenant_id,
+                                                        const common::ObString &udf_name,
+                                                        share::schema::ObPythonUDF &udf_info,
+                                                        bool &exist)
+{
+  int ret = OB_SUCCESS;
+  exist = false;
+  ObISQLClient &sql_client = *sql_proxy_;
+  if (OB_INVALID_ID == tenant_id || udf_name.empty()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(ret), K(tenant_id), K(udf_name));
+  } else {
+      SMART_VAR(ObMySQLProxy::MySQLResult, res) {
+      common::sqlclient::ObMySQLResult *result = NULL;
+      ObSqlString sql;
+      //系统表__all_udf_model_map
+      const char *const udf_model_map_table = "__all_udf_model_map";
+      if (OB_FAIL(sql.append_fmt("SELECT * FROM %s WHERE udf_name = '%.*s'", udf_model_map_table, udf_name.length(), udf_name.ptr()))) {
+        LOG_WARN("append sql1 failed", K(ret));
+      }
+      //检查__all_udf_model_map中是否存在udf_name的记录
+      if (OB_SUCC(ret)) {
+        if (OB_FAIL(sql_client.read(res, tenant_id, sql.ptr()))) {
+          LOG_WARN("ObMultiVersionSchemaService execute sql failed", K(ret), K(tenant_id), K(sql));
+        } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get result.", K(ret));
+        } else {
+          while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
+            exist = true;
+            //获取model_num与model_names
+            EXTRACT_INT_FIELD_TO_CLASS_MYSQL(*result, model_num, udf_info, int);
+            EXTRACT_VARCHAR_FIELD_TO_CLASS_MYSQL(*result, model_names, udf_info);
+          }
+          if (ret != OB_ITER_END) {
+            LOG_WARN("fail to get all model schema. iter quit. ", K(ret));
+          } else {
+            ret = OB_SUCCESS;
+            LOG_WARN("retrieve model schemas succeed", K(tenant_id));
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
 
 }//end of namespace schema
 }//end of namespace share
