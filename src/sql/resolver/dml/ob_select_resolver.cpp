@@ -1082,7 +1082,7 @@ int ObSelectResolver::resolve_normal_query(const ParseNode &parse_tree)
   OZ( resolve_where_clause(parse_tree.children_[PARSE_SELECT_WHERE]) );
 
   /* add python udf filter into select item */
-  OZ( mock_python_udf_filter_exprs() );
+  //OZ( mock_python_udf_filter_exprs() );
 
   if (OB_SUCC(ret) && !is_oracle_mode()) {
     /* resolve named window clause */

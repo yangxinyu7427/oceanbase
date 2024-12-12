@@ -8002,7 +8002,8 @@ int ObSelectLogPlan::get_python_udf_exprs_from_top(const ObLogicalOperator *top,
       }
     };
     ObRawExpr *select_expr = NULL;
-    ObIArray<SelectItem> &select_items = const_cast<ObIArray<SelectItem> &>(select_stmt->get_select_items());
+    // const ObIArray<SelectItem> &select_items = select_stmt->get_select_items();
+    // ObSEArray<SelectItem, 8> new_select_items;
     // 从top的select items中获取python udf, 并删除mock projection python udf
     for (int64_t i = 0; OB_SUCC(ret) && i < select_stmt->get_select_item_size(); ++i) {
       const SelectItem &select_item = select_stmt->get_select_item(i);
@@ -8010,16 +8011,23 @@ int ObSelectLogPlan::get_python_udf_exprs_from_top(const ObLogicalOperator *top,
       if (OB_ISNULL(select_expr)) {
         ret = OB_INVALID_ARGUMENT;
         LOG_WARN("get unexpected null", K(ret));
-      } else if (select_item.expr_name_ == "mock_projection_pyudf") {
-        // remove it
-        select_items.remove(i);
-        --i;
-      } else if (!containType(python_udf_exprs, select_expr, T_FUN_PYTHON_UDF)) {
+      //} else if (select_item.expr_name_ == "mock_projection_pyudf") {
         // skip it
-      } else if (OB_FAIL(python_udf_projection_exprs.push_back(select_expr))) {
+      } else if (containType(python_udf_exprs, select_expr, T_FUN_PYTHON_UDF) &&
+                 OB_FAIL(python_udf_projection_exprs.push_back(select_expr))) {
         LOG_WARN("push expr to python udf projection exprs failed", K(ret));
-      } else { /*do nothing*/ }
+      } else {
+        // append it into new select items
+        // new_select_items.push_back(select_item);
+      }
     }
+    /*if (OB_SUCC(ret) && new_select_items.count() != select_stmt->get_select_item_size()) {
+        ObIArray<SelectItem> &old_select_items = const_cast<ObIArray<SelectItem> &>(select_stmt->get_select_items());
+        old_select_items.reset();
+        if (OB_FAIL(append(old_select_items, new_select_items))) {
+          LOG_WARN("current stmt replace select items failed", K(ret));
+        }
+    }*/
   }
   return ret;
 }
@@ -8206,6 +8214,27 @@ int ObSelectLogPlan::allocate_python_udf_op_as_top(ObLogicalOperator *&top,
       LOG_WARN("failed to compute property", K(ret));
     } else {
       top = log_python_udf;
+    }
+  }
+
+  if (OB_SUCC(ret)) {
+    ObSelectStmt *select_stmt = const_cast<ObSelectStmt *>(get_stmt());
+    ObColumnRefRawExpr *col_expr = NULL;
+    for (int i = 0; i < temp_exprs.count(); ++i) {
+      col_expr = static_cast<ObColumnRefRawExpr *>(temp_exprs.at(i));
+      ColumnItem column_item;
+      column_item.expr_ = col_expr;
+      column_item.table_id_ = col_expr->get_table_id();
+      column_item.column_id_ = col_expr->get_column_id();
+      column_item.column_name_ = col_expr->get_column_name();
+      column_item.base_tid_ = col_expr->get_table_id();
+      column_item.base_cid_ = col_expr->get_column_id();
+      if (OB_FAIL(col_expr->extract_info())) {
+        LOG_WARN("extract column expr info failed", K(ret));
+      } else if (OB_FAIL(select_stmt->add_column_item(column_item))) {
+        LOG_WARN("add column item to stmt failed", K(ret));
+      } else {}
+      // 可能发生插入列失败
     }
   }
   return ret;

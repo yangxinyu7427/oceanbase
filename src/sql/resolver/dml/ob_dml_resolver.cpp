@@ -16474,7 +16474,6 @@ int ObDMLResolver::generate_python_udf_filters()
 
   ObIArray<ObRawExpr *> &condition_exprs = stmt->get_condition_exprs();
   ObIArray<ObRawExpr *> &python_udf_filter_exprs = stmt->get_python_udf_filter_exprs();
-  ObSEArray<ObRawExpr*, 8> temp_exprs;
 
   if (OB_SUCC(ret)) {
     ObRawExpr *condition_expr = NULL;
@@ -16494,30 +16493,6 @@ int ObDMLResolver::generate_python_udf_filters()
       } else {}
     }
   }
-  
-  // add column items
-  /*if (OB_SUCC(ret)) {
-    ObColumnRefRawExpr *col_expr = NULL;
-    if (OB_FAIL(ObRawExprUtils::extract_column_exprs(python_udf_filter_exprs, temp_exprs))) {
-        LOG_WARN("failed to extract column exprs", K(ret));
-    } else {
-      for (int i = 0; i < temp_exprs.count(); ++i) {
-        col_expr = static_cast<ObColumnRefRawExpr *>(temp_exprs.at(i));
-        ColumnItem column_item;
-        column_item.expr_ = col_expr;
-        column_item.table_id_ = col_expr->get_table_id();
-        column_item.column_id_ = col_expr->get_column_id();
-        column_item.column_name_ = col_expr->get_column_name();
-        column_item.base_tid_ = col_expr->get_table_id();
-        column_item.base_cid_ = col_expr->get_column_id();
-        if (OB_FAIL(col_expr->extract_info())) {
-          LOG_WARN("extract column expr info failed", K(ret));
-        } else if (OB_FAIL(stmt->add_column_item(column_item))) {
-          LOG_WARN("add column item to stmt failed", K(ret));
-        } else {}
-      }
-    }
-  }*/
   return ret;
 }
 
