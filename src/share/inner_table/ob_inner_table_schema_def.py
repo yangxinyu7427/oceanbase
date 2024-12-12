@@ -6974,6 +6974,26 @@ def_table_schema(
     ],
 )
 
+def_table_schema(
+    owner = 'xujiahe.xjh',
+    table_name    = '__all_udf_model_map',
+    table_id      = '520',
+    table_type = 'SYSTEM_TABLE',
+    gm_columns = ['gmt_create', 'gmt_modified'],
+    rowkey_columns = [
+        ('tenant_id', 'int'),
+        ('udf_name', 'varchar:OB_MAX_UDF_NAME_LENGTH', 'false'),
+    ],
+    in_tenant_space = True,
+
+    normal_columns = [
+      ('udf_id', 'int'),
+      ('model_num', 'int'),
+      ('model_names', 'varchar:OB_MAX_SYS_PARAM_INFO_LENGTH', 'false'),
+      ('schema_version', 'int'),
+    ],
+)
+
 
 # 余留位置（此行之前占位）
 # 本区域占位建议：采用真实表名进行占位

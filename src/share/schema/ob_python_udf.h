@@ -199,7 +199,7 @@ class ObPythonUDF : public ObSchema
 public:
     ObPythonUDF() : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), name_(), arg_num_(0), arg_names_(), 
                     arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION), 
-                    isModelSpecific_(false), udf_model_()
+                    isModelSpecific_(false), model_num_(0), udf_model_names_(), udf_model_()
                     { reset(); };
     explicit ObPythonUDF(common::ObIAllocator *allocator);
     ObPythonUDF(const ObPythonUDF &src_schema);
@@ -221,6 +221,9 @@ public:
     inline int set_arg_types(const common::ObString arg_types) { return deep_copy_str(arg_types, arg_types_); }
     inline int set_pycall(const common::ObString &pycall) { return deep_copy_str(pycall, pycall_); }
     inline void set_schema_version(int64_t version) { schema_version_ = version; }
+    inline void set_model_num(const int model_num) { model_num_ = model_num; }
+    inline void set_isModelSpecific(bool isModelSpecific) { isModelSpecific_ = isModelSpecific; }
+    inline int set_model_names(const common::ObString udf_model_names) { return deep_copy_str(udf_model_names, udf_model_names_); }
 
     //get methods
     inline uint64_t get_tenant_id() const { return tenant_id_; }
@@ -236,6 +239,10 @@ public:
     inline const char *get_pycall() const { return extract_str(pycall_); }
     inline const common::ObString &get_pycall_str() const { return pycall_; }
     inline int64_t get_schema_version() const { return schema_version_; }
+    inline int get_model_num() const { return model_num_; }
+    inline bool get_isModelSpecific() const { return isModelSpecific_; }
+    inline const char *get_model_names() const { return extract_str(udf_model_names_); }
+    inline const common::ObString &get_udf_model_names_str() const { return udf_model_names_; }
 
     //only for retrieve udf
     inline const char *get_udf_name() const { return extract_str(name_); }
@@ -243,8 +250,10 @@ public:
     
     //other
     virtual void reset() override;
-    int get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_types) const;
+    int get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_names) const;
     int get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &udf_attributes_types) const;
+    int get_udf_model_names_arr(common::ObSEArray<common::ObString, 16> &udf_model_names) const;
+    int insert_udf_model_info(ObUdfModel &model_info);
     int check_pycall() const;
 
     TO_STRING_KV(K_(tenant_id),
@@ -257,6 +266,8 @@ public:
                  K_(pycall),
                  K_(schema_version),
                  K_(isModelSpecific),
+                 K_(model_num),
+                 K_(udf_model_names),
                  K_(udf_model));
 
 public:
@@ -266,11 +277,13 @@ public:
     int arg_num_;                                                     // 参数数量
     common::ObString arg_names_;                                      // 参数名称
     common::ObString arg_types_;                                      // 参数类型
-    enum ObPythonUdfEnumType::PyUdfRetType ret_;                                           // 返回值类型
+    enum ObPythonUdfEnumType::PyUdfRetType ret_;                      // 返回值类型
     common::ObString pycall_;                                         // python code
     int64_t schema_version_;                                          // the last modify timestamp of this version
     bool isModelSpecific_;                                            // 是否为single model specific udf
-    common::ObSEArray<ObUdfModel, 16> udf_model_;                     // udf所使用的模型信息
+    int model_num_;                                                   // udf所绑定模型个数
+    common::ObString udf_model_names_;                                // udf所绑定的模型名称
+    common::ObSEArray<ObUdfModel, 16> udf_model_;                   // udf所的模型信息
 };
 
 /////////////////////////////////////////////
