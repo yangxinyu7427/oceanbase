@@ -134,6 +134,8 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
             python_udf_expr_list.at(i)->set_udf_meta_has_new_input_model_path();
             python_udf_expr_list.at(i)->set_udf_meta_new_input_model_path(new_input_model_path);
             python_udf_expr_list.at(i)->set_udf_meta_can_be_used_model_path(it->first);
+            found=false;
+            python_udf_expr_list.at(i)->set_udf_meta_has_no_output_model_path();
             break;
           }
           // 记录导出中间结果的模型

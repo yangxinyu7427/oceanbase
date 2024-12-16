@@ -104,7 +104,7 @@ public:
   int do_process(); // do real processing
   int do_process_with_mid_res_cache(int count_mid_res, int count_cols, std::vector<bool>& mid_res_bit_vector, std::vector<float*>& mid_res_vector, 
   std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str);
-  int do_process_with_cache(int count_mid_res, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector); // do processing with udf cache
+  int do_process_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector); // do processing with udf cache
   int do_process_all_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
   int do_process_all(); // process all saved store at one time
   int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);

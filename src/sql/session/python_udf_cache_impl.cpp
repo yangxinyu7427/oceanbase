@@ -43,6 +43,7 @@ using namespace oceanbase::obmysql;
 namespace oceanbase{
 namespace sql{
     class PyUDFCache{
+    public:
         typedef common::hash::ObHashMap<char*, int, 
             common::hash::NoPthreadDefendMode> PyUdfCacheMapForInt;
 
@@ -74,7 +75,7 @@ namespace sql{
         std::unordered_set<std::string> udf_list;
         std::unordered_set<std::string> path_list;
         std::unordered_map<std::string,int> mid_res_col_count_map;
-    public:
+    
         // 创建缓存
         int create(){
             int ret = OB_SUCCESS;
@@ -94,9 +95,16 @@ namespace sql{
             return ret;
         }
 
-        bool find_fine_cache_for_model_path(const common::ObString& model_path){
+        bool find_fine_cache_for_model_path(common::ObString& model_path){
             std::string path_str(model_path.ptr(), model_path.length());
             if(path_list.find(path_str)==path_list.end()){
+                return false;
+            }
+            PyUdfCacheMapForMidResult *cache_map;
+            if(cache_map_for_mid_result_.get_refactored(model_path, cache_map)!=OB_SUCCESS){
+                return false;
+            }
+            if(cache_map->empty()){
                 return false;
             }
             return true;
@@ -238,7 +246,7 @@ namespace sql{
             return ret;
         }
 
-        int get_mid_result(const common::ObString& model_path, char* key, float* value){
+        int get_mid_result(const common::ObString& model_path, char* key, float*& value){
             int ret = OB_SUCCESS;
             PyUdfCacheMapForMidResult *cache_map;
             // 有缓存就直接拿出来

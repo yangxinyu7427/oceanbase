@@ -1254,6 +1254,7 @@ ob_set_subtarget(ob_sql rewrite
   rewrite/ob_transformer_impl.cpp
   rewrite/ob_transform_dblink.cpp
   rewrite/ob_transform_pyudf_merge.cpp
+  rewrite/ob_transform_pyudf_redundent.cpp
   rewrite/ob_union_find.cpp
 )
 

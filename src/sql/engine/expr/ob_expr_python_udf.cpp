@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
+#include <regex>
 #include <sstream>
 #include <sys/syscall.h>
 
@@ -97,13 +98,27 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   int ret = OB_SUCCESS;
   dst.init_ = src.init_;
   dst.ret_ = src.ret_;
+  dst.ismerged_ = src.ismerged_;
+  dst.origin_input_count_=src.origin_input_count_;
+  dst.has_new_output_model_path_=src.has_new_output_model_path_;
+  dst.new_output_model_path_=src.new_output_model_path_;
+  dst.has_new_input_model_path_=src.has_new_input_model_path_;
+  dst.new_input_model_path_=src.new_input_model_path_;
+  dst.opted_model_path_=src.opted_model_path_;
   if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
+    LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) {
+    LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
   } else { 
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+    }
+    for(int i=0;i<src.merged_udf_names_.count();i++){
+    dst.merged_udf_names_.push_back(src.merged_udf_names_.at(i));
     }
   }
   LOG_DEBUG("set udf meta", K(src), K(dst));
@@ -184,7 +199,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
 int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
 {
   int ret = OB_SUCCESS;
-
+  bool with_fine_funcache_ = true;
   //runtime variables
   PyObject *pModule = NULL;
   PyObject *dic = NULL;
@@ -245,9 +260,9 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
   } else {
     LOG_DEBUG("Import python udf handler", K(ret));
   }
-
+  
   // 如果要导出缓存结果，就修改pycall的字段并加载到python环境中去，替换pyfun
-  if(use_cache_plus){
+  if(with_fine_funcache_){
     if(udf_meta.has_new_output_model_path_){
       std::string pycall_output(udf_meta.pycall_.ptr());
       pycall_output = pycall_output.substr(0, udf_meta.pycall_.length());

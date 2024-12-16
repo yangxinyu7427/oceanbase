@@ -4683,6 +4683,7 @@ public:
   int set_udf_meta_merged_udf_name_list(ObIArray<ObString> &merged_udf_name_list);
   int set_udf_meta_origin_input_count(int num);
   int set_udf_meta_has_new_output_model_path();
+  int set_udf_meta_has_no_output_model_path();
   int set_udf_meta_new_output_model_path(std::string path);
   int set_udf_meta_model_path(ObString model_path);
   int set_udf_meta_can_be_used_model_path(ObString can_be_used_model_path);
