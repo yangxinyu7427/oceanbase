@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
+#include <regex>
 #include <sstream>
 #include <sys/syscall.h>
 
@@ -96,10 +97,18 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
 {
   int ret = OB_SUCCESS;
   dst.ret_ = src.ret_;
+
   dst.init_ = src.init_;
   dst.batch_size_ = src.batch_size_;
   dst.batch_size_const_ = src.batch_size_const_;
   dst.model_type_ = src.model_type_;
+  dst.ismerged_ = src.ismerged_;
+  dst.origin_input_count_=src.origin_input_count_;
+  dst.has_new_output_model_path_=src.has_new_output_model_path_;
+  dst.new_output_model_path_=src.new_output_model_path_;
+  dst.has_new_input_model_path_=src.has_new_input_model_path_;
+  dst.new_input_model_path_=src.new_input_model_path_;
+  dst.opted_model_path_=src.opted_model_path_;
   if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
@@ -114,6 +123,16 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
     }
     for (int64_t i = 0; i < src.udf_model_meta_.count(); i++) {
       dst.udf_model_meta_.push_back(src.udf_model_meta_.at(i));
+    } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
+      LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
+    } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) {
+      LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
+    } else { 
+      for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
+        dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+      }
+      for(int i=0;i<src.merged_udf_names_.count();i++){
+      dst.merged_udf_names_.push_back(src.merged_udf_names_.at(i));
     }
   }
   LOG_DEBUG("set udf meta", K(src), K(dst));
@@ -214,7 +233,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
 int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
 {
   int ret = OB_SUCCESS;
-
+  bool with_fine_funcache_ = true;
   //runtime variables
   PyObject *pModule = NULL;
   PyObject *dic = NULL;
@@ -265,10 +284,131 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
     LOG_DEBUG("Import python udf handler", K(ret));
   }
 
+  // 如果要导出缓存结果，就修改pycall的字段并加载到python环境中去，替换pyfun
+  if(with_fine_funcache_){
+    if(udf_meta.has_new_output_model_path_){
+      std::string pycall_output(udf_meta.pycall_.ptr());
+      pycall_output = pycall_output.substr(0, udf_meta.pycall_.length());
+      // 替换执行函数名称
+      std::string output_pyinitial_handler = name + "_output_pyinitial";
+      std::string output_pyfun_handler = name + "_output_pyfun";
+      pycall_output.replace(pycall_output.find("pyinitial"), 9, output_pyinitial_handler);
+      pycall_output.replace(pycall_output.find("pyfun"), 5, output_pyfun_handler);
+      // 替换模型地址
+      std::regex pattern("onnx_path='(.*?)'");
+      string exchanged_onnx_path="onnx_path='"+udf_meta.new_output_model_path_+"'";
+      pycall_output = std::regex_replace(pycall_output, pattern, exchanged_onnx_path);
+      // 替换global变量名
+      change_vars_in_pycall(pycall_output, "output");
+      const char* pycall_output_c = pycall_output.c_str();
+      ObString tmpObString(pycall_output.size(),pycall_output.c_str());
+      // 初始化pycall
+      v = PyRun_StringFlags(pycall_output_c, Py_file_input, dic, dic, NULL); // test pycall
+      if(OB_ISNULL(v)) {
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("fail to write pycall into module", K(ret));
+        goto destruction;
+      }
+      pInitial = PyObject_GetAttrString(pModule, output_pyinitial_handler.c_str()); // get pyInitial()
+      if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Fail to import pyinitial", K(ret));
+        goto destruction;
+      } else if (OB_ISNULL(PyObject_CallObject(pInitial, NULL))){
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Fail to run pyinitial", K(ret));
+        goto destruction;
+      } else {
+        LOG_DEBUG("Import python udf handler", K(ret));
+      }
+    }
+    // 如果要使用缓存结果，就修改pycall中的字段并加载到python环境中去
+    if(udf_meta.has_new_input_model_path_){
+      std::string pycall_input(udf_meta.pycall_.ptr());
+      pycall_input = pycall_input.substr(0, udf_meta.pycall_.length());
+      // 替换执行函数名称
+      std::string input_pyinitial_handler = name + "_input_pyinitial";
+      std::string input_pyfun_handler = name + "_input_pyfun";
+      pycall_input.replace(pycall_input.find("pyinitial"), 9, input_pyinitial_handler);
+      pycall_input.replace(pycall_input.find("pyfun"), 5, input_pyfun_handler);
+      // 替换模型地址
+      std::regex pattern("onnx_path='(.*?)'");
+      string exchanged_onnx_path="onnx_path='"+udf_meta.new_input_model_path_+"'";
+      pycall_input = std::regex_replace(pycall_input, pattern, exchanged_onnx_path);
+      // 替换global变量名
+      change_vars_in_pycall(pycall_input, "input");
+      // 替换入参
+      std::regex pattern2(R"(elem: .*)");
+      std::string replacement = "elem: args[0]";
+      pycall_input = std::regex_replace(pycall_input, pattern2, replacement);
+      const char* pycall_input_c = pycall_input.c_str();
+      // 初始化pycall
+      v = PyRun_StringFlags(pycall_input_c, Py_file_input, dic, dic, NULL); // test pycall
+      if(OB_ISNULL(v)) {
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("fail to write pycall into module", K(ret));
+        goto destruction;
+      }
+      pInitial = PyObject_GetAttrString(pModule, input_pyinitial_handler.c_str()); // get pyInitial()
+      if(OB_ISNULL(pInitial) || !PyCallable_Check(pInitial)) {
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Fail to import pyinitial", K(ret));
+        goto destruction;
+      } else if (OB_ISNULL(PyObject_CallObject(pInitial, NULL))){
+        process_python_exception();
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Fail to run pyinitial", K(ret));
+        goto destruction;
+      } else {
+        LOG_DEBUG("Import python udf handler", K(ret));
+      }
+    }
+  }
+  destruction: 
+  
   //release GIL
   if (nStatus)
     PyGILState_Release(gstate);
 
+  return ret;
+}
+
+int ObExprPythonUdf::change_vars_in_pycall(string &code, string pre){
+  int ret = OB_SUCCESS;
+  std::regex global_pattern(R"(global\s+([^\n]+))");
+  std::smatch match;
+  if (std::regex_search(code, match, global_pattern)) {
+      // Extract matched variable names and remove spaces
+      std::string global_vars = match[1].str();
+      global_vars.erase(std::remove(global_vars.begin(), global_vars.end(), ' '), global_vars.end());
+      std::vector<std::string> vars;
+      std::string delimiter = ",";
+
+      size_t pos = 0;
+      while ((pos = global_vars.find(delimiter)) != std::string::npos) {
+          vars.push_back(global_vars.substr(0, pos));
+          global_vars.erase(0, pos + delimiter.length());
+      }
+      vars.push_back(global_vars);
+
+      // Create replacement rules
+      std::unordered_map<std::string, std::string> replacements;
+      for (const auto& var : vars) {
+          replacements[var] = var + pre;
+      }
+
+      // Replace variable names in the code
+      for (const auto& pair : replacements) {
+          const auto& old_name = pair.first;
+          const auto& new_name = pair.second;
+          code = std::regex_replace(code, std::regex("\\b" + old_name + "\\b"), new_name);
+      }
+    }
   return ret;
 }
 

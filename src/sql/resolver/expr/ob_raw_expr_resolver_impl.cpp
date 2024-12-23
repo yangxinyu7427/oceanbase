@@ -7802,6 +7802,7 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     }
   }
 
+
   // 返回python udf expr
   if (OB_SUCC(ret)) {
     func_expr->set_func_name(udf_name);
@@ -7817,6 +7818,14 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
   if (OB_FAIL(ret) || OB_FAIL(ctx_.python_udf_exprs_->push_back(func_expr))) {
     LOG_WARN("failed to push back python udf exprs in select clause", K(ret), K(func_expr));
   }
+  /*
+  if (OB_SUCC(ret)) {
+    if (ctx_.current_scope_ == T_FIELD_LIST_SCOPE && OB_FAIL(ctx_.python_udf_exprs_->push_back(func_expr))) {
+      LOG_WARN("failed to push back python udf exprs in select clause", K(ret), K(func_expr));
+    } else if (ctx_.current_scope_ == T_WHERE_SCOPE && OB_FAIL(ctx_.python_udf_exprs_->push_back(func_expr))) { // wait to-do
+      LOG_WARN("failed to push back python udf exprs in where clause", K(ret), K(func_expr));
+    } else {}
+  }*/
   return ret;
 }
 
