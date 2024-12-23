@@ -1083,6 +1083,7 @@ int ObRawExprResolverImpl::do_recursive_resolve(const ParseNode *node, ObRawExpr
         LOG_ERROR("A BUG, Never Be Here!!!", K(ret));
         break;
       }
+      case T_FUN_UDF_MODEL:
       case T_FUN_PYTHON_UDF: {
         if (OB_FAIL(process_python_udf_node(node, expr))) {
           LOG_WARN("fail to process python udf node", K(ret), K(node));
@@ -7646,7 +7647,7 @@ int ObRawExprResolverImpl::transform_ratio_afun_to_arg_div_sum(const ParseNode *
   return ret;
 }
 
-int ObRawExprResolverImpl::check_udf_info(const ParseNode *expr_list_node, const share::schema::ObPythonUDF &udf_info) 
+int ObRawExprResolverImpl::check_python_udf_info(const ParseNode *expr_list_node, const share::schema::ObPythonUDF &udf_info) 
 {
   int ret = OB_SUCCESS;
   //resolve expr_list_node
@@ -7667,9 +7668,18 @@ int ObRawExprResolverImpl::check_udf_info(const ParseNode *expr_list_node, const
   return ret;
 }
 
+/*
+  可能有以下几种形式：
+  PREDICT(batch_size) USING MODEL model_name (args)
+  PREDICT USING MODEL model_name (args)
+  PREDICT(batch_size) udf_name (args)
+  PREDICT udf_name (args)
+*/
 int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawExpr *&expr)
 {
   int ret = OB_SUCCESS;
+  int child_num = node->num_child_;   //孩子个数
+  int64_t batch_size = 0;
   share::schema::ObPythonUDF udf_info;
   bool exist = false;
   ObString udf_name;
@@ -7690,38 +7700,85 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
     LOG_WARN("invalid argument", K(ret), K(node));
   } else if (OB_FAIL(ctx_.session_info_->get_collation_connection(cs_type))) {
     LOG_WARN("failed to get collation", K(ret));
-  } else if (OB_UNLIKELY(1 > node->num_child_) || OB_ISNULL(node->children_)) {
+  } else if (OB_UNLIKELY(node->num_child_ <= 1) || OB_ISNULL(node->children_)) {
     ret = OB_ERR_PARSER_SYNTAX;
     LOG_WARN("invalid node children for python udf node", K(ret), K(node->num_child_), "node", SJ(ObParserResultPrintWrapper(*node)));
   } else {
-    int child_num = node->num_child_;   //孩子个数
-    int64_t batch_size = 0;
-    if (child_num == 3) {    //若SELECT PREDICT中提供了batch_size
-      batch_size = std::stoi(node->children_[0]->str_value_);    //获取batch_size值
+    if (child_num == 3) { // 指定了batch_size值
+      batch_size = std::stoi(node->children_[0]->str_value_); // 获取batch_size值
     }
-    ObString name(node->children_[child_num-2]->str_len_, node->children_[child_num-2]->str_value_);
-    if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      LOG_WARN("Malloc function name failed", K(ret));
-    } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {
-    } else if (OB_FAIL(ctx_.schema_checker_->get_python_udf_info(ctx_.session_info_->get_effective_tenant_id(),
-                                                                 udf_name,
-                                                                 udf_info,
-                                                                 exist))) {
-      LOG_WARN("failed to resolve python udf", K(ret));
-    } else if (!exist) {
-      ret = OB_ERR_FUNCTION_UNKNOWN;
-      LOG_WARN("cannot find python udf", K(ret));
-    } else if (OB_FAIL(check_udf_info(node->children_[child_num - 1], udf_info))) {
-      LOG_WARN("fail to pass udf info check", K(ret));
-    } else if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_PYTHON_UDF, func_expr))) { //create raw expr 
+
+    // 获取name并进行info构造
+    ObString name(node->children_[child_num - 2]->str_len_, node->children_[child_num - 2]->str_value_); 
+    if (node->type_ == T_FUN_UDF_MODEL) { // 倒数第二项为model name
+      share::schema::ObUdfModel model_info;
+      ObString model_name;
+      if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, model_name))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_WARN("Malloc model name failed", K(ret));
+      } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, model_name))) {
+      } else if (OB_FAIL(ctx_.schema_checker_->get_udf_model_info(ctx_.session_info_->get_effective_tenant_id(),
+                                                                  model_name,
+                                                                  model_info,
+                                                                  exist))) { // single model udf
+        ret = OB_ERR_FUNCTION_UNKNOWN;
+        LOG_WARN("failed to resolve udf model info", K(ret));
+      } else if (!exist) {
+        ret = OB_ERR_FUNCTION_UNKNOWN;
+        LOG_WARN("cannot find udf model", K(ret));
+      } else {
+        // 根据model info构造python udf info
+        udf_name = model_name;
+        udf_info.set_name(model_name);
+        udf_info.set_arg_num(model_info.get_arg_num());
+        udf_info.set_arg_names(model_info.get_arg_names());
+        udf_info.set_arg_types(model_info.get_arg_types());
+        udf_info.set_ret(model_info.get_ret());
+        udf_info.isModelSpecific_ = true;
+        udf_info.udf_model_.push_back(model_info);
+
+        if (OB_FAIL(check_python_udf_info(node->children_[child_num - 1], udf_info))) {
+          LOG_WARN("fail to check python udf args type", K(ret));
+        } else {
+          // do nothing
+        }
+      }
+    } else if (node->type_ == T_FUN_PYTHON_UDF) { // 倒数第二项为python udf name
+      if (OB_FAIL(ob_write_string(ctx_.expr_factory_.get_allocator(), name, udf_name))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_WARN("Malloc function name failed", K(ret));
+      } else if (FALSE_IT(IGNORE_RETURN ObCharset::casedn(CS_TYPE_UTF8MB4_GENERAL_CI, udf_name))) {
+      } else if (OB_FAIL(ctx_.schema_checker_->get_python_udf_info(ctx_.session_info_->get_effective_tenant_id(),
+                                                                   udf_name,
+                                                                   udf_info,
+                                                                   exist))) {  // arbitrary code python udf
+        LOG_WARN("failed to resolve python udf", K(ret));
+      } else if (!exist) {
+        ret = OB_ERR_FUNCTION_UNKNOWN;
+        LOG_WARN("cannot find python udf", K(ret));
+      } else if (OB_FAIL(check_python_udf_info(node->children_[child_num - 1], udf_info))) {
+        LOG_WARN("fail to check python udf args type", K(ret));
+      } else {
+        // do nothing
+      }
+    } else { 
+      ret = OB_ERR_INVALID_PYTHON_UDF;
+      LOG_WARN("failed to resolve python/model udf", K(ret));
+    }
+  }
+
+  // 构造 python udf raw expr
+  if (OB_SUCC(ret)) { 
+    if (OB_FAIL(ctx_.expr_factory_.create_raw_expr(T_FUN_PYTHON_UDF, func_expr))) { // create raw expr 
       LOG_WARN("fail to create raw expr", K(ret));
     } else if (OB_ISNULL(func_expr)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("null ptr", K(ret));
-    } else if (OB_FAIL(func_expr->set_udf_meta(udf_info, batch_size))) {     //传递udf_meta
+    } else if (OB_FAIL(func_expr->set_udf_meta(udf_info, batch_size))) { // 传递udf_meta
+      ret = OB_ERR_UNEXPECTED;
       LOG_WARN("set python udf info failed", K(ret));
     } else if (udf_info.get_arg_num() != node->children_[child_num - 1]->num_child_) {
+      ret = OB_ERR_UNEXPECTED;
       LOG_WARN("invalid udf arg nums", K(ret));
     } else {
       //resolve params
@@ -7743,16 +7800,21 @@ int ObRawExprResolverImpl::process_python_udf_node(const ParseNode *node, ObRawE
         }
       }
     }
-    if (OB_SUCC(ret)) {
-      func_expr->set_func_name(udf_name);
-      ObSysFunRawExpr *tmp_expr = func_expr;
-      if (OB_FAIL(ObRawExprUtils::function_alias(ctx_.expr_factory_, tmp_expr))) {
-        LOG_WARN("failed to do funcion alias", K(ret), K(func_expr));
-      } else {
-        expr = tmp_expr;
-      }
+  }
+
+
+  // 返回python udf expr
+  if (OB_SUCC(ret)) {
+    func_expr->set_func_name(udf_name);
+    ObSysFunRawExpr *tmp_expr = func_expr;
+    if (OB_FAIL(ObRawExprUtils::function_alias(ctx_.expr_factory_, tmp_expr))) {
+      LOG_WARN("failed to do funcion alias", K(ret), K(func_expr));
+    } else {
+      expr = tmp_expr;
     }
   }
+
+  // 准备后续改写与算子分配
   if (OB_FAIL(ret) || OB_FAIL(ctx_.python_udf_exprs_->push_back(func_expr))) {
     LOG_WARN("failed to push back python udf exprs in select clause", K(ret), K(func_expr));
   }

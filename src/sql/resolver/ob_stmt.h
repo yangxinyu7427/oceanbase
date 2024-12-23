@@ -389,6 +389,9 @@ public:
             // python udf
             || stmt_type == stmt::T_CREATE_PYTHON_UDF
             || stmt_type == stmt::T_DROP_PYTHON_UDF
+            //model
+            || stmt_type == stmt::T_CREATE_UDF_MODEL
+            || stmt_type == stmt::T_DROP_UDF_MODEL
             );
   }
 

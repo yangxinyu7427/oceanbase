@@ -4654,18 +4654,43 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf, int batch_
     }
   }
   udf_meta_.ret_ = udf.get_ret();
+  udf_meta_.model_type_ = udf.isModelSpecific_ ? ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC : ObPythonUdfEnumType::PyUdfUsingType::ARBITRARY_CODE;
   /* data from schame, deep copy maybe a better choices */
   if (OB_ISNULL(inner_alloc_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("inner allocator or expr factory is NULL", K(inner_alloc_), K(ret));
   } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf.get_name_str(), udf_meta_.name_))) {
+    ret = OB_ERR_UNEXPECTED; 
     LOG_WARN("fail to write name", K(udf.get_name_str()), K(ret));
   } else if (OB_FAIL(ob_write_string(*inner_alloc_, udf.get_pycall_str(), udf_meta_.pycall_))) {
+    ret = OB_ERR_UNEXPECTED; 
     LOG_WARN("fail to write pycall", K(udf.get_pycall_str()), K(ret));
-  } else if (OB_FAIL(udf.get_arg_types_arr(udf_meta_.udf_attributes_types_))){ 
-    LOG_WARN("fail to insert attributes types", K(udf.get_pycall_str()), K(ret));
-  } else if (OB_FAIL(udf.get_arg_names_arr(udf_meta_.udf_attributes_names_))){ 
-    LOG_WARN("fail to insert attributes names", K(udf.get_pycall_str()), K(ret));
+  } else if (OB_FAIL(udf.get_arg_types_arr(udf_meta_.udf_attributes_types_))) {
+    ret = OB_ERR_UNEXPECTED;  
+    LOG_WARN("fail to insert attributes types", K(ret));
+  } else if (OB_FAIL(udf.get_arg_names_arr(*inner_alloc_, udf_meta_.udf_attributes_names_))) {
+    ret = OB_ERR_UNEXPECTED;  
+    LOG_WARN("fail to insert attributes names", K(ret));
+  } else {
+    // 添加model元信息处理
+    for (int i = 0; OB_SUCC(ret) && i < udf.udf_model_.count(); ++i) {
+      ObUdfModelMeta model_meta;
+      ObUdfModel &model_info = udf.udf_model_.at(i);
+      model_meta.model_name_ = model_info.model_name_;
+      model_meta.framework_ = model_info.framework_;
+      model_meta.model_type_ = model_info.model_type_;
+      model_meta.model_path_ = model_info.model_path_;
+      model_meta.ret_ = model_info.ret_;
+      if (OB_FAIL(model_info.get_arg_types_arr(model_meta.model_attributes_types_))) {
+        ret = OB_ERR_UNEXPECTED; 
+        LOG_WARN("fail to insert attributes types", K(ret));
+      } else if (OB_FAIL(model_info.get_arg_names_arr(*inner_alloc_, model_meta.model_attributes_names_))) {
+        ret = OB_ERR_UNEXPECTED; 
+        LOG_WARN("fail to insert attributes names", K(ret));
+      } else {
+        udf_meta_.udf_model_meta_.push_back(model_meta);
+      }
+    }
   }
   return ret;
 }

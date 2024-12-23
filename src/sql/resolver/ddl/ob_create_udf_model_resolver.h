@@ -9,32 +9,23 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PubL v2 for more details.
  */
-
-#ifndef _OB_CREATE_PYTHON_UDF_RESOLVER_H
-#define _OB_CREATE_PYTHON_UDF_RESOLVER_H 1
-
-#include "sql/resolver/ddl/ob_create_python_udf_stmt.h"
+#ifndef _OB_CREATE_UDF_MODEL_RESOLVER_H
+#define _OB_CREATE_UDF_MODEL_RESOLVER_H 1
+#include "sql/resolver/ddl/ob_create_udf_model_stmt.h"
 #include "sql/resolver/ddl/ob_ddl_resolver.h"
 #include "share/ob_rpc_struct.h"
 #include "share/schema/ob_schema_struct.h"
-
 namespace oceanbase
 {
 namespace sql
 {
-
-class ObCreatePythonUdfResolver : public ObDDLResolver
+class ObCreateUdfModelResolver : public ObDDLResolver
 {
 public:
-  explicit ObCreatePythonUdfResolver(ObResolverParams &params);
-  virtual ~ObCreatePythonUdfResolver();
-
+  explicit ObCreateUdfModelResolver(ObResolverParams &params);
+  virtual ~ObCreateUdfModelResolver();
   virtual int resolve(const ParseNode &parse_tree);
-  int resolve_model_path(const ParseNode *parse_node, obrpc::ObCreatePythonUdfArg &create_python_udf_arg);
-  int resolve_pycall(const ParseNode *parse_node, obrpc::ObCreatePythonUdfArg &create_python_udf_arg);
 };
-
 }
 }
-
-#endif /* _OB_CREATE_PYTHON_UDF_RESOLVER_H */
+#endif /* _OB_CREATE_UDF_MODEL_RESOLVER_H */

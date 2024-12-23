@@ -777,6 +777,7 @@ typedef enum {
   ROUTINE_PRIV = 41,
   COLUMN_PRIV = 42,
   PYTHON_UDF_SCHEMA = 43,
+  UDF_MODEL_SCHEMA = 44,
   ///<<< add schema type before this line
   OB_MAX_SCHEMA
 } ObSchemaType;

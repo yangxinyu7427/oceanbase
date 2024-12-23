@@ -134,11 +134,11 @@ int ObCreatePythonUdfResolver::resolve(const ParseNode &parse_tree)
     ParseNode *create_python_udf_node = const_cast<ParseNode*>(&parse_tree);
     if (OB_ISNULL(create_python_udf_node)
         || T_CREATE_PYTHON_UDF != create_python_udf_node->type_
-        || ((4 != create_python_udf_node->num_child_) && (3 != create_python_udf_node->num_child_))       //语法树根节点的孩子数不正确
+        || (0 >= create_python_udf_node->num_child_)       //语法树根节点的孩子数不正确
         || OB_ISNULL(create_python_udf_node->children_)) {
       ret = OB_INVALID_ARGUMENT;
       SQL_RESV_LOG(WARN, "invalid argument.", K(ret));
-    } else {
+    } else { 
       int children_num = create_python_udf_node->num_child_;
       ObCreatePythonUdfStmt *create_python_udf_stmt = NULL;
       ObString udf_name;
@@ -148,79 +148,97 @@ int ObCreatePythonUdfResolver::resolve(const ParseNode &parse_tree)
       } else {
         stmt_ = create_python_udf_stmt;
         obrpc::ObCreatePythonUdfArg &create_python_udf_arg = create_python_udf_stmt->get_create_python_udf_arg();
-        
+         
         //get udf name
         ParseNode *relation_node = create_python_udf_node->children_[0];
         udf_name = ObString(relation_node->str_len_, relation_node->str_value_);
         //set udf name
         create_python_udf_arg.python_udf_.set_name(udf_name);
-        if (4 == children_num) {
-            //resolve function element
-            ParseNode *function_element_list_node = create_python_udf_node->children_[1];
-            //set arg_num
-            int arg_num = function_element_list_node->num_child_;
-            create_python_udf_arg.python_udf_.set_arg_num(arg_num);
-            std::string arg_names = "";
-            std::string arg_types = "";
-            for (int32_t i = 0; i < arg_num; ++i) {
-                //T_PARAM_DEFINITION
-                ParseNode *element = function_element_list_node->children_[i];
-                //T_IDENT
-                ParseNode *arg_name_node = element->children_[0];
-                //get arg_name
-                const char* arg_name = arg_name_node->str_value_;
-                arg_names += arg_name;
-                if (i != arg_num - 1) arg_names += ",";
-                //get arg type
-                ParseNode *type_node = element->children_[1];
-                switch (type_node->value_) {
-                    case 1:
-                        arg_types += "STRING";
-                        break;
-                    case 2:
-                        arg_types += "INTEGER";
-                        break;
-                    case 3:
-                        arg_types += "REAL";
-                        break;
-                    case 4:
-                        arg_types += "DECIMAL";
-                        break;       
-                }
-                if (i != arg_num - 1) arg_types += ",";
-            }
-            //set arg_names
-            create_python_udf_arg.python_udf_.set_arg_names(common::ObString(arg_names.length(),arg_names.c_str()));
-            //set arg_types
-            create_python_udf_arg.python_udf_.set_arg_types(common::ObString(arg_types.length(),arg_types.c_str()));
-            //set return type
-            switch (create_python_udf_node->children_[2]->value_) {
+        //创建Python UDF
+        //resolve function element
+        ParseNode *function_element_list_node = create_python_udf_node->children_[1];
+        //set arg_num
+        int arg_num = function_element_list_node->num_child_;
+        create_python_udf_arg.python_udf_.set_arg_num(arg_num);
+        std::string arg_names = "";
+        std::string arg_types = "";
+        for (int32_t i = 0; i < arg_num; ++i) {
+            //T_PARAM_DEFINITION
+            ParseNode *element = function_element_list_node->children_[i];
+            //T_IDENT
+            ParseNode *arg_name_node = element->children_[0];
+            //get arg_name
+            const char* arg_name = arg_name_node->str_value_;
+            arg_names += arg_name;
+            if (i != arg_num - 1) arg_names += ",";
+            //get arg type
+            ParseNode *type_node = element->children_[1];
+            switch (type_node->value_) {
                 case 1:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::STRING);
+                    arg_types += "STRING";
                     break;
                 case 2:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::INTEGER);
+                    arg_types += "INTEGER";
                     break;
                 case 3:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::REAL);
+                    arg_types += "REAL";
                     break;
                 case 4:
-                    create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUDF::DECIMAL);
-                    break;
+                    arg_types += "DECIMAL";
+                    break;       
             }
-        } 
-        else if (3 == children_num) {
-            //resolve model_path
-            ParseNode *model_name_node = create_python_udf_node->children_[1];
-            ObString model_name = ObString(model_name_node->str_len_, model_name_node->str_value_);
-            // ret = resolve_model_path(model_name_node, create_python_udf_arg);
-            //set model_name
-            create_python_udf_arg.python_udf_.set_model_name(model_name);
+            if (i != arg_num - 1) arg_types += ",";
+        }
+        //set arg_names
+        create_python_udf_arg.python_udf_.set_arg_names(common::ObString(arg_names.length(),arg_names.c_str()));
+        //set arg_types
+        create_python_udf_arg.python_udf_.set_arg_types(common::ObString(arg_types.length(),arg_types.c_str()));
+        //set return type
+        switch (create_python_udf_node->children_[children_num - 2]->value_) {
+            case 1:
+                create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::STRING);
+                break;
+            case 2:
+                create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER);
+                break;
+            case 3:
+                create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::REAL);
+                break;
+            case 4:
+                create_python_udf_arg.python_udf_.set_ret(schema::ObPythonUdfEnumType::PyUdfRetType::DECIMAL);
+                break;
         }
         // resolve pycall 
         // T_PYTHON_CODE_TYPE
         ParseNode *pycall_node = create_python_udf_node->children_[children_num - 1];
         ret = resolve_pycall(pycall_node, create_python_udf_arg);
+        //2:创建Python UDF并绑定MODEL
+        if (5 == children_num) {
+            //resolve udf_model_list
+            ParseNode *model_list_node = create_python_udf_node->children_[2];
+            int model_num = model_list_node->num_child_;
+            std::string model_names = "";
+            if (1 == model_num) {
+                create_python_udf_arg.python_udf_.set_isModelSpecific(true);
+            } else {
+                create_python_udf_arg.python_udf_.set_isModelSpecific(false);
+            }
+            for (int32_t i = 0; i < model_num; ++i) {
+                //T_PARAM_DEFINITION
+                ParseNode *element = model_list_node->children_[i];
+                //get arg_name
+                const char* model_name = element->str_value_;
+                model_names += model_name;
+                if (i != model_num - 1) model_names += ",";
+            }
+            //set model_num
+            create_python_udf_arg.python_udf_.set_model_num(model_num);
+            //set model_names
+            create_python_udf_arg.python_udf_.set_model_names(common::ObString(model_names.length(),model_names.c_str()));
+            // ret = resolve_model_path(model_name_node, create_python_udf_arg);
+            // //set model_name
+            // create_python_udf_arg.python_udf_.set_model_name(model_name);
+        }
         //set tenant_id
         create_python_udf_arg.python_udf_.set_tenant_id(params_.session_info_->get_effective_tenant_id());
       }

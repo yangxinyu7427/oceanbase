@@ -283,7 +283,7 @@ END_P SET_VAR DELIMITER
         EXTENDED_NOADDR EXTENT_SIZE EXTRACT EXCEPT EXPIRED ENCODING EMPTY_FIELD_AS_NULL EXTERNAL
 
         FAILOVER FAST FAULTS FIELDS FILEX FILE_PATH FINAL_COUNT FIRST FIRST_VALUE FIXED FLUSH FOLLOWER FORMAT
-        FOUND FREEZE FREQUENCY FUNCTION FOLLOWING FLASHBACK FULL FRAGMENTATION FROZEN FILE_ID
+        FOUND FRAMEWORK FREEZE FREQUENCY FUNCTION FOLLOWING FLASHBACK FULL FRAGMENTATION FROZEN FILE_ID
         FIELD_OPTIONALLY_ENCLOSED_BY FIELD_DELIMITER
 
         GENERAL GEOMETRY GEOMCOLLECTION GEOMETRYCOLLECTION GET_FORMAT GLOBAL GRANTS GROUP_CONCAT GROUPING GTS
@@ -310,7 +310,7 @@ END_P SET_VAR DELIMITER
         MASTER_SSL_CRL MASTER_SSL_CRLPATH MASTER_SSL_KEY MASTER_USER MAX MAX_CONNECTIONS_PER_HOUR MAX_CPU
         LOG_DISK_SIZE MAX_IOPS MEMORY_SIZE MAX_QUERIES_PER_HOUR MAX_ROWS MAX_SIZE
         MAX_UPDATES_PER_HOUR MAX_USER_CONNECTIONS MEDIUM MEMORY MEMTABLE MESSAGE_TEXT META MICROSECOND
-        MIGRATE MIN MIN_CPU MIN_IOPS MIN_MAX MINOR MIN_ROWS MINUS MINUTE MODE MODEL MODIFY MONTH MOVE
+        MIGRATE MIN MIN_CPU MIN_IOPS MIN_MAX MINOR MIN_ROWS MINUS MINUTE MODE MODEL MODEL_LOCATION MODIFY MONTH MOVE
         MULTILINESTRING MULTIPOINT MULTIPOLYGON MUTEX MYSQL_ERRNO MIGRATION MAX_USED_PART_ID MAXIMIZE
         MATERIALIZED MEMBER MEMSTORE_PERCENT MINVALUE MY_NAME
 
@@ -537,8 +537,11 @@ END_P SET_VAR DELIMITER
 %type <node> id_dot_id id_dot_id_dot_id
 
 /*IMBridge Metadata*/ 
+/*python udf*/
 %type <node> create_python_udf_stmt drop_python_udf_stmt
-%type <node> function_element_list function_element param_name param_type python_code_type
+%type <node> function_element_list function_element param_name param_type python_code_type python_udf_model_list python_udf_model
+%type <node> create_udf_model_stmt drop_udf_model_stmt
+%type <node> model_metadata_list model_metadata_element predict_python_udf_element
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -597,6 +600,8 @@ stmt:
   | drop_function_stmt      { $$ = $1; check_question_mark($$, result); }
   | create_python_udf_stmt  { $$ = $1; check_question_mark($$, result); }
   | drop_python_udf_stmt    { $$ = $1; check_question_mark($$, result); }
+  | create_udf_model_stmt   { $$ = $1; check_question_mark($$, result); }
+  | drop_udf_model_stmt     { $$ = $1; check_question_mark($$, result); }
   | create_table_like_stmt  { $$ = $1; check_question_mark($$, result); }
   | create_database_stmt    { $$ = $1; check_question_mark($$, result); }
   | drop_database_stmt      { $$ = $1; check_question_mark($$, result); }
@@ -2925,35 +2930,9 @@ MOD '(' expr ',' expr ')'
   malloc_non_terminal_node(udf_node, result->malloc_pool_, T_FUN_UDF, 4, $3, params, id_node->children_[0], NULL);
   store_pl_ref_object_symbol(udf_node, result, REF_FUNC);
 }
-| PREDICT function_name '(' opt_expr_as_list ')'
+| predict_python_udf_element
 {
-  if (NULL != $4)
-  {
-    ParseNode *params = NULL;
-    merge_nodes(params, result, T_EXPR_LIST, $4);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $2, params);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-  else
-  {
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 1, $2);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-}
-| PREDICT '(' INTNUM ')' function_name '(' opt_expr_as_list ')'
-{
-  if (NULL != $7)
-  {
-    ParseNode *params = NULL;
-    merge_nodes(params, result, T_EXPR_LIST, $7);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $3, $5, params);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
-  else
-  {
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, $5);
-    store_pl_ref_object_symbol($$, result, REF_FUNC);
-  }
+  $$ = $1;
 }
 | sys_interval_func
 {
@@ -3080,6 +3059,69 @@ MOD '(' expr ',' expr ')'
 | GEOMCOLLECTION '(' ')'
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_SYS_GEOMCOLLECTION, 1, NULL);
+}
+;
+
+predict_python_udf_element:
+PREDICT function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $4)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $4);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $2, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 1, $2);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PREDICT '(' INTNUM ')' function_name '(' opt_expr_as_list ')'
+{
+  if (NULL != $7)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $7);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 3, $3, $5, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_PYTHON_UDF, 2, $3, $5);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PREDICT USING MODEL python_udf_model '(' opt_expr_as_list ')'
+{
+  if (NULL != $6)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $6);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, $4, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 1, $4);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+}
+| PREDICT '(' INTNUM ')' USING MODEL python_udf_model '(' opt_expr_as_list ')'
+{
+  if (NULL != $9)
+  {
+    ParseNode *params = NULL;
+    merge_nodes(params, result, T_EXPR_LIST, $9);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 3, $3, $7, params);
+    store_pl_ref_object_symbol($$, result, REF_FUNC);
+  }
+  else
+  {
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, $3, $7);
+    store_pl_ref_object_symbol($$, result, REF_FUNC); 
+  }
 }
 ;
 
@@ -5029,14 +5071,38 @@ CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' RETURNS ret_type python_
                            code_type_node);                /* python code type */
 }
 |
-CREATE PYTHON_UDF NAME_OB MODEL NAME_OB python_code_type
+CREATE PYTHON_UDF NAME_OB '(' function_element_list ')' WITH MODEL python_udf_model_list RETURNS ret_type python_code_type
 {
+  ParseNode *function_elements = NULL;
   ParseNode *code_type_node = NULL;
-  merge_nodes(code_type_node, result, T_PYTHON_CODE_TYPE, $6);
-  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_PYTHON_UDF, 3, 
-                           $3,                             /* udf name */
-                           $5,                             /* model name */
+  ParseNode *udf_model_node = NULL;
+  merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $5);
+  merge_nodes(udf_model_node, result, T_UDF_MODEL_LIST, $9);
+  merge_nodes(code_type_node, result, T_PYTHON_CODE_TYPE, $12);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_PYTHON_UDF, 5, 
+                           $3,                            /* udf name */
+                           function_elements,             /* function parameter */
+                           udf_model_node,                /* model name */
+                           $11,                           /* return type */
                            code_type_node);               /* python code type */
+}
+;
+
+python_udf_model_list:
+python_udf_model
+{
+  $$ = $1;
+}
+| python_udf_model_list ',' python_udf_model
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_LINK_NODE, 2, $1, $3);
+}
+;
+
+python_udf_model:
+NAME_OB
+{
+  $$ = $1;
 }
 ;
 
@@ -5115,6 +5181,74 @@ python_code_type:
 FILE_PATH STRING_VALUE
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_FILE_PATH, 1, $2);
+}
+;
+
+create_udf_model_stmt:
+CREATE MODEL opt_if_exists NAME_OB '(' function_element_list ')' RETURNS ret_type WITH '(' model_metadata_list ')' 
+{
+  ParseNode *function_elements = NULL;
+  ParseNode *model_metadata_node = NULL;
+  merge_nodes(function_elements, result, T_FUNCTION_ELEMENT_LIST, $6);
+  merge_nodes(model_metadata_node, result, T_METADATA_LIST, $12);
+  malloc_non_terminal_node($$, result->malloc_pool_, T_CREATE_UDF_MODEL, 5, 
+                           $3,                             /* if exists */
+                           $4,                             /* model name */
+                           function_elements,              /* function parameter */
+                           $9,                             /* return type */
+                           model_metadata_node);           /* python code type */
+}
+;
+
+drop_udf_model_stmt:
+DROP MODEL opt_if_exists NAME_OB
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_UDF_MODEL, 2, $3, $4);
+}
+;
+
+//show_udf_model_stmt:
+//SHOW MODEL opt_if_exists NAME_OB
+//{
+//  malloc_non_terminal_node($$, result->malloc_pool_, T_SHOW_UDF_MODEL, 2, $3, $4);
+//}
+// model_metadata_list:
+// '(' FRAMEWORK STRING_VALUE ',' TYPE STRING_VALUE ',' MODEL_LOCATION STRING_VALUE ')'
+// {
+//   malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_METADATA, 3, $3, $6, $9);
+// }
+// | 
+// ;
+
+model_metadata_list:
+model_metadata_element
+{
+  $$ = $1;
+}
+| 
+model_metadata_list ',' model_metadata_element
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_LINK_NODE, 2, $1, $3);
+}
+;
+
+model_metadata_element:
+FRAMEWORK STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_FRAMEWORK, 1, $2);
+  $$->value_ = 1;
+}
+|
+TYPE STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_TYPE, 1, $2);
+  $$->value_ = 2;
+}
+|
+MODEL_LOCATION STRING_VALUE
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_MODEL_LOCATION, 1, $2);  
+  $$->value_ = 3;
 }
 ;
 
@@ -20002,6 +20136,7 @@ ACCOUNT
 |       FROZEN
 |       FOUND
 |       FRAGMENTATION
+|       FRAMEWORK
 |       FREEZE
 |       FREQUENCY
 |       FUNCTION
@@ -20145,6 +20280,7 @@ ACCOUNT
 |       MINUS
 |       MODE
 |       MODEL
+|       MODEL_LOCATION
 |       MODIFY
 |       MONTH
 |       MOVE

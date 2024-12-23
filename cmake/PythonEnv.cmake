@@ -1,5 +1,5 @@
 # IMBridge_CMake
-ob_define(PYTHON_DIR "/usr/local/python/3.11-withssl")
+ob_define(PYTHON_DIR "/usr/local/python311")
 
 set(PYTHON_LIB_DIR "${PYTHON_DIR}/lib")
 
@@ -13,4 +13,4 @@ target_include_directories(
   "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/core/include/"
   "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/_core/include/")
 target_link_libraries(python_lib INTERFACE
-    -L${PYTHON_LIB_DIR} -lpython3.11 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic)
+    -L${PYTHON_DIR}/lib -lpython3.11 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic)

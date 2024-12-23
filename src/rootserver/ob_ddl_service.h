@@ -927,6 +927,13 @@ int check_table_udt_id_is_exist(share::schema::ObSchemaGetterGuard &schema_guard
   virtual int check_python_udf_exist(uint64 tenant_id, const common::ObString &name, bool &is_exsit, uint64_t &udf_id);
   //----End of Functions for managing udf----    
 
+  //----Functions for managing udf---- IMBridge_Metadata
+  virtual int create_udf_model(share::schema::ObUdfModel &model_info,
+                               const common::ObString &ddl_stmt_str);
+  virtual int drop_udf_model(const obrpc::ObDropUdfModelArg &drop_udf_model_arg);
+  virtual int check_udf_model_exist(uint64 tenant_id, const common::ObString &name, bool &is_exsit, uint64_t &model_id);
+  //----End of Functions for managing udf----    
+
   //----Functions for managing routine----
   virtual int create_routine(share::schema::ObRoutineInfo &routine_info,
                              const share::schema::ObRoutineInfo *old_routine_info,

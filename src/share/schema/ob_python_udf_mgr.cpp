@@ -29,21 +29,21 @@ using namespace common::hash;
 
 ObSimplePythonUdfSchema::ObSimplePythonUdfSchema()
   : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), udf_name_(), arg_num_(0),
-arg_names_(), arg_types_(), ret_(ObPythonUDF::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
+arg_names_(), arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
 {
   reset();
 }
 
 ObSimplePythonUdfSchema::ObSimplePythonUdfSchema(ObIAllocator *allocator)
   : ObSchema(allocator), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), udf_name_(), arg_num_(0),
-arg_names_(), arg_types_(), ret_(ObPythonUDF::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
+arg_names_(), arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
 {
   reset();
 }
 
 ObSimplePythonUdfSchema::ObSimplePythonUdfSchema(const ObSimplePythonUdfSchema &other)
   : ObSchema(), tenant_id_(common::OB_INVALID_ID), udf_id_(common::OB_INVALID_ID), udf_name_(), arg_num_(0),
-arg_names_(), arg_types_(), ret_(ObPythonUDF::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
+arg_names_(), arg_types_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), schema_version_(common::OB_INVALID_VERSION) 
 {
   reset();
   *this = other;
@@ -59,7 +59,7 @@ void ObSimplePythonUdfSchema::reset()
   udf_name_.reset();
   arg_names_.reset();
   arg_types_.reset();
-  ret_ = ObPythonUDF::UDF_UNINITIAL;
+  ret_ = ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL;
   pycall_.reset();
   ObSchema::reset();
 }

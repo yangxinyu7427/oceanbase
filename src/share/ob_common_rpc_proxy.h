@@ -155,6 +155,11 @@ public:
   RPC_S(PRD drop_python_udf, obrpc::OB_DROP_PYTHON_UDF, (ObDropPythonUdfArg));
   //----End of definitions for managing python udf----
 
+  //----Definitions for managing model---- IMBridge Metadata
+  RPC_S(PRD create_udf_model, obrpc::OB_CREATE_UDF_MODEL, (ObCreateUdfModelArg));
+  RPC_S(PRD drop_udf_model, obrpc::OB_DROP_UDF_MODEL, (ObDropUdfModelArg));
+  //----End of definitions for managing python udf----
+
   //----Definitions for managing sequence----
   RPC_S(PRD do_sequence_ddl, obrpc::OB_DO_SEQUENCE_DDL, (ObSequenceDDLArg));
   //----End of definitions for managing sequence----

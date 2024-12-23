@@ -726,6 +726,7 @@ class ObRlsSqlService;
 class ObServerSchemaService;
 class ObContextSqlService;
 class ObPythonUdfSqlService;
+class ObUdfModelSqlService;
 class ObSchemaService
 {
 public:
@@ -784,6 +785,7 @@ public:
   DECLARE_GET_DDL_SQL_SERVICE_FUNC(Rls, rls);
   //DECLARE_GET_DDL_SQL_SERVICE_FUNC(sys_priv, priv);
   DECLARE_GET_DDL_SQL_SERVICE_FUNC(PythonUdf, python_udf);
+  DECLARE_GET_DDL_SQL_SERVICE_FUNC(UdfModel, udf_model);
 
 
   /* sequence_id related */
@@ -997,6 +999,7 @@ public:
   virtual int fetch_new_rls_group_id(const uint64_t tenant_id, uint64_t &new_rls_group_id) = 0;
   virtual int fetch_new_rls_context_id(const uint64_t tenant_id, uint64_t &new_rls_context_id) = 0;
   virtual int fetch_new_python_udf_id(const uint64_t tenant_id, uint64_t &new_python_udf_id) = 0;
+  virtual int fetch_new_udf_model_id(const uint64_t model_id, uint64_t &new_model_id) = 0;
 
 //------------------For managing privileges-----------------------------//
   #define GET_BATCH_SCHEMAS_WITH_ALLOCATOR_FUNC_DECLARE_PURE_VIRTUAL(SCHEMA, SCHEMA_TYPE)  \

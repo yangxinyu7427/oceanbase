@@ -453,6 +453,7 @@ ob_set_subtarget(ob_share schema
   schema/ob_python_udf.cpp
   schema/ob_python_udf_mgr.cpp
   schema/ob_python_udf_sql_service.cpp
+  schema/ob_udf_model_sql_service.cpp
 )
 
 ob_set_subtarget(ob_share stat

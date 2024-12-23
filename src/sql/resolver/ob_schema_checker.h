@@ -388,6 +388,10 @@ public:
                           const common::ObString &udf_name,
                           share::schema::ObPythonUDF &udf_info,
                           bool &exist);
+  int get_udf_model_info(uint64_t tenant_id,
+                         const common::ObString &model_name,
+                         share::schema::ObUdfModel &model_info,
+                         bool &exist);                        
   int check_sequence_exist_with_name(const uint64_t tenant_id,
                                      const uint64_t database_id,
                                      const common::ObString &sequence_name,
