@@ -9,13 +9,10 @@ using namespace oceanbase::common;
 
 int ObLogPythonUDF::get_op_exprs(ObIArray<ObRawExpr*> &all_exprs) {
   int ret = OB_SUCCESS;
-  // 不必加入python udf exprs
-  if (OB_FAIL(ObLogicalOperator::get_op_exprs(all_exprs))) {
+  if (OB_FAIL(append(all_exprs, python_udf_filter_exprs_))) {
+    LOG_WARN("failed to push back python udf filter exprs", K(ret));
+  } else if (OB_FAIL(ObLogicalOperator::get_op_exprs(all_exprs))) {
     LOG_WARN("get op exprs failed", K(ret));
-  /*} else if (OB_FAIL(append(all_exprs, python_udf_projection_exprs_))) {
-    LOG_WARN("append python udf projection exprs failed", K(ret));
-  } else if (OB_FAIL(append(all_exprs, python_udf_filter_exprs_))) {
-    LOG_WARN("append python udf filter exprs failed", K(ret));*/
   } else { /*do noting*/ }
   return ret;
 }
