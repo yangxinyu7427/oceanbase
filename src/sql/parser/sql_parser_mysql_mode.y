@@ -3093,41 +3093,33 @@ PREDICT function_name '(' opt_expr_as_list ')'
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }
-| PREDICT USING MODEL python_udf_model_list '(' opt_expr_as_list ')'
+| PREDICT USING MODEL python_udf_model '(' opt_expr_as_list ')'
 {
   if (NULL != $6)
   {
-    ParseNode *udf_model_node = NULL;
     ParseNode *params = NULL;
-    merge_nodes(udf_model_node, result, T_UDF_MODEL_LIST, $4);
     merge_nodes(params, result, T_EXPR_LIST, $6);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, udf_model_node, params);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, $4, params);
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
   else
   {
-    ParseNode *udf_model_node = NULL;
-    merge_nodes(udf_model_node, result, T_UDF_MODEL_LIST, $4);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 1, udf_model_node);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 1, $4);
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
 }
-| PREDICT '(' INTNUM ')' USING MODEL python_udf_model_list '(' opt_expr_as_list ')'
+| PREDICT '(' INTNUM ')' USING MODEL python_udf_model '(' opt_expr_as_list ')'
 {
   if (NULL != $9)
   {
-    ParseNode *udf_model_node = NULL;
     ParseNode *params = NULL;
-    merge_nodes(udf_model_node, result, T_UDF_MODEL_LIST, $7);
     merge_nodes(params, result, T_EXPR_LIST, $9);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 3, $3, udf_model_node, params);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 3, $3, $7, params);
     store_pl_ref_object_symbol($$, result, REF_FUNC);
   }
   else
   {
-    ParseNode *udf_model_node = NULL;
-    merge_nodes(udf_model_node, result, T_UDF_MODEL_LIST, $7);
-    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, $3, udf_model_node);
+    malloc_non_terminal_node($$, result->malloc_pool_, T_FUN_UDF_MODEL, 2, $3, $7);
     store_pl_ref_object_symbol($$, result, REF_FUNC); 
   }
 }
@@ -5215,11 +5207,11 @@ DROP MODEL opt_if_exists NAME_OB
 }
 ;
 
-show_udf_model_stmt:
-SHOW MODEL opt_if_exists NAME_OB
-{
-  malloc_non_terminal_node($$, result->malloc_pool_, T_SHOW_UDF_MODEL, 2, $3, $4);
-}
+//show_udf_model_stmt:
+//SHOW MODEL opt_if_exists NAME_OB
+//{
+//  malloc_non_terminal_node($$, result->malloc_pool_, T_SHOW_UDF_MODEL, 2, $3, $4);
+//}
 // model_metadata_list:
 // '(' FRAMEWORK STRING_VALUE ',' TYPE STRING_VALUE ',' MODEL_LOCATION STRING_VALUE ')'
 // {

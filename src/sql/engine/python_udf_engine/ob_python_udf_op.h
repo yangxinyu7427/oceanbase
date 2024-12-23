@@ -110,7 +110,8 @@ public:
   //计算过程  
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size); // wrap all args
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size]
-  int eval(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
+  int eval(PyObject *pArgs, int64_t eval_size);
+  int eval_python_udf(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
   int eval_model_udf(PyObject *pArgs, int64_t eval_size); // do python single model udf evaluation
   int modify_desirable(timeval &start, timeval &end, int64_t eval_size);
   int reset_input_store() { return input_store_.reset(); }
@@ -135,6 +136,9 @@ private:
   // 运算结果暂存
   int result_size_;
   void *result_store_;
+
+  // model udf / python udf
+  share::schema::ObPythonUdfEnumType::PyUdfUsingType eval_type_;
 };
 typedef common::ObDList<ObPythonUDFCell> PythonUDFCellList;
 

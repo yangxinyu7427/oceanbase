@@ -112,6 +112,10 @@ public:
     inline enum ObPythonUdfEnumType::PyUdfRetType get_ret() const { return ret_; } 
     inline int64_t get_schema_version() const { return schema_version_; }
 
+    int get_arg_names_arr(common::ObIAllocator &allocator, 
+                          common::ObSEArray<common::ObString, 16> &model_attributes_names) const;
+    int get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &model_attributes_types) const;
+
     //other
     virtual void reset() override;
 
@@ -250,7 +254,8 @@ public:
     
     //other
     virtual void reset() override;
-    int get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_names) const;
+    int get_arg_names_arr(common::ObIAllocator &allocator,
+                          common::ObSEArray<common::ObString, 16> &udf_attributes_names) const;
     int get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &udf_attributes_types) const;
     int get_udf_model_names_arr(common::ObSEArray<common::ObString, 16> &udf_model_names) const;
     int insert_udf_model_info(ObUdfModel &model_info);

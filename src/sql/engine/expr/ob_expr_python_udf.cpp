@@ -95,15 +95,25 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
                                      const share::schema::ObPythonUDFMeta &src)
 {
   int ret = OB_SUCCESS;
-  dst.init_ = src.init_;
   dst.ret_ = src.ret_;
+  dst.init_ = src.init_;
+  dst.batch_size_ = src.batch_size_;
+  dst.batch_size_const_ = src.batch_size_const_;
+  dst.model_type_ = src.model_type_;
   if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
-  } else { 
+  } else {
+    for (int64_t i = 0; i < src.udf_attributes_names_.count(); i++) {
+      const ObString &name = src.udf_attributes_names_.at(i);
+      dst.udf_attributes_names_.push_back(name);
+    }
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+    }
+    for (int64_t i = 0; i < src.udf_model_meta_.count(); i++) {
+      dst.udf_model_meta_.push_back(src.udf_model_meta_.at(i));
     }
   }
   LOG_DEBUG("set udf meta", K(src), K(dst));
@@ -119,7 +129,7 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
   } else if (udf_meta_.ret_ == ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("udf meta ret type is null", K(ret));
-  } else if (OB_ISNULL(udf_meta_.pycall_)) {
+  } else if (udf_meta_.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::ARBITRARY_CODE && OB_ISNULL(udf_meta_.pycall_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("udf meta pycall is null", K(ret));
   } else {
@@ -173,18 +183,22 @@ int ObExprPythonUdf::init_udf(const common::ObIArray<ObRawExpr*> &param_exprs)
 
   // check python code
   if (OB_SUCC(ret)) {
-    if (udf_meta_.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::INVALID) {
+    switch (udf_meta_.model_type_) {
+    case ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC:
+      if (OB_FAIL(import_model_udf(udf_meta_))) {
+        ret = OB_INIT_FAIL;
+        LOG_WARN("import model udf failed", K(ret));
+      }
+      break;
+    case ObPythonUdfEnumType::PyUdfUsingType::ARBITRARY_CODE:
+      if (OB_FAIL(import_udf(udf_meta_))) {
+        ret = OB_INIT_FAIL;
+        LOG_WARN("import python udf failed", K(ret));
+      }
+      break;
+    default:
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("invalid udf model type", K(ret));
-    } else if (udf_meta_.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::ARBITRARY_CODE) {
-      ret = import_model_udf(udf_meta_);
-    } else if (udf_meta_.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC) {
-      ret = import_udf(udf_meta_);
-    } else if (udf_meta_.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::NONE) {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("not support udf model type", K(ret));
-    } else {
-      ret = OB_ERR_UNEXPECTED;
     }
   }
 
@@ -263,127 +277,144 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
   int ret = OB_SUCCESS;
 
   // 检查是否是single model udf
-  OZ(udf_meta.model_type_ == share::schema::ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC);
-  OZ(udf_meta.udf_model_meta_.count() == 1);
-
-  //runtime variables
-  PyObject *pModule = NULL;
-  PyObject *dic = NULL;
-  PyObject *v = NULL;
-  //PyObject *pClass = NULL;
-  PyObject *pInstance = NULL;
-  PyObject *pInitial = NULL;
-
-  //name
-  std::string name(udf_meta.name_.ptr());
-  name = name.substr(0, udf_meta.name_.length());
-  std::string pyinitial_handler = "pyinitial";
-  std::string pyfun_handler = "pyfun";
-
-  // 定义pycall
-  std::string pycall = "class " + name + "UdfClass:";
-  
-  switch (udf_meta.udf_model_meta_[0].framework_) {
-    case share::schema::ObPythonUdfEnumType::ModelFrameworkType::SKLEARN : {
-      pycall += std::string("\nimport pickle") +
-                std::string("\nimport numpy as np") +
-                std::string("\ndef pyinitial(self):") +
-                std::string("\n\tself.anonymous_model = pickle.load(open('") + 
-                std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
-                std::string("', 'rb'))") +
-                std::string("\ndef pyfun(self, *args):") +
-                std::string("\n\treturn self.anonymous_model.predict(np.column_stack(args))");
-      break;
-    }
-    case share::schema::ObPythonUdfEnumType::ModelFrameworkType::ONNX : {
-      std::string input_columns = "";
-      pycall += std::string("\nimport numpy as np") +
-                std::string("\nimport onnxruntime as ort") +
-                std::string("\nself.nanonymous_model_input_columns = [") + 
-                std::string(input_columns) + 
-                std::string("]") +
-                std::string("\nself.nanonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str}") +
-                std::string("\ndef pyinitial(self):") +
-                std::string("\n\tself.anonymous_model_session = ort.InferenceSession('") + 
-                std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
-                std::string("', sess_options=ortconfig)") +
-                std::string("\ndef pyfun(self, *args):") +
-                std::string("\n\tinfer_batch = {") +
-                std::string("\n\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
-                std::string("\n\t\tfor i, elem in enumerate(self.anonymous_model_input_columns)}") +
-                std::string("\n\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0]], infer_batch)");
-
-      break;
-    }
-    case share::schema::ObPythonUdfEnumType::ModelFrameworkType::PYTORCH : {
-      pycall += std::string("\nimport torch") +
-                std::string("\nimport numpy as np") +
-                std::string("\ndef pyinitial(self):") +
-                std::string("\n\tself.anonymous_model = torch.load('") + 
-                std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
-                std::string("')") +
-                std::string("\ndef pyfun(self, *args):") +
-                std::string("\n\treturn self, anonymous_model(np.column_stack(args))");
-      break;
-    }
-    default : {
-      ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("Unexpected framework type", K(ret));
-    }
-  }
-
-  pycall.replace(pycall.find("\n"), 1, "\n\t");
-  pycall += "\n" + name + "UdfInstance = " + name + "UdfClass()";
-  
-  
-  const char* pycall_c = pycall.c_str();
-  //pycall.replace(pycall.find("pyinitial"), 9, pyinitial_handler);
-  //pycall.replace(pycall.find("pyfun"), 5, pyfun_handler);
-  
-  //Acquire GIL
-  bool nStatus = PyGILState_Check();
-  PyGILState_STATE gstate;
-  if(!nStatus) {
-    gstate = PyGILState_Ensure();
-    nStatus = true;
-  }
-
-  // prepare and import python code
-  if (OB_FAIL(ret) || (pModule = PyImport_AddModule("__main__")) == nullptr) { // load main module
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to load main module", K(ret));
-  } else if ((dic = PyModule_GetDict(pModule)) == nullptr) { // get module dic
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to get module dic", K(ret));
-  } else if((v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL)) == nullptr) { // test pycall
-    process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to write pycall into module", K(ret));
-  /*} else if ((pClass = PyObject_GetAttrString(pModule, (name + "UdfClass").c_str())) == nullptr) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to get custom model udf class", K(ret));
-  } else if ((pInstance = PyObject_CallObject(pClass, NULL) == nullptr) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to get custom model udf instance", K(ret));*/
-  } else if ((pInstance = PyObject_GetAttrString(pModule, (name + "UdfInstance").c_str())) == nullptr) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("fail to get custom model udf instance", K(ret));
-  } else if ((pInitial = PyObject_GetAttrString(pInstance, pyinitial_handler.c_str())) == nullptr ||
-              !PyCallable_Check(pInitial)) { // get and check pyInitial()
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to check pyinitial", K(ret));
-  } else if (PyObject_CallMethod(pInstance, pyinitial_handler.c_str(), "") == nullptr) { // invocate pyInitial()
-    process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Fail to run pyinitial in pInstance", K(ret));
+  if (udf_meta.model_type_ != share::schema::ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC) {
+    ret = OB_ERR_INVALID_PYTHON_UDF;
+    LOG_WARN("Unexpected Python UDF Using Type", K(ret));
+  } else if (udf_meta.udf_model_meta_.count() != 1) {
+    ret = OB_ERR_INVALID_PYTHON_UDF;
+    LOG_WARN("Unexpected Model Specific UDF meta count", K(ret));
   } else {
-    LOG_DEBUG("Import python udf handler", K(ret));
+    //runtime variables
+    PyObject *pModule = NULL;
+    PyObject *dic = NULL;
+    PyObject *v = NULL;
+    PyObject *pClass = NULL;
+    PyObject *pInstance = NULL;
+    PyObject *pInitial = NULL;
+
+    //name
+    std::string name(udf_meta.name_.ptr());
+    name = name.substr(0, udf_meta.name_.length());
+    //std::string pyinitial_handler = name + "_pyinitial";
+    //std::string pyfun_handler = name + "_pyfun";
+    std::string pyinitial_handler("pyinitial");
+    std::string pyfun_handler("pyfun");
+
+    std::string class_name = name + std::string("UdfClass");
+    std::string instance_name = name + std::string("UdfInstance");
+
+    // 定义pycall python class形式
+    //std::string pycall = "class " + class_name + ":";
+    std::string pycall = "";
+
+    switch (udf_meta.udf_model_meta_[0].framework_) {
+      case share::schema::ObPythonUdfEnumType::ModelFrameworkType::SKLEARN : {
+        pycall += std::string("\nimport pickle") +
+                  std::string("\nimport numpy as np") +
+                  std::string("\nimport pandas as pd") +
+                  std::string("\nclass ") + class_name + std::string(":") +
+                  std::string("\n\tdef pyinitial(self):") +
+                  std::string("\n\t\tself.anonymous_model = pickle.load(open('") + 
+                  std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
+                  std::string("', 'rb'))") +
+                  std::string("\n\tdef pyfun(self, names, args):") +
+                  //std::string("\n\t\twith open('/home/obtest/log/printlog', 'w') as f:") +
+                  //std::string("\n\t\t\tf.write(names)") +
+                  std::string("\n\t\treturn self.anonymous_model.predict(pd.DataFrame(np.column_stack(args), columns=names))");
+                  //std::string("\n\t\treturn args[0]");
+        break;
+      }
+      case share::schema::ObPythonUdfEnumType::ModelFrameworkType::ONNX : {
+        std::string input_columns = "";
+        pycall += std::string("\nimport numpy as np") +
+                  std::string("\nimport onnxruntime as ort") +
+                  std::string("\nclass ") + class_name + std::string(":") +
+                  std::string("\n\tself.nanonymous_model_input_columns = [") + 
+                  std::string(input_columns) + 
+                  std::string("]") +
+                  std::string("\n\tself.nanonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str}") +
+                  std::string("\n\tdef pyinitial(self):") +
+                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
+                  std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
+                  std::string("', sess_options=ortconfig)") +
+                  std::string("\n\tdef pyfun(self, *args):") +
+                  std::string("\n\t\tinfer_batch = {") +
+                  std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
+                  std::string("\n\t\t\tfor i, elem in enumerate(self.anonymous_model_input_columns)}") +
+                  std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0]], infer_batch)");
+
+        break;
+      }
+      case share::schema::ObPythonUdfEnumType::ModelFrameworkType::PYTORCH : {
+        pycall += std::string("\nimport torch") +
+                  std::string("\nimport numpy as np") +
+                  std::string("\nclass ") + class_name + std::string(":") +
+                  std::string("\n\tdef pyinitial(self):") +
+                  std::string("\n\t\tself.anonymous_model = torch.load('") + 
+                  std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
+                  std::string("')") +
+                  std::string("\n\tdef pyfun(self, *args):") +
+                  std::string("\n\t\treturn self, anonymous_model(np.column_stack(args))");
+        break;
+      }
+      default : {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Unexpected framework type", K(ret));
+      }
+    }
+
+    //pycall.replace(pycall.find("\n"), 1, "\n\t");
+    pycall += "\n" + instance_name +" = " + class_name + "()";
+    
+
+    //pycall.replace(pycall.find("pyinitial"), 9, pyinitial_handler);
+    //pycall.replace(pycall.find("pyfun"), 5, pyfun_handler);
+    const char* pycall_c = pycall.c_str();
+    
+    //Acquire GIL
+    bool nStatus = PyGILState_Check();
+    PyGILState_STATE gstate;
+    if(!nStatus) {
+      gstate = PyGILState_Ensure();
+      nStatus = true;
+    }
+
+    // prepare and import python code
+    if (OB_FAIL(ret) || (pModule = PyImport_AddModule("__main__")) == nullptr) { // load main module
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to load main module", K(ret));
+    } else if ((dic = PyModule_GetDict(pModule)) == nullptr) { // get module dic
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get module dic", K(ret));
+    } else if((v = PyRun_StringFlags(pycall_c, Py_file_input, dic, dic, NULL)) == nullptr) { // test pycall
+      process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to write pycall into module", K(ret));
+    } else if ((pClass = PyObject_GetAttrString(pModule, class_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get custom model udf class", K(ret));
+    /*} else if ((pInstance = PyObject_CallObject(pClass, NULL) == nullptr)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get custom model udf instance", K(ret));*/
+    } else if ((pInstance = PyObject_GetAttrString(pModule, instance_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get custom model udf instance", K(ret));
+    } else if ((pInitial = PyObject_GetAttrString(pClass, pyinitial_handler.c_str())) == nullptr ||
+                !PyCallable_Check(pInitial)) { // get and check pyInitial()
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Fail to check pyinitial", K(ret));
+    } else if (PyObject_CallMethod(pInstance, pyinitial_handler.c_str(), NULL) == nullptr) { // invocate pyInitial()
+      process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Fail to run pyinitial in pInstance", K(ret));
+    } else {
+      LOG_DEBUG("Import python udf handler", K(ret));
+    }
+
+    //release GIL
+    if(nStatus)
+      PyGILState_Release(gstate);
   }
-
-  //release GIL
-  if(nStatus)
-    PyGILState_Release(gstate);
-
   return ret;
 }
 

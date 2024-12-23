@@ -820,6 +820,7 @@ int ObPythonUDFCell::init(ObExpr *expr,
     ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
     desirable_ = info->predict_size; // 初始值256
     batch_size_ = batch_size;
+    eval_type_ = info->udf_meta_.model_type_;
   }
   return ret;
 }
@@ -1107,7 +1108,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size)
 int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size)
 {
   int ret = OB_SUCCESS;
-  pArgs = PyTuple_New(expr_->arg_cnt_); // malloc hook
+  pArgs = PyList_New(expr_->arg_cnt_); // malloc hook
   int64_t saved_size = input_store_.get_saved_size();
   eval_size = (idx + predict_size) < saved_size ? predict_size : saved_size - idx;
   npy_intp elements[1] = {eval_size};
@@ -1182,7 +1183,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t pre
           LOG_WARN("Unsupported input type.", K(ret));
         }
       }
-      if(PyTuple_SetItem(pArgs, i, numpyarray) != 0){
+      if(PyList_SetItem(pArgs, i, numpyarray) != 0){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Set numpy array arg failed.", K(ret));
       }
@@ -1191,7 +1192,33 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t pre
   return ret;
 }
 
-int ObPythonUDFCell::eval(PyObject *pArgs, int64_t eval_size)
+int ObPythonUDFCell::eval(PyObject *pArgs, int64_t eval_size) {
+  int ret = OB_SUCCESS;
+  if (eval_size <= 0) {
+    LOG_WARN("empty evaluation size", K(ret));
+  } else {
+    switch (eval_type_) {
+    case ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC:
+      if (OB_FAIL(eval_model_udf(pArgs, eval_size))) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("eval model specific udf failed", K(ret));
+      }
+      break;
+    case ObPythonUdfEnumType::PyUdfUsingType::ARBITRARY_CODE:
+      if (OB_FAIL(eval_python_udf(pArgs, eval_size))) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("eval arbitrary code python udf failed", K(ret));
+      }
+      break;
+    default:
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("invalid udf model type", K(ret));
+    }
+  }
+  return ret;
+}
+
+int ObPythonUDFCell::eval_python_udf(PyObject *pArgs, int64_t eval_size)
 {
   int ret = OB_SUCCESS;
   // evalatuion in python interpreter
@@ -1242,38 +1269,69 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   //std::string pyfun_handler = name.append("_pyfun");
-  std::string pyfun_handler = "pyfun";
+  std::string pyfun_handler("pyfun");
+
+  std::string class_name = name + "UdfClass";
+  std::string instance_name = name + "UdfInstance";
+  PyObject *method_name = Py_BuildValue("s", "pyfun");
 
   PyObject *pModule = nullptr;
+  PyObject *pClass = nullptr;
   PyObject *pInstance = nullptr;
   PyObject *pFunc = nullptr;
   PyObject *pResult = nullptr;
+  PyObject *pArgNames = nullptr;
 
-  if ((pModule = PyImport_AddModule("__main__")) == nullptr) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Import main module failed.", K(ret));
-  } else if ((pInstance = PyObject_GetAttrString(pModule, (name + "UdfInstance").c_str())) == nullptr) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Get custom model udf instance failed.", K(ret));
-  } else if ((pFunc = PyObject_GetAttrString(pInstance, pyfun_handler.c_str())) == nullptr ||
-              !PyCallable_Check(pFunc)) {
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Check function handler failed.", K(ret));
-  } else if ((pResult = PyObject_CallMethod(pInstance, pyfun_handler.c_str(), "", pArgs)) == nullptr) {
-    ObExprPythonUdf::process_python_exception();
-    ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("Execute Python model UDF error.", K(ret));
+  ObSEArray<ObString, 16L> &udf_attributes_names = info->udf_meta_.udf_attributes_names_;
+  if (udf_attributes_names.count() != expr_->arg_cnt_) {
+    ret = OB_INIT_FAIL;
+    LOG_WARN("Unexpected udf arg counts", K(ret));
   } else {
-    // numpy array concat
-    if (result_store_ == nullptr) {
-      result_store_ = reinterpret_cast<void *>(pResult);
-    } else {
-      PyObject *concat = PyTuple_New(2);
-      PyTuple_SetItem(concat, 0, reinterpret_cast<PyObject *>(result_store_));
-      PyTuple_SetItem(concat, 1, pResult);
-      result_store_ = reinterpret_cast<void *>(PyArray_Concatenate(concat, 0));
+    pArgNames = PyList_New(expr_->arg_cnt_);
+    for (int i = 0; OB_SUCC(ret) && i < expr_->arg_cnt_; ++i) {
+      if (udf_attributes_names.at(i).ptr() == nullptr) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Null udf atttrbutes names", K(ret));
+      } else {
+        std::string name = std::string(udf_attributes_names.at(i).ptr(), udf_attributes_names.at(i).length());
+        const char* c_name = name.c_str();
+        PyList_SetItem(pArgNames, i, Py_BuildValue("s", c_name));
+      }
     }
-    result_size_ += eval_size;
+  }
+
+  if (OB_SUCC(ret)) {
+    // do evaluation in python interpreter
+    if ((pModule = PyImport_AddModule("__main__")) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Import main module failed.", K(ret));
+    } else if ((pInstance = PyObject_GetAttrString(pModule, instance_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Get custom model udf instance failed.", K(ret));
+    } else if ((pClass = PyObject_GetAttrString(pModule, class_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get custom model udf class", K(ret));
+    } else if ((pFunc = PyObject_GetAttrString(pClass, pyfun_handler.c_str())) == nullptr ||
+                !PyCallable_Check(pFunc)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Check function handler failed.", K(ret));
+    //} else if ((pResult = PyObject_CallMethodObjArgs(pInstance, method_name, pArgNames, pArgs)) == nullptr) {
+    } else if ((pResult = PyObject_CallMethod(pInstance, "pyfun", "NN", pArgNames, pArgs)) == nullptr) {
+      ObExprPythonUdf::process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Execute Python model UDF error.", K(ret));
+    } else {
+      // numpy array concat
+      if (result_store_ == nullptr) {
+        result_store_ = reinterpret_cast<void *>(pResult);
+      } else {
+        PyObject *concat = PyTuple_New(2);
+        PyTuple_SetItem(concat, 0, reinterpret_cast<PyObject *>(result_store_));
+        PyTuple_SetItem(concat, 1, pResult);
+        result_store_ = reinterpret_cast<void *>(PyArray_Concatenate(concat, 0));
+      }
+      result_size_ += eval_size;
+    }
   }
   return ret;
 }

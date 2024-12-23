@@ -46,14 +46,17 @@ ObPythonUDF::~ObPythonUDF()
 {
 }
 
-int ObPythonUDF::get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_names) const {
+int ObPythonUDF::get_arg_names_arr(common::ObIAllocator &allocator, 
+                                   common::ObSEArray<common::ObString, 16> &udf_attributes_names) const {
   int ret = OB_SUCCESS;
   udf_attributes_names.reuse();
   char* arg_names_str = const_cast<char*>(get_arg_names());
   std::istringstream ss(arg_names_str);
   std::string token;
   while (std::getline(ss, token, ',')) {
-      udf_attributes_names.push_back(common::ObString(token.length(),token.c_str()));
+    char *ptr = static_cast<char *>(allocator.alloc(token.length()));
+    MEMCPY(ptr, token.c_str(), token.length());
+    udf_attributes_names.push_back(common::ObString(token.length(), ptr));
   }
   if(udf_attributes_names.count() != arg_num_) {
     ret = OB_ERR_UNEXPECTED;
@@ -267,6 +270,49 @@ void ObUdfModel::reset()
   arg_types_.reset();
   ret_ = ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL;
   ObSchema::reset();
+}
+
+int ObUdfModel::get_arg_names_arr(common::ObIAllocator &allocator, 
+                                  common::ObSEArray<common::ObString, 16> &model_attributes_names) const {
+  int ret = OB_SUCCESS;
+  model_attributes_names.reuse();
+  char* arg_names_str = const_cast<char*>(get_arg_names());
+  std::istringstream ss(arg_names_str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    char *ptr = static_cast<char *>(allocator.alloc(token.length()));
+    MEMCPY(ptr, token.c_str(), token.length());
+    model_attributes_names.push_back(common::ObString(token.length(), ptr));
+  }
+  if(model_attributes_names.count() != arg_num_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to resolve arg names string", K(ret));
+  }
+  return ret;
+}
+
+int ObUdfModel::get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &model_attributes_types) const {
+  int ret = OB_SUCCESS;
+  model_attributes_types.reuse();
+  char* arg_types_str = const_cast<char*>(get_arg_types());
+  std::istringstream ss(arg_types_str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    if (token == "STRING") {
+      model_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::STRING);
+    } else if (token == "INTEGER") {
+      model_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::INTEGER);
+    } else if (token == "REAL") {
+      model_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::REAL);
+    } else if (token == "DECIMAL") {
+      model_attributes_types.push_back(ObPythonUdfEnumType::PyUdfRetType::DECIMAL);
+    }
+  }
+  if(model_attributes_types.count() != arg_num_) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("fail to resolve arg types string", K(ret));
+  }
+  return ret;
 }
 
 OB_SERIALIZE_MEMBER(ObUdfModel,
