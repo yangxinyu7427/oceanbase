@@ -13176,6 +13176,105 @@ int ObTransformUtils::pack_stmt(ObTransformerCtx *ctx,
   return ret;
 }
 
+//for python udf
+int ObTransformUtils::extract_python_udf_exprs(
+    ObIArray<ObRawExpr *> &src_exprs,
+    ObIArray<ObRawExpr *> &dst_exprs) 
+{
+  int ret = OB_SUCCESS;
+  ObRawExpr *expr = NULL;
+  int32_t i = 0;
+  while (OB_SUCC(ret) && i < src_exprs.count()) {
+    expr = src_exprs.at(i);
+    if(expr_contain_type(expr, T_FUN_PYTHON_UDF)) {
+      dst_exprs.push_back(expr);
+      src_exprs.remove(i);
+    } else {
+      ++i;
+    }
+  }
+  return ret;
+}
+
+//simple recusive find python_udf
+bool ObTransformUtils::expr_contain_type(
+    ObRawExpr *expr,
+    ObExprOperatorType type)
+{
+  if(OB_ISNULL(expr)) {
+    return false;
+  } else if(expr->get_expr_type() == type) {
+    return true;
+  } else {
+    for(int32_t i = 0; i < expr->get_param_count(); i++) {
+      if(expr_contain_type(expr->get_param_expr(i), type))
+        return true;
+    }
+    return false;
+  }
+}
+
+// count num of python udf in one expr tree
+int ObTransformUtils::count_python_udf_num(ObRawExpr *expr)
+{
+  int count=0;
+  if(OB_ISNULL(expr)){
+    return 0;
+  } 
+  if(expr->get_expr_type()==T_FUN_PYTHON_UDF){
+    count++;
+  } 
+  for(int i=0;i<expr->get_param_count();i++){
+    count=count+count_python_udf_num(expr->get_param_expr(i));
+  }
+  return count;
+}
+
+// find python udf index, and save them in array
+int ObTransformUtils::extract_python_udf_exprs_idx_in_condition(
+    ObIArray<int64_t> &idx_list,
+    ObIArray<ObRawExpr *> &src_exprs)
+{
+  int ret = OB_SUCCESS;
+  ObRawExpr *expr = NULL;
+  int64_t i = 0;
+  while (OB_SUCC(ret) && i < src_exprs.count()) {
+    expr = src_exprs.at(i);
+    if(expr_contain_type(expr, T_FUN_PYTHON_UDF)) {
+      idx_list.push_back(i);
+    }
+    i++;
+  }
+  return ret;
+}
+
+// extract python udf expr in exprs
+int ObTransformUtils::extract_all_python_udf_raw_expr_in_raw_expr(
+  ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+  ObRawExpr *src_expr)
+{
+  int ret = OB_SUCCESS;
+  if(OB_ISNULL(src_expr)) {
+    return 0;
+  }
+  ObPythonUdfRawExpr *python_udf_expr=NULL;
+  if(src_expr->get_expr_type() == T_FUN_PYTHON_UDF){
+
+    if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
+      // 进行expr转换
+      LOG_WARN("convert expr to ObPythonUdfRawExpr fail", K(ret));
+    } else {
+      python_udf_expr_list.push_back(python_udf_expr);
+    }
+  }
+  
+  for(int32_t i = 0; i < src_expr->get_param_count(); i++) {
+    extract_all_python_udf_raw_expr_in_raw_expr(python_udf_expr_list,src_expr->get_param_expr(i));
+  }
+      
+  return ret; 
+}  
+
 /*
  * create a view to pre aggregation and push down group by:
  * select c1, c2 + 1, sum(2*c3) from t1 where c1 > 3 group by grouping sets(c1, c2+1) having c1 is

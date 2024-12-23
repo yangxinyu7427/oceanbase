@@ -43,6 +43,8 @@ public:
                                 
   int init_udf(const common::ObIArray<ObRawExpr*> &param_exprs);
 
+  static int change_vars_in_pycall(string &pycall, string pre);
+
   static int import_udf(const share::schema::ObPythonUDFMeta &udf_meta);
 
   static int eval_python_udf(EVAL_FUNC_ARG_DECL);
@@ -84,6 +86,8 @@ public:
   int round;
   int round_limit; // rounds of stoping batch size motification
   int delta; // delta batch size
+  bool is_new_full_cache=false;
+  bool is_new_mid_cache=false;
 };
 } /* namespace sql */
 } /* namespace oceanbase */

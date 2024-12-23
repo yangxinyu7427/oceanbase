@@ -4363,6 +4363,7 @@ int ObSelectLogPlan::allocate_link_scan_as_top(ObLogicalOperator *&old_top)
 // 1. 生成log plan tree, 包括Join/TableScan/SubplanScan/Sort/Material算子
 // 2. 分配top算子，包括Count/Group By/SubPlanFilter/Window Sort/Distinct/Order By
 //                     Limit/Late Materialization/Select Into
+//                     Predict Operator for python udfs
 // 3. 选出最终代价最小的plan
 int ObSelectLogPlan::generate_raw_plan_for_plain_select()
 {
@@ -7921,15 +7922,24 @@ int ObSelectLogPlan::candi_allocate_python_udf()
 {
   int ret = OB_SUCCESS;
   const ObSelectStmt *stmt = get_stmt();
-  ObSEArray<ObRawExpr*, 8> candi_subquery_exprs;
+  ObLogicalOperator *best_plan = NULL;
+  ObSEArray<ObRawExpr*, 8> python_udf_projection_exprs;
+  ObSEArray<ObRawExpr*, 8> python_udf_filter_exprs;
   ObSEArray<CandidatePlan, 8> python_udf_plans;
   if (OB_ISNULL(stmt) || OB_UNLIKELY(!stmt->has_python_udf())) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("unexpected params", K(ret), K(stmt), K(stmt->has_python_udf()));
-  } else if (OB_FAIL(append(candi_subquery_exprs, stmt->get_python_udf_exprs()))) {
-    LOG_WARN("failed to append exprs", K(ret));
-  } else if (OB_FAIL(candi_allocate_subplan_filter(candi_subquery_exprs))) {
-    LOG_WARN("failed to do allocate subplan filter", K(ret));
+  //} else if (OB_FAIL(append(python_udf_projection_exprs, stmt->get_python_udf_exprs()))) {
+  //  LOG_WARN("failed to append exprs", K(ret));
+  } else if (OB_FAIL(candidates_.get_best_plan(best_plan))) {
+    LOG_WARN("failed to get current best plan", K(ret));
+  } else if (OB_ISNULL(best_plan)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("get unexpected null", K(ret));
+  } else if (OB_FAIL(get_python_udf_exprs_from_top(best_plan, python_udf_projection_exprs, python_udf_filter_exprs))) {
+    LOG_WARN("failed to get python udf projection and filter exprs", K(ret));
+  /*} else if (OB_FAIL(candi_allocate_subplan_filter(python_udf_projection_exprs, &python_udf_filter_exprs))) {
+    LOG_WARN("failed to do allocate subplan filter", K(ret));*/
   //} else if (OB_FAIL(candi_allocate_python_udf_with_hint(stmt->get_python_udf_exprs(),
   //                                                       //stmt->get_qualify_filters(),
   //                                                       python_udf_plans))) {
@@ -7939,9 +7949,10 @@ int ObSelectLogPlan::candi_allocate_python_udf()
   //} else if (OB_FAIL(get_log_plan_hint().check_status())) {
   //  LOG_WARN("failed to generate plans with hint", K(ret));
   } else if (OB_FAIL(candi_allocate_python_udf(stmt->get_python_udf_exprs(),
-                                               //stmt->get_qualify_filters(),
+                                               python_udf_projection_exprs,
+                                               python_udf_filter_exprs,
                                                python_udf_plans))) {
-    LOG_WARN("failed to allocate python udf", K(ret));
+    LOG_WARN("failed to allocate python udf projection", K(ret));
   } else {
     LOG_TRACE("succeed to allocate python udf without hint", K(python_udf_plans.count()));
   }
@@ -7963,6 +7974,65 @@ int ObSelectLogPlan::candi_allocate_python_udf()
   return ret;
 }
 
+int ObSelectLogPlan::get_python_udf_exprs_from_top(const ObLogicalOperator *top,
+				                                           ObIArray<ObRawExpr *> &python_udf_projection_exprs,
+                                                   ObIArray<ObRawExpr *> &python_udf_filter_exprs)
+{
+  int ret = OB_SUCCESS;
+  const ObSelectStmt *select_stmt = get_stmt();
+  python_udf_projection_exprs.reuse();
+  python_udf_filter_exprs.reuse();
+  if (OB_ISNULL(select_stmt) || OB_ISNULL(top)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("get unexpected null", K(select_stmt), K(top), K(ret));
+  } else {
+    std::function<bool(ObRawExpr *, ObItemType)> containType = 
+      [&containType](ObRawExpr *expr, ObItemType type) -> bool {
+      if (expr->get_expr_type() == type) {
+        return true;
+      } else if (expr->get_param_count() == 0) {
+        return false;
+      } else {
+        bool res = false;
+        for (int i = 0; i < expr->get_param_count(); ++i) {
+          res = res || containType(expr->get_param_expr(i), type);
+        }
+        return res;
+      }
+    };
+    ObRawExpr *select_expr = NULL;
+    ObRawExpr *filter_expr = NULL;
+    for (int64_t i = 0; OB_SUCC(ret) && i < select_stmt->get_select_item_size(); ++i) {
+      select_expr = select_stmt->get_select_item(i).expr_;
+      if (OB_ISNULL(select_expr)) {
+        ret = OB_INVALID_ARGUMENT;
+        LOG_WARN("get unexpected null", K(ret));
+      } else if (!containType(select_expr, T_FUN_PYTHON_UDF)) {
+        // skip it
+      } else if (OB_FAIL(python_udf_projection_exprs.push_back(select_expr))) {
+        LOG_WARN("push expr to python udf projection exprs failed", K(ret));
+      } else { /*do nothing*/ }
+    }
+
+    ExprIArray &top_filter_exprs = const_cast<ExprIArray &>(top->get_filter_exprs());
+    int64_t i = 0;
+    while (OB_SUCC(ret) && i < top_filter_exprs.count()) {
+      filter_expr = top_filter_exprs.at(i);
+      if (OB_ISNULL(filter_expr)) {
+        ret = OB_INVALID_ARGUMENT;
+        LOG_WARN("get unexpected null", K(ret));
+      } else if (!containType(filter_expr, T_FUN_PYTHON_UDF)) {
+        // skip it
+        ++i;
+      } else if (OB_FAIL(python_udf_filter_exprs.push_back(filter_expr))) {
+        LOG_WARN("push expr to python udf filter exprs failed", K(ret));
+      } else if (OB_FAIL(top_filter_exprs.remove(i))) {
+        LOG_WARN("remove python udf filter exprs from stmt conditions failed", K(ret));
+      } else { /*do nothing*/ }
+    }
+  }
+  return ret;
+}
 
 // not supported yet
 /*int ObSelectLogPlan::candi_allocate_python_udf_with_hint(const ObIArray<ObWinFunRawExpr*> &python_udf_exprs,
@@ -8039,7 +8109,8 @@ int ObSelectLogPlan::candi_allocate_python_udf()
 }*/
 
 int ObSelectLogPlan::candi_allocate_python_udf(const ObIArray<ObPythonUdfRawExpr*> &python_udf_exprs,
-                                               //const ObIArray<ObRawExpr*> &qualify_filters,
+                                               const ObIArray<ObRawExpr*> &python_udf_projection_exprs,
+                                               const ObIArray<ObRawExpr*> &python_udf_filter_exprs,
                                                ObIArray<CandidatePlan> &total_plans)
 {
   int ret = OB_SUCCESS;
@@ -8052,15 +8123,17 @@ int ObSelectLogPlan::candi_allocate_python_udf(const ObIArray<ObPythonUdfRawExpr
   } else {
     OPT_TRACE_TITLE("start generate python udf operator");
     //ObSEArray<ObOpPseudoColumnRawExpr*, 4> status_exprs;
-    PythonUDFOpHelper python_udf_helper(python_udf_exprs);
+    PythonUDFOpHelper python_udf_helper(python_udf_exprs,
+                                        python_udf_projection_exprs,
+                                        python_udf_filter_exprs);
     for (int64_t i = 0; OB_SUCC(ret) && i < candi_plans.count(); ++i) {
-      OPT_TRACE("generate window function for plan:", candi_plans.at(i));
+      OPT_TRACE("generate python udfs for plan:", candi_plans.at(i));
       if (OB_FAIL(generate_python_udf_plans(python_udf_helper,
                                             //status_exprs,
                                             total_plans,
                                             candi_plans.at(i)
                                            ))) {
-        LOG_WARN("failed to allocate window functions", K(ret));
+        LOG_WARN("failed to allocate python udfs", K(ret));
       } else { }
     }
   }
@@ -8075,6 +8148,8 @@ int ObSelectLogPlan::generate_python_udf_plans(PythonUDFOpHelper &python_udf_hel
   int ret = OB_SUCCESS;
   ObLogicalOperator *top = NULL;
   const ObIArray<ObPythonUdfRawExpr*> &python_udf_exprs = python_udf_helper.all_python_udf_exprs_;
+  const ObIArray<ObRawExpr*> &python_udf_projection_exprs = python_udf_helper.python_udf_projection_exprs_;
+  const ObIArray<ObRawExpr*> &python_udf_filter_exprs = python_udf_helper.python_udf_filter_exprs_;
   ObExchangeInfo exch_info;
   ObSEArray<OrderItem, 8> tmp_sort_keys; // empty
   //const ObIArray<OrderItem> &sort_keys
@@ -8082,6 +8157,7 @@ int ObSelectLogPlan::generate_python_udf_plans(PythonUDFOpHelper &python_udf_hel
   //int64_t prefix_pos = 0;
   // 此处简单地只生成一个执行计划
   // 理论上可以在此根据python udf执行次序和onnx计算图，进行顺序优化和融合过程
+  // 但是决定在改写层做那些
   CandidatePlan candidate_plan = orig_candidate_plan;
   if (OB_ISNULL(top = candidate_plan.plan_tree_)) {
     ret = OB_ERR_UNEXPECTED;
@@ -8093,9 +8169,9 @@ int ObSelectLogPlan::generate_python_udf_plans(PythonUDFOpHelper &python_udf_hel
   if (OB_FAIL(allocate_sort_and_exchange_as_top(top, exch_info, tmp_sort_keys, false,
                                                   0, top->get_is_local_order()))) {
     LOG_WARN("failed to allocate sort and exchange as top", K(ret));
-  //} else if (OB_FAIL(allocate_exchange_as_top(top, exch_info))) {     
+  //} else if (OB_FAIL(allocate_exchange_as_top(top, exch_info))) {
   //  LOG_WARN("failed to allocate exchange as top", K(ret));
-  } else if (OB_FAIL(allocate_python_udf_op_as_top(top, python_udf_exprs))) {
+  } else if (OB_FAIL(allocate_python_udf_op_as_top(top, python_udf_exprs, python_udf_projection_exprs, python_udf_filter_exprs))) {
     LOG_WARN("failed to allocate python udf operator as top", K(ret));
   } else if (OB_FAIL(total_plans.push_back(CandidatePlan(top)))) {
     LOG_WARN("failed to push back", K(ret));
@@ -8104,7 +8180,9 @@ int ObSelectLogPlan::generate_python_udf_plans(PythonUDFOpHelper &python_udf_hel
 }
 
 int ObSelectLogPlan::allocate_python_udf_op_as_top(ObLogicalOperator *&top,
-                                                   const ObIArray<ObPythonUdfRawExpr*> &python_udf_exprs)
+                                                   const ObIArray<ObPythonUdfRawExpr*> &python_udf_exprs,
+                                                   const ObIArray<ObRawExpr*> &python_udf_projection_exprs,
+                                                   const ObIArray<ObRawExpr*> &python_udf_filter_exprs)
 {
   int ret = OB_SUCCESS;
   ObLogPythonUDF *log_python_udf = NULL;
@@ -8117,7 +8195,15 @@ int ObSelectLogPlan::allocate_python_udf_op_as_top(ObLogicalOperator *&top,
     LOG_ERROR("failed to allocate python udf operator", K(ret));
   } else if (OB_FAIL(append(log_python_udf->get_python_udf_exprs(), python_udf_exprs))) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("failed to append python udf exprs", K(ret));
+    LOG_WARN("failed to append all python udf exprs", K(ret));
+  } else if (OB_FAIL(append(log_python_udf->get_python_udf_projection_exprs(), python_udf_projection_exprs))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("failed to append python udf projection exprs", K(ret));
+  } else if (OB_FAIL(append(log_python_udf->get_python_udf_filter_exprs(), python_udf_filter_exprs))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("failed to append python udf filter exprs", K(ret));
+  } else if (OB_FAIL(log_python_udf->get_filter_exprs().assign(python_udf_filter_exprs))) {
+    LOG_WARN("failed to set python udf filter exprs", K(ret));
   } else {
     log_python_udf->set_child(ObLogicalOperator::first_child, top);
     if (OB_FAIL(log_python_udf->compute_property())) {

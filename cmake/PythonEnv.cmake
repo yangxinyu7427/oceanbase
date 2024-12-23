@@ -10,6 +10,7 @@ target_include_directories(
   python_lib INTERFACE
   "${PYTHON_DIR}/include/python3.11"
   "${PYTHON_LIB_DIR}"
-  "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/core/include/")
+  "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/core/include/"
+  "${PYTHON_LIB_DIR}/python3.11/site-packages/numpy/_core/include/")
 target_link_libraries(python_lib INTERFACE
     -L${PYTHON_LIB_DIR} -lpython3.11 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic)

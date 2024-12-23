@@ -113,6 +113,7 @@ constexpr int OB_INVALID_DATE_FORMAT_END = -4190;
 constexpr int OB_DDL_TASK_EXECUTE_TOO_MUCH_TIME = -4192;
 constexpr int OB_HASH_EXIST = -4200;
 constexpr int OB_HASH_NOT_EXIST = -4201;
+constexpr int OB_PYUDF_CACHE_NOT_EXIST = -8888;
 constexpr int OB_HASH_GET_TIMEOUT = -4204;
 constexpr int OB_HASH_PLACEMENT_RETRY = -4205;
 constexpr int OB_HASH_FULL = -4206;
