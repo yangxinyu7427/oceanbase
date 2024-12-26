@@ -31,33 +31,33 @@ class ObPythonUdfEnumType {
 public:
   //枚举计算结果后返回值类型
   enum ModelFrameworkType {
-      INVALID_FRAMEWORK_TYPE,
-      ONNX,
-      SKLEARN,
-      PYTORCH,
-      UNSUPPORTED,
+    INVALID_FRAMEWORK_TYPE,
+    ONNX,
+    SKLEARN,
+    PYTORCH,
+    UNSUPPORTED,
   };
 
   enum ModelType {
-      INVALID_MODEL_TYPE,
-      DECISION_TREE,
+    INVALID_MODEL_TYPE,
+    DECISION_TREE,
   };
 
   //枚举计算结果后返回值类型
   enum PyUdfRetType {
-      UDF_UNINITIAL,
-      STRING,
-      INTEGER,
-      REAL,
-      DECIMAL,
+    UDF_UNINITIAL,
+    STRING,
+    INTEGER,
+    REAL,
+    DECIMAL,
   };
 
   //枚举UDF携带模型信息的类型
   enum PyUdfUsingType {
-      INVALID,
-      MODEL_SPECIFIC,
-      ARBITRARY_CODE,
-      NONE,
+    INVALID,
+    MODEL_SPECIFIC,
+    ARBITRARY_CODE,
+    NONE,
   };
 };
 
@@ -302,8 +302,9 @@ public :
   ObPythonUDFMeta() : name_(), ret_(ObPythonUdfEnumType::PyUdfRetType::UDF_UNINITIAL), pycall_(), 
                       udf_attributes_names_(), udf_attributes_types_(), init_(false), 
                       batch_size_(256), batch_size_const_(false), 
-                      model_type_(ObPythonUdfEnumType::PyUdfUsingType::INVALID), udf_model_meta_(), ismerged_(false), 
-                      merged_udf_names_(), origin_input_count_(0), has_new_output_model_path_(false), has_new_input_model_path_(false) {} 
+                      model_type_(ObPythonUdfEnumType::PyUdfUsingType::INVALID), udf_model_meta_(),is_retree_opt_(false),
+                      ismerged_(false), merged_udf_names_(), origin_input_count_(0), 
+                      has_new_output_model_path_(false), has_new_input_model_path_(false) {} 
   virtual ~ObPythonUDFMeta() = default;
 
   void assign(const ObPythonUDFMeta &other) { 
@@ -327,6 +328,7 @@ public :
     can_be_used_model_path_=other.can_be_used_model_path_;
     opted_model_path_=other.opted_model_path_;
     model_path_=other.model_path_;
+    is_retree_opt_ = other.is_retree_opt_;
   }
 
   ObPythonUDFMeta &operator=(const class ObPythonUDFMeta &other) {
@@ -350,6 +352,7 @@ public :
     model_path_=other.model_path_;
     model_type_ = other.model_type_;
     udf_model_meta_ = other.udf_model_meta_;
+    is_retree_opt_ = other.is_retree_opt_;
     return *this;
   }
 
@@ -374,6 +377,11 @@ public :
   bool batch_size_const_;                                                   // batch_size是否动态调整
   ObPythonUdfEnumType::PyUdfUsingType model_type_;                                  // 是否包含模型信息
   common::ObSEArray<ObUdfModelMeta, 16> udf_model_meta_;                    // udf所使用的模型信息
+
+  // dtpo
+  bool is_retree_opt_;
+
+  // yxy
   bool ismerged_;//是否经查询内冗余消除融合
   std::string opted_model_path_;//经查询内冗余消除策略优化后的模型地址
   common::ObSEArray<common::ObString, 16> merged_udf_names_; //融合的udf名

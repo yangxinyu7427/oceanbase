@@ -102,6 +102,8 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   dst.batch_size_ = src.batch_size_;
   dst.batch_size_const_ = src.batch_size_const_;
   dst.model_type_ = src.model_type_;
+  
+  /*------ yxy -----*/
   dst.ismerged_ = src.ismerged_;
   dst.origin_input_count_=src.origin_input_count_;
   dst.has_new_output_model_path_=src.has_new_output_model_path_;
@@ -109,10 +111,15 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
   dst.has_new_input_model_path_=src.has_new_input_model_path_;
   dst.new_input_model_path_=src.new_input_model_path_;
   dst.opted_model_path_=src.opted_model_path_;
+  /*------ yxy -----*/
   if (OB_FAIL(ob_write_string(alloc, src.name_, dst.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) { // yxy
+    LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) { // yxy
+    LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
   } else {
     for (int64_t i = 0; i < src.udf_attributes_names_.count(); i++) {
       const ObString &name = src.udf_attributes_names_.at(i);
@@ -123,15 +130,8 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
     }
     for (int64_t i = 0; i < src.udf_model_meta_.count(); i++) {
       dst.udf_model_meta_.push_back(src.udf_model_meta_.at(i));
-    } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
-      LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
-    } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) {
-      LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
-    } else { 
-      for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
-        dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
-      }
-      for(int i=0;i<src.merged_udf_names_.count();i++){
+    } 
+    for(int i=0;i<src.merged_udf_names_.count();i++){ // yxy
       dst.merged_udf_names_.push_back(src.merged_udf_names_.at(i));
     }
   }
@@ -458,30 +458,25 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
                   std::string("', 'rb'))") +
                   std::string("\n\tdef pyfun(self, names, args):") +
-                  //std::string("\n\t\twith open('/home/obtest/log/printlog', 'w') as f:") +
-                  //std::string("\n\t\t\tf.write(names)") +
                   std::string("\n\t\treturn self.anonymous_model.predict(pd.DataFrame(np.column_stack(args), columns=names))");
-                  //std::string("\n\t\treturn args[0]");
         break;
       }
       case share::schema::ObPythonUdfEnumType::ModelFrameworkType::ONNX : {
-        std::string input_columns = "";
         pycall += std::string("\nimport numpy as np") +
                   std::string("\nimport onnxruntime as ort") +
                   std::string("\nclass ") + class_name + std::string(":") +
-                  std::string("\n\tself.nanonymous_model_input_columns = [") + 
-                  std::string(input_columns) + 
-                  std::string("]") +
-                  std::string("\n\tself.nanonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str}") +
                   std::string("\n\tdef pyinitial(self):") +
+                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str}") +
                   std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
                   std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
                   std::string("', sess_options=ortconfig)") +
-                  std::string("\n\tdef pyfun(self, *args):") +
-                  std::string("\n\t\tinfer_batch = {") +
-                  std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
-                  std::string("\n\t\t\tfor i, elem in enumerate(self.anonymous_model_input_columns)}") +
-                  std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0]], infer_batch)");
+                  std::string("\n\tdef pyfun(self, names, args):") +
+                  //std::string("\n\t\tinfer_batch = {") +
+                  //std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
+                  //std::string("\n\t\t\tfor i, elem in enumerate(names)}") +
+                  std::string("\n\t\tinfer_batch = {'float_input': np.column_stack(args).astype(np.float32)}") +
+                  std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0].name], infer_batch)[0]");
 
         break;
       }
