@@ -77,13 +77,13 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (FALSE_IT(select_stmt = static_cast<ObSelectStmt*>(stmt))) {
     //准备进行改写
     LOG_WARN("select stmt is NULL", K(ret));
-  } else if (select_stmt->get_condition_exprs().empty()) {
+  } else if (select_stmt->get_python_udf_filter_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
+  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_python_udf_filter_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
+  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_python_udf_filter_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(optimize_on_merged_onnx_model(onnx_model_opted_path))){
     LOG_WARN("optimize_on_merged_model fail", K(ret));
@@ -681,8 +681,8 @@ int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt
   ObSEArray<ObSelectStmt*, 16> child_stmts;
   int python_udf_count=0;
 
-  for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
-    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)));
+  for(int32_t i = 0; i < stmt.get_python_udf_filter_exprs().count(); i++) {
+    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_python_udf_filter_expr(i)));
   }
 
   if(python_udf_count>1){

@@ -113,6 +113,10 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(alloc, src.pycall_, dst.pycall_))) {
     LOG_WARN("fail to write pycall", K(src.pycall_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
+    LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
+  } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) {
+    LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
   } else {
     for (int64_t i = 0; i < src.udf_attributes_names_.count(); i++) {
       const ObString &name = src.udf_attributes_names_.at(i);
@@ -123,15 +127,8 @@ int ObExprPythonUdf::deep_copy_udf_meta(share::schema::ObPythonUDFMeta &dst,
     }
     for (int64_t i = 0; i < src.udf_model_meta_.count(); i++) {
       dst.udf_model_meta_.push_back(src.udf_model_meta_.at(i));
-    } else if (OB_FAIL(ob_write_string(alloc, src.can_be_used_model_path_, dst.can_be_used_model_path_))) {
-      LOG_WARN("fail to write pycall", K(src.can_be_used_model_path_), K(ret));
-    } else if (OB_FAIL(ob_write_string(alloc, src.model_path_, dst.model_path_))) {
-      LOG_WARN("fail to write pycall", K(src.model_path_), K(ret));
-    } else { 
-      for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
-        dst.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
-      }
-      for(int i=0;i<src.merged_udf_names_.count();i++){
+    }
+    for(int i=0;i<src.merged_udf_names_.count();i++){
       dst.merged_udf_names_.push_back(src.merged_udf_names_.at(i));
     }
   }
