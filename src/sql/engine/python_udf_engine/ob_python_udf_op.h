@@ -262,6 +262,8 @@ public:
   virtual int inner_rescan() override;
   virtual int inner_get_next_row() override;
   virtual int inner_get_next_batch(const int64_t max_row_cnt) override;
+  virtual int inner_get_next_batch_with_cache(const int64_t max_row_cnt) override;
+  virtual int inner_get_next_batch_without_cache(const int64_t max_row_cnt) override;
   virtual void destroy() override;
 
 private:

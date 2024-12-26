@@ -17,8 +17,8 @@ typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
 static bool with_batch_control_ = true; // 是否进行batch size控制
-static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
-static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
+static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
+static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
 
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
@@ -135,6 +135,17 @@ int ObPythonUDFOp::inner_get_next_row()
   return ret;
 }
 
+int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
+{
+  int ret = OB_SUCCESS;
+  if(with_full_funcache_||with_fine_funcache_) {
+    ret = inner_get_next_batch_with_cache(max_row_cnt);
+  } else {
+    ret = inner_get_next_batch_without_cache(max_row_cnt);
+  }
+  return ret;
+}
+
 /*使用缓存，确保每轮迭代能够以合适的批次大小计算Python UDF
 * 1. 调用Python UDF expr的子expr
 * 2. 复制frame上的输入至input缓存
@@ -143,7 +154,107 @@ int ObPythonUDFOp::inner_get_next_row()
 * 5. 将output缓存复制回frame上的输出
 * 6. 重复5至output缓存清空
  */
-int ObPythonUDFOp::inner_get_next_batch(const int64_t max_row_cnt)
+int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
+{
+  int ret = OB_SUCCESS;
+  // get data from buffer
+
+  // Ensure GIL
+  bool nStatus = PyGILState_Check();
+  PyGILState_STATE gstate;
+  if(!nStatus) {
+    gstate = PyGILState_Ensure();
+    nStatus = true;
+  }
+  struct timeval t1, t2;
+  gettimeofday(&t1, NULL);
+
+  if (with_batch_control_) {
+    if (OB_SUCC(ret) && !controller_.can_output()) {
+      clear_evaluated_flag();
+      controller_.resize(controller_.get_desirable() * 2);
+      const ObBatchRows *child_brs = nullptr;
+      while (OB_SUCC(ret) && !brs_.end_ && !controller_.is_full()) { // while loop直至缓存填满
+        if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Get child next batch failed.", K(ret));
+        } else if (brs_.copy(child_brs)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Copy child batch rows failed.", K(ret));
+        } else if (OB_FAIL(controller_.store(eval_ctx_, brs_))){
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Save input batchrows failed.", K(ret));
+        }
+      }
+      if (OB_FAIL(ret) || OB_FAIL(controller_.process())) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Process python udf failed.", K(ret));
+      }
+    }
+  } else { // 无batch size控制
+    if (OB_SUCC(ret)) { 
+      clear_evaluated_flag();
+      controller_.resize(controller_.get_desirable());
+      const ObBatchRows *child_brs = nullptr;
+      if (OB_FAIL(child_->get_next_batch(max_row_cnt, child_brs))) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Get child next batch failed.", K(ret));
+      } else if (brs_.copy(child_brs)) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Copy child batch rows failed.", K(ret));
+      } else if (OB_FAIL(controller_.store(eval_ctx_, brs_))){
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Save input batchrows failed.", K(ret));
+      } else if (OB_FAIL(controller_.process())) {
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Process python udf failed.", K(ret));
+      } else {}
+    }
+  }
+
+  if (OB_FAIL(ret) || OB_FAIL(controller_.restore(eval_ctx_, brs_, max_row_cnt))) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Restore output batchrows failed.", K(ret));
+  } else {
+    // reset all spec filters
+    FOREACH_CNT_X(e, MY_SPEC.filters_, OB_SUCC(ret)) {
+      (*e)->clear_evaluated_flag(eval_ctx_);
+      (*e)->get_eval_info(eval_ctx_).clear_evaluated_flag();
+    }
+  }
+  gettimeofday(&t2, NULL);
+  double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec);
+  double time_s = timeuse / 1000;
+  // std::fstream time_log;
+  // time_log.open("/home/test/experiments/oceanbase/opt/op_time.log", std::ios::app);
+  // time_log << time_s << " ";
+  // time_log.close(); 
+
+  //PyGC_Enable();
+  //PyGC_Collect();
+  // Release GIL
+  if(nStatus) {
+    PyGILState_Release(gstate);
+  }
+
+  /*std::ofstream outputFile("/home/test/experiments/oceanbase/px/log/batch_size.txt", std::ios::app);
+  if (outputFile) {
+    outputFile << brs_.size_ << std::endl;
+  }
+  outputFile.close();*/
+
+  return ret;
+}
+
+/*使用缓存，确保每轮迭代能够以合适的批次大小计算Python UDF
+* 1. 调用Python UDF expr的子expr
+* 2. 复制frame上的输入至input缓存
+* 3. 重复1，2至input缓存到达阈值
+* 4. 直接在input缓存上计算Python UDF，并将结果保存至output缓存
+* 5. 将output缓存复制回frame上的输出
+* 6. 重复5至output缓存清空
+ */
+int ObPythonUDFOp::inner_get_next_batch_with_cache(const int64_t max_row_cnt)
 {
   int ret = OB_SUCCESS;
   // get data from buffer
