@@ -178,7 +178,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
-    udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+    udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
     udf_meta_opted.udf_attributes_types_=udf_meta_opted_l.udf_attributes_types_;
     for(int i=udf_input_count;i<udf_meta_opted_r.udf_attributes_types_.count();i++){
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_opted_r.udf_attributes_types_.at(i));
@@ -328,7 +328,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
-    udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+    udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
     udf_meta_opted.udf_attributes_types_=udf_meta_opted_l.udf_attributes_types_;
     for(int i=udf_input_count_l;i<udf_meta_opted_r.udf_attributes_types_.count();i++){
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_opted_r.udf_attributes_types_.at(i));
@@ -367,7 +367,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     // 获取右子树的返回值类型
     ObObjType dataType=expr_r->get_data_type();
     string inputType;
-    ObPythonUDF::PyUdfRetType udf_meta_ret_type;
+    share::schema::ObPythonUdfEnumType::PyUdfRetType udf_meta_ret_type;
     switch(dataType) {
         case ObCharType :
         case ObVarcharType :
@@ -376,7 +376,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
         case ObMediumTextType :
         case ObLongTextType : {
           inputType="string";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::STRING;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::STRING;
           break;
         }
         case ObTinyIntType :
@@ -385,17 +385,17 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
         case ObInt32Type :
         case ObIntType :{
           inputType="int";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::INTEGER;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
           break;
         }
         case ObDoubleType :{
           inputType="double";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::REAL;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::REAL;
           break;
         }
         // case ObNumberType :{
         //   inputType="double";
-        //   udf_meta_ret_type=ObPythonUDF::PyUdfRetType::DECIMAL;
+        //   udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::DECIMAL;
         //   break;
         // }
         default : 
@@ -420,7 +420,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
-      udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+      udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
       udf_meta_opted.udf_attributes_types_=udf_meta_opted_l.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
       // 构造新的python_udf_expr
@@ -454,7 +454,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     // 获取左子树的返回值类型
     ObObjType dataType=expr_l->get_data_type();
     string inputType;
-    ObPythonUDF::PyUdfRetType udf_meta_ret_type;
+    share::schema::ObPythonUdfEnumType::PyUdfRetType udf_meta_ret_type;
     switch(dataType) {
         case ObCharType :
         case ObVarcharType :
@@ -463,7 +463,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
         case ObMediumTextType :
         case ObLongTextType : {
           inputType="string";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::STRING;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::STRING;
           break;
         }
         case ObTinyIntType :
@@ -472,17 +472,17 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
         case ObInt32Type :
         case ObIntType :{
           inputType="int";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::INTEGER;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
           break;
         }
         case ObDoubleType :{
           inputType="double";
-          udf_meta_ret_type=ObPythonUDF::PyUdfRetType::REAL;
+          udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::REAL;
           break;
         }
         // case ObNumberType :{
         //   inputType="double";
-        //   udf_meta_ret_type=ObPythonUDF::PyUdfRetType::DECIMAL;
+        //   udf_meta_ret_type=share::schema::ObPythonUdfEnumType::PyUdfRetType::DECIMAL;
         //   break;
         // }
         default : 
@@ -507,7 +507,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
-      udf_meta_opted.ret_=ObPythonUDF::PyUdfRetType::INTEGER;
+      udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
       udf_meta_opted.udf_attributes_types_=udf_meta_opted_r.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
       // 构造新的python_udf_expr

@@ -13,9 +13,12 @@ using namespace common;
 namespace sql
 {
 
+typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
+
+
 static bool with_batch_control_ = true; // 是否进行batch size控制
-static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
-static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
+static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
+static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
 
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
@@ -1157,16 +1160,16 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   count=0;
   for(int i=0;i<mid_res_bit_vector.size();i++){
     if(mid_res_bit_vector[i]){
-      if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+      if(ret_type==PyUdfType::STRING){
         const char* value=PyUnicode_AsUTF8(
           PyArray_GETITEM((PyArrayObject *)pResult_input, (char *)PyArray_GETPTR1((PyArrayObject *)pResult_input, count++)));
         string value_str(value);
         cached_res_for_str[i]=value_str;
-      }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+      }else if(ret_type==PyUdfType::INTEGER){
         int tmp=PyLong_AsLong(
           PyArray_GETITEM((PyArrayObject *)pResult_input, (char *)PyArray_GETPTR1((PyArrayObject *)pResult_input, count++)));
         cached_res_for_int[i]=tmp;
-      }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::REAL){
+      }else if(ret_type==PyUdfType::REAL){
         double tmp=PyFloat_AsDouble(
           PyArray_GETITEM((PyArrayObject *)pResult_input, (char *)PyArray_GETPTR1((PyArrayObject *)pResult_input, count++)));
         cached_res_for_double[i]=tmp;
@@ -1534,12 +1537,12 @@ int ObPythonUDFCell::do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, 
   VectorFormat format = VEC_INVALID;
   const ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
   switch(info->udf_meta_.ret_) {
-    case share::schema::ObPythonUdfEnumType::PyUdfRetType::STRING:
+    case PyUdfType::STRING:
       format = VEC_DISCRETE;
       //format = VEC_CONTINUOUS;
     break;
-    case share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER:
-    case share::schema::ObPythonUdfEnumType::PyUdfRetType::REAL:
+    case PyUdfType::INTEGER:
+    case PyUdfType::REAL:
       format = VEC_FIXED;
     break;
     default:
@@ -1601,12 +1604,12 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
   //if (!expr_->get_eval_info(eval_ctx).evaluated_) {
   VectorFormat format = VEC_INVALID;
   switch(info->udf_meta_.ret_) {
-    case share::schema::ObPythonUDF::PyUdfRetType::STRING:
+    case PyUdfType::STRING:
       format = VEC_DISCRETE;
       //format = VEC_CONTINUOUS;
     break;
-    case share::schema::ObPythonUDF::PyUdfRetType::INTEGER:
-    case share::schema::ObPythonUDF::PyUdfRetType::REAL:
+    case PyUdfType::INTEGER:
+    case PyUdfType::REAL:
       format = VEC_FIXED;
     break;
     default:
@@ -1981,6 +1984,8 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
   std::string instance_name = name + "UdfInstance";
   PyObject *method_name = Py_BuildValue("s", "pyfun");
 
+  ObUdfModelMeta model_meta = info->udf_meta_.udf_model_meta_.at(0);
+
   PyObject *pModule = nullptr;
   PyObject *pClass = nullptr;
   PyObject *pInstance = nullptr;
@@ -2021,7 +2026,6 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
                 !PyCallable_Check(pFunc)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Check function handler failed.", K(ret));
-    //} else if ((pResult = PyObject_CallMethodObjArgs(pInstance, method_name, pArgNames, pArgs)) == nullptr) {
     } else if ((pResult = PyObject_CallMethod(pInstance, "pyfun", "NN", pArgNames, pArgs)) == nullptr) {
       ObExprPythonUdf::process_python_exception();
       ret = OB_ERR_UNEXPECTED;
@@ -2038,6 +2042,10 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
       }
       result_size_ += eval_size;
     }
+  }
+  if (result_store_ == nullptr) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("Unexpected null result store.", K(ret));
   }
   return ret;
 }
@@ -2320,11 +2328,11 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                 }
               }
           }
-          if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+          if(ret_type==PyUdfType::STRING){
             cells_cached_res_for_str[count].resize(size);
-          }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+          }else if(ret_type==PyUdfType::INTEGER){
             cells_cached_res_for_int[count].resize(size);
-          }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::REAL){
+          }else if(ret_type==PyUdfType::REAL){
             cells_cached_res_for_double[count].resize(size);
           }
           //检查input是否有初始化缓存
@@ -2332,7 +2340,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
             // 有初始化缓存
             cells_can_use_cache[count]=0;
             // 查缓存，并把有缓存的input标识出来
-            if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+            if(ret_type==PyUdfType::STRING){
               for(int j=0; j < cell->get_input_store().get_saved_size(); ++j){
                 string value;
                 const char* original_c_str=input_list_for_cells[count][j].c_str();
@@ -2362,7 +2370,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                   cells_cached_res_for_str[count][j]=value;
                 }
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+            }else if(ret_type==PyUdfType::INTEGER){
               for(int j=0; j < cell->get_input_store().get_saved_size(); ++j){
                 int value;
                 const char* original_c_str=input_list_for_cells[count][j].c_str();
@@ -2392,7 +2400,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                   cells_cached_res_for_int[count][j]=value;
                 }
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::REAL){
+            }else if(ret_type==PyUdfType::REAL){
               for(int j=0; j < cell->get_input_store().get_saved_size(); ++j){
                 double value;
                 const char* original_c_str=input_list_for_cells[count][j].c_str();
@@ -2426,21 +2434,21 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
           }else if(info->udf_meta_.ismerged_){
             // 如果是经查询内冗余消除后的udf，就不对融合后的udf进行缓存，而是缓存融合前的每个udf
             cells_can_use_cache[count]=0;
-            if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+            if(ret_type==PyUdfType::STRING){
               for(auto name: info->udf_meta_.merged_udf_names_){
                 if(!udf_cache.find_cache_for_cell(name)){
                   udf_cache.create_cache_for_cell_for_str(name);
                   info->is_new_full_cache=true;
                 }
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+            }else if(ret_type==PyUdfType::INTEGER){
               for(auto name: info->udf_meta_.merged_udf_names_){
                 if(!udf_cache.find_cache_for_cell(name)){
                   udf_cache.create_cache_for_cell_for_int(name);
                   info->is_new_full_cache=true;
                 }   
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::REAL){
+            }else if(ret_type==PyUdfType::REAL){
               for(auto name: info->udf_meta_.merged_udf_names_){
                 if(!udf_cache.find_cache_for_cell(name)){
                   udf_cache.create_cache_for_cell_for_double(name);
@@ -2451,17 +2459,17 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
           }else{
             // 没初始化缓存，就初始化
             cells_can_use_cache[count]=0;
-            if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::STRING){
+            if(ret_type==PyUdfType::STRING){
               if(!udf_cache.find_cache_for_cell(udf_name)){
                 udf_cache.create_cache_for_cell_for_str(udf_name);
                 info->is_new_full_cache=true;
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::INTEGER){
+            }else if(ret_type==PyUdfType::INTEGER){
               if(!udf_cache.find_cache_for_cell(udf_name)){
                 udf_cache.create_cache_for_cell_for_int(udf_name);
                 info->is_new_full_cache=true;
               }
-            }else if(ret_type==share::schema::ObPythonUDF::PyUdfRetType::REAL){
+            }else if(ret_type==PyUdfType::REAL){
               if(!udf_cache.find_cache_for_cell(udf_name)){
                 udf_cache.create_cache_for_cell_for_double(udf_name);
                 info->is_new_full_cache=true;

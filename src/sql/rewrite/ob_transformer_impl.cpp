@@ -47,6 +47,7 @@
 #include "sql/rewrite/ob_transform_count_to_exists.h"
 #include "sql/rewrite/ob_transform_expr_pullup.h"
 #include "sql/rewrite/ob_transform_dblink.h"
+#include "sql/rewrite/ob_transform_pyudf_dtpo.h"
 #include "sql/rewrite/ob_transform_pyudf_merge.h"
 #include "sql/rewrite/ob_transform_pyudf_redundent.h"
 #include "common/ob_smart_call.h"
@@ -323,8 +324,9 @@ int ObTransformerImpl::transform_rule_set(ObDMLStmt *&stmt,
   { // pull up python udf filter
     // pile
     bool trans_happened = false;
-    APPLY_RULE_IF_NEEDED(PYUDF_MERGE,ObTransformPyUDFMerge);
-    APPLY_RULE_IF_NEEDED(PYUDF_REDUNDENT,ObTransformPyUDFRedundent);
+    APPLY_RULE_IF_NEEDED(PYUDF_DTPO, ObTransformPyUdfDTPO);
+    //APPLY_RULE_IF_NEEDED(PYUDF_MERGE,ObTransformPyUDFMerge);
+    //APPLY_RULE_IF_NEEDED(PYUDF_REDUNDENT,ObTransformPyUDFRedundent);
   }
   return ret;
 }
