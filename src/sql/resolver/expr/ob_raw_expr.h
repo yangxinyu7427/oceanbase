@@ -4678,7 +4678,19 @@ public:
   int assign(const ObRawExpr &other) override;
   int inner_deep_copy(ObIRawExprCopier &copier) override;
   int set_udf_meta(share::schema::ObPythonUDF &udf, int batch_size);
+  int set_udf_meta(share::schema::ObPythonUDFMeta &src);
   const share::schema::ObPythonUDFMeta &get_udf_meta() const { return udf_meta_; }
+  share::schema::ObPythonUDFMeta &get_udf_meta() { return udf_meta_; }
+  int set_udf_meta_merged_udf_name_list(ObIArray<ObString> &merged_udf_name_list);
+  int set_udf_meta_origin_input_count(int num);
+  int set_udf_meta_has_new_output_model_path();
+  int set_udf_meta_has_no_output_model_path();
+  int set_udf_meta_new_output_model_path(std::string path);
+  int set_udf_meta_model_path(ObString model_path);
+  int set_udf_meta_can_be_used_model_path(ObString can_be_used_model_path);
+  int set_udf_meta_has_new_input_model_path();
+  int set_udf_meta_opted_model_path(std::string opted_model_path);
+  int set_udf_meta_new_input_model_path(std::string path);
   virtual bool inner_same_as(const ObRawExpr &expr,
                              ObExprEqualCheckContext *check_context = NULL) const override;
   virtual int get_name_internal(char *buf, const int64_t buf_len, int64_t &pos, ExplainType type) const override;

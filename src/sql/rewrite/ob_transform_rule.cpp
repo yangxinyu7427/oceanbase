@@ -134,6 +134,9 @@ const char* ObTransformerCtx::get_trans_type_string(uint64_t trans_type)
     TRANS_TYPE_TO_STR(SIMPLIFY_WINFUNC)
     TRANS_TYPE_TO_STR(SELECT_EXPR_PULLUP)
     TRANS_TYPE_TO_STR(PROCESS_DBLINK)
+    TRANS_TYPE_TO_STR(PYUDF_MERGE)
+    TRANS_TYPE_TO_STR(PYUDF_REDUNDENT)
+    TRANS_TYPE_TO_STR(PYUDF_DTPO)
     default:  return NULL;
   }
 }

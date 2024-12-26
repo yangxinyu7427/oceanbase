@@ -5207,11 +5207,11 @@ DROP MODEL opt_if_exists NAME_OB
 }
 ;
 
-// show_udf_model_stmt:
-// SHOW MODEL opt_if_exists NAME_OB
-// {
-//   malloc_non_terminal_node($$, result->malloc_pool_, T_SHOW_UDF_MODEL, 2, $3, $4);
-// }
+//show_udf_model_stmt:
+//SHOW MODEL opt_if_exists NAME_OB
+//{
+//  malloc_non_terminal_node($$, result->malloc_pool_, T_SHOW_UDF_MODEL, 2, $3, $4);
+//}
 // model_metadata_list:
 // '(' FRAMEWORK STRING_VALUE ',' TYPE STRING_VALUE ',' MODEL_LOCATION STRING_VALUE ')'
 // {

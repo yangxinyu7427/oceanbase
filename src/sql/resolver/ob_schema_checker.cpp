@@ -1927,7 +1927,15 @@ int ObSchemaChecker::get_python_udf_info(uint64_t tenant_id,
     LOG_WARN("invalid argument", K(ret), K(schema_mgr_));
   } else if (OB_FAIL(schema_mgr_->get_python_udf_info(tenant_id, udf_name, udf_info, exist))) {
     LOG_WARN("failed to get python udf schema", K(ret));
-  }
+  } else {
+    // 根据udf name获取所有关联model info，可能为空
+    
+    // 查udf, model对应表
+
+    // 根据对应的id，查model表
+
+    // 依次塞入udf_info的数组里
+  } 
   return ret;
 }
 

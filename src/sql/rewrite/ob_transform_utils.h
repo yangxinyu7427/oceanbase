@@ -1812,6 +1812,22 @@ public:
   static int extract_shared_exprs(ObDMLStmt *parent,
                                   ObIArray<ObRawExpr *> &relation_exprs,
                                   ObIArray<ObRawExpr *> &common_exprs);
+
+  // for python udf
+  static int extract_python_udf_exprs(ObIArray<ObRawExpr *> &src_exprs,
+                                      ObIArray<ObRawExpr *> &dst_exprs);
+
+  static bool expr_contain_type(ObRawExpr *expr,
+                               ObExprOperatorType type);   
+
+  static int count_python_udf_num(ObRawExpr *expr);
+
+  static int extract_python_udf_exprs_idx_in_condition(ObIArray<int64_t> &idx_list,
+                                         ObIArray<ObRawExpr *> &src_exprs);  
+
+  static int extract_all_python_udf_raw_expr_in_raw_expr(ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
+                                        ObRawExpr *src_expr);
+
   static int check_is_index_part_key(ObTransformerCtx &ctx, ObDMLStmt &stmt, ObRawExpr *check_expr, bool &is_valid);
 
   static int check_stmt_is_only_full_group_by(const ObSelectStmt *stmt,
