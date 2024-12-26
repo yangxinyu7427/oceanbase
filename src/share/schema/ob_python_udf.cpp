@@ -46,14 +46,17 @@ ObPythonUDF::~ObPythonUDF()
 {
 }
 
-int ObPythonUDF::get_arg_names_arr(common::ObSEArray<common::ObString, 16> &udf_attributes_names) const {
+int ObPythonUDF::get_arg_names_arr(common::ObIAllocator &allocator,
+                                   common::ObSEArray<common::ObString, 16> &udf_attributes_names) const {
   int ret = OB_SUCCESS;
   udf_attributes_names.reuse();
   char* arg_names_str = const_cast<char*>(get_arg_names());
   std::istringstream ss(arg_names_str);
   std::string token;
   while (std::getline(ss, token, ',')) {
-      udf_attributes_names.push_back(common::ObString(token.length(),token.c_str()));
+      char *ptr = static_cast<char *>(allocator.alloc(token.length()));
+      MEMCPY(ptr, token.c_str(), token.length());
+      udf_attributes_names.push_back(common::ObString(token.length(), ptr));
   }
   if(udf_attributes_names.count() != arg_num_) {
     ret = OB_ERR_UNEXPECTED;
@@ -86,14 +89,17 @@ int ObPythonUDF::get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfR
   return ret;
 }
 
-int ObPythonUDF::get_udf_model_names_arr(common::ObSEArray<common::ObString, 16> &udf_model_names) const {
+int ObPythonUDF::get_udf_model_names_arr(common::ObIAllocator &allocator,
+                                         common::ObSEArray<common::ObString, 16> &udf_model_names) const {
   int ret = OB_SUCCESS;
   udf_model_names.reuse();
   char* udf_model_names_str = const_cast<char*>(get_model_names());
   std::istringstream ss(udf_model_names_str);
   std::string token;
   while (std::getline(ss, token, ',')) {
-      udf_model_names.push_back(common::ObString(token.length(),token.c_str()));
+      char *ptr = static_cast<char *>(allocator.alloc(token.length()));
+      MEMCPY(ptr, token.c_str(), token.length());
+      udf_model_names.push_back(common::ObString(token.length(), ptr));
   }
   if(udf_model_names.count() != model_num_) {
     ret = OB_ERR_UNEXPECTED;

@@ -4664,7 +4664,7 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDF &udf, int batch_
     LOG_WARN("fail to write pycall", K(udf.get_pycall_str()), K(ret));
   } else if (OB_FAIL(udf.get_arg_types_arr(udf_meta_.udf_attributes_types_))){ 
     LOG_WARN("fail to insert attributes types", K(udf.get_pycall_str()), K(ret));
-  } else if (OB_FAIL(udf.get_arg_names_arr(udf_meta_.udf_attributes_names_))){ 
+  } else if (OB_FAIL(udf.get_arg_names_arr(*inner_alloc_, udf_meta_.udf_attributes_names_))){ 
     LOG_WARN("fail to insert attributes names", K(udf.get_pycall_str()), K(ret));
   }
   return ret;
