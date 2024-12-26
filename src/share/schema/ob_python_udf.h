@@ -257,7 +257,7 @@ public:
     int get_arg_names_arr(common::ObIAllocator &allocator,
                           common::ObSEArray<common::ObString, 16> &udf_attributes_names) const;
     int get_arg_types_arr(common::ObSEArray<ObPythonUdfEnumType::PyUdfRetType, 16> &udf_attributes_types) const;
-    int get_udf_model_names_arr(common::ObSEArray<common::ObString, 16> &udf_model_names) const;
+    int get_udf_model_names_arr(common::ObIAllocator &allocator, common::ObSEArray<common::ObString, 16> &udf_model_names) const;
     int insert_udf_model_info(ObUdfModel &model_info);
     int check_pycall() const;
 

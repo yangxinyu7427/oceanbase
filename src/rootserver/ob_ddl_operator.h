@@ -860,6 +860,10 @@ public:
                      const common::ObString &name,
                      common::ObMySQLTransaction &trans,
                      const common::ObString *ddl_stmt_str/*=NULL*/);
+  int drop_udf_model_map(const uint64_t tenant_id,
+                         const common::ObString &name,
+                         common::ObMySQLTransaction &trans,
+                         const common::ObString *ddl_stmt_str/*=NULL*/);   
   //----End of functions for managing model----
 
   //----Functions for label security----

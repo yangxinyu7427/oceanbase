@@ -34939,15 +34939,19 @@ int ObDDLService::drop_python_udf(const obrpc::ObDropPythonUdfArg &drop_python_u
     LOG_WARN("invalid argument", K(drop_python_udf_arg), K(ret));
   }
 
+  //check udf model map exist & drop udf model map
   //check python udf exist & drop udf
   if (OB_SUCC(ret)) {
-    bool is_exist = false;
+    bool udf_model_exist = false;
+    bool python_udf_exist = false;
     uint64_t udf_id = OB_INVALID_ID;
     int64_t refreshed_schema_version = 0;
+    udf_model_exist = schema_service_->check_udf_model_map_exist(tenant_id, name, udf_id);
     if (OB_FAIL(schema_service_->check_python_udf_exist(tenant_id, name,
-                                                        is_exist, udf_id))) {
+                                                        python_udf_exist, udf_id))) {
       LOG_WARN("check_udf_exist failed", K(tenant_id), K(name), K(ret));
-    } else if (!is_exist) {
+    } 
+    if (!python_udf_exist) {
       if (if_exist) {
         LOG_USER_NOTE(OB_ERR_FUNCTION_UNKNOWN, "PYTHON UDF", name.length(), name.ptr());
         LOG_INFO("function not exist, no need to delete it", K(tenant_id), K(name));
@@ -34960,11 +34964,22 @@ int ObDDLService::drop_python_udf(const obrpc::ObDropPythonUdfArg &drop_python_u
     } else if (OB_FAIL(trans.start(sql_proxy_, tenant_id, refreshed_schema_version))) {
       LOG_WARN("start transaction failed", KR(ret), K(tenant_id));
     } else {
+      LOG_WARN("===DDLOperator===:",K(udf_model_exist), K(python_udf_exist), K(ret));
       ObDDLOperator ddl_operator(*schema_service_, *sql_proxy_);
       if (OB_FAIL(ObDependencyInfo::modify_dep_obj_status(trans, tenant_id, udf_id,
                                                           ddl_operator, *schema_service_))) {
         LOG_WARN("failed to modify obj status", K(ret));
-      } else if (OB_FAIL(ddl_operator.drop_python_udf(tenant_id, name, trans, &drop_python_udf_arg.ddl_stmt_str_))) {
+      } 
+      if (!udf_model_exist) {
+        if (if_exist) {
+          LOG_INFO("udf model map not exist, no need to delete it", K(tenant_id), K(name));
+        } else {
+          LOG_WARN("udf model map not exist, can't delete it", K(tenant_id), K(name), K(ret));
+        }
+      } else if (OB_FAIL(ddl_operator.drop_udf_model_map(tenant_id, name, trans, &drop_python_udf_arg.ddl_stmt_str_))) {
+        LOG_WARN("ddl_operator drop_udf_model_map failed", K(tenant_id), K(ret));
+      } 
+      if (OB_FAIL(ddl_operator.drop_python_udf(tenant_id, name, trans, &drop_python_udf_arg.ddl_stmt_str_))) {
         LOG_WARN("ddl_operator drop_python_udf failed", K(tenant_id), K(ret));
       } else {/*do nothing*/}
     }

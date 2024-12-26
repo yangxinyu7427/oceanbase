@@ -349,6 +349,7 @@ public:
                              bool &exist,
                              uint64_t &udf_id);
   int get_python_udf_info(const uint64_t tenant_id,
+                          common::ObIAllocator &allocator,
                           const common::ObString &udf_name,
                           share::schema::ObPythonUDF &udf_info,
                           bool &exist);
@@ -366,10 +367,16 @@ public:
   int fill_udf_model_schema(const uint64_t tenant_id,
                             common::sqlclient::ObMySQLResult &result,
                             ObUdfModel &model_info);
+  bool check_udf_model_map_exist(const uint64_t tenant_id,
+                                 const common::ObString &name,
+                                 uint64_t &udf_id);
   int get_udf_model_map_info(const uint64_t tenant_id,
                              const common::ObString &udf_name,
                              share::schema::ObPythonUDF &udf_info,
                              bool &exist);
+  int fill_udf_model_map_schema(const uint64_t tenant_id,
+                                common::sqlclient::ObMySQLResult &result,
+                                ObPythonUDF &udf_info);
   /*------------- refresh schema interface -----------------*/
   int broadcast_tenant_schema(
       const uint64_t tenant_id,

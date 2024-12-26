@@ -170,11 +170,9 @@ int ObPythonUdfSqlService::delete_python_udf(const uint64_t tenant_id,
 {
   int ret = OB_SUCCESS;
   int64_t affected_rows = 0;
-  ObSqlString sql1, sql2, sql3;
+  ObSqlString sql;
   const int64_t IS_DELETED = 1;
   const uint64_t exec_tenant_id = ObSchemaUtils::get_exec_tenant_id(tenant_id);
-  //udf-model映射关系是否存在
-  bool udf_model_exist = false;
   if (OB_ISNULL(sql_client)) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("invalid sql client is NULL", K(ret));
@@ -194,61 +192,19 @@ int ObPythonUdfSqlService::delete_python_udf(const uint64_t tenant_id,
     //   ret = OB_ERR_UNEXPECTED;
     //   LOG_WARN("no row has inserted", K(ret));
     // } else {/*do nothing*/}
-    std::string udf_model_table = "__all_udf_model_map";        //udf与model关联系统表
-    SMART_VAR(ObMySQLProxy::MySQLResult, res) {
-      common::sqlclient::ObMySQLResult *result = NULL;
-      // delete from __all_udf_model_map
-      //首先先检查记录是否存在
-      if (OB_FAIL(sql1.append_fmt("SELECT * FROM %s WHERE udf_name = '%.*s'", udf_model_table.c_str(), name.length(), name.ptr()))) {
-          LOG_WARN("append sql failed", K(ret));
-        } 
-      if (OB_SUCC(ret)) {
-        if (OB_FAIL(sql_client->read(res, tenant_id, sql1.ptr()))) {
-          LOG_WARN("ObMultiVersionSchemaService execute sql1 failed", K(ret), K(tenant_id), K(sql1));
-        } else if (OB_UNLIKELY(NULL == (result = res.get_result()))) {
-          ret = OB_ERR_UNEXPECTED;
-          LOG_WARN("fail to get result. ", K(ret));
-        } else {
-          while (OB_SUCCESS == ret && OB_SUCCESS == (ret = result->next())) {
-            udf_model_exist = true;
-          }
-          if (ret != OB_ITER_END) {
-            LOG_WARN("fail to get all python udf schema. iter quit. ", K(ret));
-          } else {
-            ret = OB_SUCCESS;
-            LOG_WARN("retrieve python udf schemas succeed", K(tenant_id));
-          }
-        }
-      }
-    }
-    //若udf-model记录存在
-    if (udf_model_exist == true) {
-      if (FAILEDx(sql2.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND udf_name='%s'",
-                                  udf_model_table.c_str(),
-                                  ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
-                                  name.ptr()))) {
-        LOG_WARN("append_fmt failed", K(ret));
-      } else if (OB_FAIL(sql_client->write(exec_tenant_id, sql2.ptr(), affected_rows))) {
-        LOG_WARN("fail to execute sql", K(tenant_id), K(sql2), K(ret));
-      } else if (1 != affected_rows) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("no row deleted", K(sql2), K(affected_rows), K(ret));
-      }
-    }
     //删除__all_python_udf系统表中的记录
     std::string python_udf_table = "__all_python_udf";          //python udf系统表
-    if (FAILEDx(sql3.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND name='%s'",
+    if (FAILEDx(sql.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND name='%s'",
                                python_udf_table.c_str(),
                                ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
                                name.ptr()))) {
       LOG_WARN("append_fmt failed", K(ret));
-    } else if (OB_FAIL(sql_client->write(exec_tenant_id, sql3.ptr(), affected_rows))) {
-      LOG_WARN("fail to execute sql", K(tenant_id), K(sql3), K(ret));
+    } else if (OB_FAIL(sql_client->write(exec_tenant_id, sql.ptr(), affected_rows))) {
+      LOG_WARN("fail to execute sql", K(tenant_id), K(sql), K(ret));
     } else if (1 != affected_rows) {
       ret = OB_ERR_UNEXPECTED;
-      LOG_WARN("no row deleted", K(sql3), K(affected_rows), K(ret));
+      LOG_WARN("no row deleted", K(sql), K(affected_rows), K(ret));
     } else {/*do nothing*/}
-
     // // log operation
     // if (OB_SUCC(ret)) {
     //   ObSchemaOperation opt;
@@ -269,6 +225,68 @@ int ObPythonUdfSqlService::delete_python_udf(const uint64_t tenant_id,
   return ret;
 }
 
+int ObPythonUdfSqlService::delete_udf_model_map(const uint64_t tenant_id,            
+                                                const common::ObString &name,
+                                                const int64_t new_schema_version,
+                                                common::ObISQLClient *sql_client,
+                                                const common::ObString *ddl_stmt_str)
+{
+  int ret = OB_SUCCESS;
+  int64_t affected_rows = 0;
+  ObSqlString sql;
+  const int64_t IS_DELETED = 1;
+  const uint64_t exec_tenant_id = ObSchemaUtils::get_exec_tenant_id(tenant_id);
+  if (OB_ISNULL(sql_client)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid sql client is NULL", K(ret));
+  } else {
+    // // insert into __all_udf_history
+    // if (FAILEDx(sql.assign_fmt(
+    //                "INSERT INTO %s(tenant_id, name, schema_version, is_deleted)"
+    //                " VALUES(%lu,'%s',%ld,%ld)",
+    //                OB_ALL_FUNC_HISTORY_TNAME,
+    //                ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
+    //                name.ptr(),
+    //                new_schema_version, IS_DELETED))) {
+    //   LOG_WARN("assign insert into all udf history fail", K(tenant_id), K(ret));
+    // } else if (OB_FAIL(sql_client->write(exec_tenant_id, sql.ptr(), affected_rows))) {
+    //   LOG_WARN("execute sql fail", K(sql), K(ret));
+    // } else if (1 != affected_rows) {
+    //   ret = OB_ERR_UNEXPECTED;
+    //   LOG_WARN("no row has inserted", K(ret));
+    // } else {/*do nothing*/}
+
+    std::string udf_model_table = "__all_udf_model_map";        //udf与model关联系统表
+    if (FAILEDx(sql.assign_fmt("DELETE FROM %s WHERE tenant_id = %ld AND udf_name='%s'",
+                                udf_model_table.c_str(),
+                                ObSchemaUtils::get_extract_tenant_id(exec_tenant_id, tenant_id),
+                                name.ptr()))) {
+      LOG_WARN("append_fmt failed", K(ret));
+    } else if (OB_FAIL(sql_client->write(exec_tenant_id, sql.ptr(), affected_rows))) {
+      LOG_WARN("fail to execute sql", K(tenant_id), K(sql), K(ret));
+    } else if (1 != affected_rows) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("no row deleted", K(sql), K(affected_rows), K(ret));
+    }
+    // // log operation
+    // if (OB_SUCC(ret)) {
+    //   ObSchemaOperation opt;
+    //   opt.tenant_id_ = tenant_id;
+    //   opt.op_type_ = OB_DDL_DROP_UDF;
+    //   opt.schema_version_ = new_schema_version;
+    //   opt.udf_name_ = name;
+    //   //this is a trick. just like outline, synonym
+    //   //use table_id_ to store there own id, we use table name to store
+    //   //udf name.
+    //   opt.table_name_ = name;
+    //   opt.ddl_stmt_str_ = (NULL != ddl_stmt_str) ? *ddl_stmt_str : ObString();
+    //   if (OB_FAIL(log_operation(opt, *sql_client))) {
+    //     LOG_WARN("Failed to log operation", K(ret));
+    //   }
+    // }
+  }
+  return ret;
+}
 
 int ObPythonUdfSqlService::drop_python_udf(const ObPythonUDF &udf_info,
                                            const int64_t new_schema_version,
