@@ -174,7 +174,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     prefix_list.erase(prefix_list.begin());
     prefix_list.push_back(prefix);
     // 生成新的udf_meta
-    oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+    oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -242,7 +242,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
       LOG_WARN("convert expr to ObPythonUdfRawExpr fail", K(ret));
     }else{
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=python_udf_expr->get_udf_meta();
       // 替换model地址
       oceanbase::share::schema::ObPythonUDFMeta udf_meta=python_udf_expr->get_udf_meta();
       ObString pycall_ob=udf_meta.pycall_;
@@ -324,7 +324,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     // 生成新的prefix
     prefix=prefix_l+"_"+prefix_r;
     // 生成新的udf_meta
-    oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+    oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -416,7 +416,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       // 生成新的prefix
       prefix=prefix_l;
       // 生成新的udf_meta
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -503,7 +503,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       // 生成新的prefix
       prefix=prefix_r;
       // 生成新的udf_meta
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_r;
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同

@@ -1882,7 +1882,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size)
 int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size)
 {
   int ret = OB_SUCCESS;
-  pArgs = PyList_New(expr_->arg_cnt_); // malloc hook
+  pArgs = PyTuple_New(expr_->arg_cnt_); // malloc hook
   int64_t saved_size = input_store_.get_saved_size();
   eval_size = (idx + predict_size) < saved_size ? predict_size : saved_size - idx;
   npy_intp elements[1] = {eval_size};
@@ -1957,7 +1957,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t pre
           LOG_WARN("Unsupported input type.", K(ret));
         }
       }
-      if(PyList_SetItem(pArgs, i, numpyarray) != 0){
+      if(PyTuple_SetItem(pArgs, i, numpyarray) != 0){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Set numpy array arg failed.", K(ret));
       }
@@ -2410,7 +2410,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                 case ObTextType:
                 case ObMediumTextType:
                 case ObLongTextType: {
-                  ObDatum *src = reinterpret_cast<ObDatum *>(cell->get_input_store().get_data_ptr_at(0));
+                  ObDatum *src = reinterpret_cast<ObDatum *>(cell->get_input_store().get_data_ptr_at(i));
                   for (int j=0; j < cell->get_store_size(); ++j) {
                     input_list_for_cells[count][j].append(std::string(src[j].ptr_, src[j].len_));
                   }
@@ -2422,13 +2422,13 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                 case ObInt32Type:
                 case ObIntType: { 
                   for (int j=0; j < cell->get_store_size(); ++j) {
-                    input_list_for_cells[count][j].append(std::to_string(*(reinterpret_cast<int *>(cell->get_input_store().get_data_ptr_at(0))+ j)));
+                    input_list_for_cells[count][j].append(std::to_string(*(reinterpret_cast<int *>(cell->get_input_store().get_data_ptr_at(i))+ j)));
                   }
                   break;
                 }
                 case ObDoubleType: {
                   for (int j=0; j < cell->get_store_size(); ++j) {
-                    input_list_for_cells[count][j].append(std::to_string(*(reinterpret_cast<double *>(cell->get_input_store().get_data_ptr_at(0))+ j)));
+                    input_list_for_cells[count][j].append(std::to_string(*(reinterpret_cast<double *>(cell->get_input_store().get_data_ptr_at(i))+ j)));
                   }
                   break;
                 }
