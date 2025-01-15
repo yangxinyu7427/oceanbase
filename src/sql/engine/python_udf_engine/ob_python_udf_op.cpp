@@ -16,7 +16,7 @@ namespace sql
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
-static bool with_batch_control_ = true; // 是否进行batch size控制
+static bool with_batch_control_ = false; // 是否进行batch size控制
 static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
 
@@ -329,16 +329,21 @@ int ObPythonUDFOp::inner_get_next_batch_with_cache(const int64_t max_row_cnt)
       // } else {}
       if (with_full_funcache_||with_fine_funcache_){
         // 检查每个cell是否有缓存，如果有就直接将其标识出来
+        gettimeofday(&ut1, NULL);
         controller_.check_cached_result_on_cells(eval_ctx_, controller_.get_desirable());
+        gettimeofday(&ut2, NULL);
         if (OB_FAIL(ret) || OB_FAIL(controller_.process_with_cache(eval_ctx_))) {
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("Process python udf failed.", K(ret));
         }
+        gettimeofday(&ut3, NULL);
       }else{
+        gettimeofday(&ut4, NULL);
         if (OB_FAIL(ret) || OB_FAIL(controller_.process())) {
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("Process python udf failed.", K(ret));
         }
+        gettimeofday(&ut5, NULL);
       }
     }
   }
@@ -1155,11 +1160,13 @@ int ObPythonUDFCell::wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx,
     if(cached_bit_vector[i]||mid_res_bit_vector[i])
       real_eval_size--;
   }
+  // 将没有被缓存的元组组装，交给python环境执行
+  //pArgs = PyList_New(expr_->arg_cnt_); // malloc hook
+  pArgs = PyTuple_New(expr_->arg_cnt_); // malloc hook
   if(real_eval_size==0){
     return ret;
   }
-  // 将没有被缓存的元组组装，交给python环境执行
-  pArgs = PyTuple_New(expr_->arg_cnt_); // malloc hook
+
   npy_intp elements[1] = {real_eval_size};
   if (expr_ == nullptr) {
     ret = OB_NOT_INIT;
@@ -1223,6 +1230,7 @@ int ObPythonUDFCell::wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx,
           LOG_WARN("Unsupported input type.", K(ret));
         }
       }
+      //if(PyList_SetItem(pArgs, i, numpyarray) != 0){
       if(PyTuple_SetItem(pArgs, i, numpyarray) != 0){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Set numpy array arg failed.", K(ret));
@@ -1235,6 +1243,8 @@ int ObPythonUDFCell::wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx,
 int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_cols, std::vector<bool>& mid_res_bit_vector, std::vector<float*>& mid_res_vector, 
   std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str){
   int ret = OB_SUCCESS;
+  struct timeval ut1, ut2, ut3, ut4, ut5, ut6, ut7;
+  gettimeofday(&ut1, NULL);
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
   std::string name(info->udf_meta_.name_.ptr());
   auto ret_type=info->udf_meta_.ret_;
@@ -1243,6 +1253,7 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   pModule = PyImport_AddModule("__main__");
   std::string pyfun_handler_input = name+"_input_pyfun";
   PyObject *pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
+  //PyObject *pArgs_input = PyList_New(1);
   PyObject *pArgs_input = PyTuple_New(1);
   PyObject *pResult_Array_input = NULL;
   PyObject *pResult_input = NULL;
@@ -1250,6 +1261,7 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   npy_intp numCols = count_cols;
   npy_intp dims[2] = {numRows, numCols};
   PyObject* pArray_input = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
+  gettimeofday(&ut2, NULL);
   float* data_input = static_cast<float*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(pArray_input)));
   int count=0;
   for(int i=0;i<mid_res_bit_vector.size();i++){
@@ -1258,8 +1270,13 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
       count++;
     }
   }
+  gettimeofday(&ut3, NULL);
+  //PyList_SetItem(pArgs_input, 0, pArray_input);
   PyTuple_SetItem(pArgs_input, 0, pArray_input);
+  gettimeofday(&ut4, NULL);
+  //pResult_Array_input = PyObject_CallFunction(pFunc_input, "N", pArgs_input);
   pResult_Array_input = PyObject_CallObject(pFunc_input, pArgs_input);
+  gettimeofday(&ut5, NULL);
   if (!pResult_Array_input) {
     ret = OB_ERR_UNEXPECTED;
   }
@@ -1287,11 +1304,25 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
       }
     }
   }
+  gettimeofday(&ut6, NULL);
   // Release Python objects
   Py_XDECREF(pFunc_input);
   //Py_XDECREF(pArgs_input);
   Py_XDECREF(pArray_input);
   Py_XDECREF(pResult_Array_input);
+  gettimeofday(&ut7, NULL);
+  std::string file_name("/home/");
+  file_name.append(std::string("midcachelog"));
+  file_name.append(".log");
+  std::fstream f;
+  f.open(file_name, std::ios::out | std::ios::app); // 追加写入
+  f << "Start a new batch!" << std::endl;
+  f << "init python time: " << (ut2.tv_sec - ut1.tv_sec) * 1000 + (double)(ut2.tv_usec - ut1.tv_usec) / 1000 << " ms" << std::endl;
+  f << "copy time: " << (ut3.tv_sec - ut2.tv_sec) * 1000 + (double)(ut3.tv_usec - ut2.tv_usec) / 1000 << " ms" << std::endl;
+  f << "PyTuple_SetItem time: " << (ut4.tv_sec - ut3.tv_sec) * 1000 + (double)(ut4.tv_usec - ut3.tv_usec) / 1000 << " ms" << std::endl;
+  f << "PyObject_CallObject time: " << (ut5.tv_sec - ut4.tv_sec) * 1000 + (double)(ut5.tv_usec - ut4.tv_usec) / 1000 << " ms" << std::endl;
+  f << "after run time: " << (ut6.tv_sec - ut5.tv_sec) * 1000 + (double)(ut6.tv_usec - ut5.tv_usec) / 1000 << " ms" << std::endl;
+  f << "release time: " << (ut7.tv_sec - ut6.tv_sec) * 1000 + (double)(ut7.tv_usec - ut6.tv_usec) / 1000 << " ms" << std::endl;
   return ret;
 }
 
@@ -1882,6 +1913,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size)
 int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size)
 {
   int ret = OB_SUCCESS;
+  //pArgs = PyList_New(expr_->arg_cnt_); // malloc hook
   pArgs = PyTuple_New(expr_->arg_cnt_); // malloc hook
   int64_t saved_size = input_store_.get_saved_size();
   eval_size = (idx + predict_size) < saved_size ? predict_size : saved_size - idx;
@@ -1957,6 +1989,7 @@ int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t pre
           LOG_WARN("Unsupported input type.", K(ret));
         }
       }
+      //if(PyList_SetItem(pArgs, i, numpyarray) != 0){
       if(PyTuple_SetItem(pArgs, i, numpyarray) != 0){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Set numpy array arg failed.", K(ret));
@@ -2021,6 +2054,7 @@ int ObPythonUDFCell::eval_python_udf(PyObject *pArgs, int64_t eval_size)
       || !PyCallable_Check(pFunc))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Get function handler failed.", K(ret));
+  //} else if ((resultArray = PyObject_CallFunction(pFunc, "N", pArgs)) == nullptr) {
   } else if ((resultArray = PyObject_CallObject(pFunc, pArgs)) == nullptr) {
     ObExprPythonUdf::process_python_exception();
     ret = OB_ERR_UNEXPECTED;
@@ -2355,6 +2389,7 @@ int ObPUStoreController::process_with_cache(ObEvalCtx &eval_ctx)
 
 int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int size){
   int ret = OB_SUCCESS;
+  struct timeval ut1, ut2, ut3, ut4, ut5, ut6, ut7, ut8, ut9, ut10, ut11;
   int count=0;
   ObSQLSessionInfo* session=eval_ctx.exec_ctx_.get_my_session(); 
   PyUDFCache& udf_cache=session->get_pyudf_cache();
@@ -2362,6 +2397,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
     for (ObPythonUDFCell* cell = cells_list_.get_first(); 
         cell != header && OB_SUCC(ret); 
         cell = cell->get_next()) {
+          gettimeofday(&ut1, NULL);
           // 初始化controller中的缓存相关数据结构
           ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(cell->get_expr()->extra_info_);
           ObString udf_name=info->udf_meta_.name_;
@@ -2395,7 +2431,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
               }
             }
           }
-
+          gettimeofday(&ut2, NULL);
           // 构造input数组
           int input_count;
           if(info->udf_meta_.ismerged_)
@@ -2439,6 +2475,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
                 }
               }
           }
+          gettimeofday(&ut3, NULL);
           if(ret_type==PyUdfType::STRING){
             cells_cached_res_for_str[count].resize(size);
           }else if(ret_type==PyUdfType::INTEGER){
@@ -2447,7 +2484,7 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
             cells_cached_res_for_double[count].resize(size);
           }
           //检查input是否有初始化缓存
-          if(!info->is_new_full_cache&&udf_cache.find_cache_for_cell(udf_name)){
+          if(udf_cache.find_cache_for_cell(udf_name)){
             // 有初始化缓存
             cells_can_use_cache[count]=0;
             // 查缓存，并把有缓存的input标识出来
@@ -2606,6 +2643,16 @@ int ObPUStoreController::check_cached_result_on_cells(ObEvalCtx &eval_ctx, int s
             }
           }
           count++;
+          gettimeofday(&ut4, NULL);
+          std::string file_name("/home/");
+          file_name.append(std::string("findcachelog"));
+          file_name.append(".log");
+          std::fstream f;
+          f.open(file_name, std::ios::out | std::ios::app); // 追加写入
+          f << "Start a new batch!" << std::endl;
+          f << "init time: " << (ut2.tv_sec - ut1.tv_sec) * 1000 + (double)(ut2.tv_usec - ut1.tv_usec) / 1000 << " ms" << std::endl;
+          f << "init input time: " << (ut3.tv_sec - ut2.tv_sec) * 1000 + (double)(ut3.tv_usec - ut2.tv_usec) / 1000 << " ms" << std::endl;
+          f << "find cache time: " << (ut4.tv_sec - ut3.tv_sec) * 1000 + (double)(ut4.tv_usec - ut3.tv_usec) / 1000 << " ms" << std::endl;
         }
   return ret;
 }
