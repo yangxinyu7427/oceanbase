@@ -16,7 +16,7 @@ namespace sql
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
-static bool with_batch_control_ = false; // 是否进行batch size控制
+static bool with_batch_control_ = true; // 是否进行batch size控制
 static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
 
@@ -1140,9 +1140,9 @@ int ObPythonUDFCell::do_process_all_with_cache(std::vector<bool>& bit_vector, st
   if(real_eval_size==0){
     result_size_ += input_store_.get_saved_size();
   }
-  if (OB_SUCC(ret)) {
-    input_store_.reuse();
-  }
+  // if (OB_SUCC(ret)) {
+  //   input_store_.reuse();
+  // }
   gettimeofday(&t2, NULL);
   double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
   double tps = real_eval_size * 1000000 / timeuse; // current tuples per sec
@@ -1257,14 +1257,23 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   PyObject *pArgs_input = PyTuple_New(1);
   PyObject *pResult_Array_input = NULL;
   PyObject *pResult_input = NULL;
-  npy_intp numRows = count_mid_res;
+  int count=0;
+  //for(int i=0;i<mid_res_bit_vector.size();i++){
+  for(int i=0;i<input_store_.get_saved_size();i++){
+    if(mid_res_bit_vector[i]){
+      count++;
+    }
+  }
+  if(count==0)
+    return ret;
+  npy_intp numRows = count;
   npy_intp numCols = count_cols;
   npy_intp dims[2] = {numRows, numCols};
   PyObject* pArray_input = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
   gettimeofday(&ut2, NULL);
   float* data_input = static_cast<float*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(pArray_input)));
-  int count=0;
-  for(int i=0;i<mid_res_bit_vector.size();i++){
+  count=0;
+  for(int i=0;i<input_store_.get_saved_size();i++){
     if(mid_res_bit_vector[i]){
       std::copy(mid_res_vector[i], mid_res_vector[i]+numCols, data_input + count * numCols);
       count++;
@@ -1824,15 +1833,7 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
           udf_cache.set_int(udf_name, input_list[i+output_idx], cached_res_for_int[i+output_idx]);
           continue;
         }
-        // 存储中间结果
-        if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
-          npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
-          float* tmp_mid_result = new float[numCols];
-          std::copy(rowData, rowData + numCols, tmp_mid_result);
-          udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
-          udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
-        }
+        
         // 存入缓存
         int value=PyLong_AsLong(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
         if(info->udf_meta_.ismerged_){
@@ -1851,6 +1852,17 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
           }
         }else{
           udf_cache.set_int(udf_name, input_list[i+output_idx], value);
+        }
+        // 存储中间结果
+        if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
+          npy_intp numCols = PyArray_DIM(mid_result_store, 1);
+          npy_intp numRows1 = PyArray_DIM(mid_result_store, 0);
+          npy_intp numRows2 = PyArray_DIM(result_store, 0);
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* tmp_mid_result = new float[numCols];
+          std::copy(rowData, rowData + numCols, tmp_mid_result);
+          udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
+          udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         vector->set_int(i, value);
         count++;
@@ -2381,6 +2393,7 @@ int ObPUStoreController::process_with_cache(ObEvalCtx &eval_ctx)
       stored_output_cnt_ = stored_input_cnt_;
       stored_input_cnt_ = 0;
       output_idx_ = 0;
+      //count_cached_mid_res=0;
     }
     count++;
   }
