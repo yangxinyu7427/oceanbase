@@ -103,7 +103,7 @@ public:
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
   int do_process(); // do real processing
   int do_process_with_mid_res_cache(int count_mid_res, int count_cols, std::vector<bool>& mid_res_bit_vector, std::vector<float*>& mid_res_vector, 
-  std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str);
+  std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str, std::vector<bool>& cells_cached_res_bit_vector);
   int do_process_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector); // do processing with udf cache
   int do_process_all_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
   int do_process_all(); // process all saved store at one time
@@ -200,6 +200,7 @@ public:
   bool is_empty() { return stored_input_cnt_ == 0; }
   bool can_output() { return output_idx_ < stored_output_cnt_; }
   bool end_output() { return output_idx_ == stored_output_cnt_; }
+  int init_input_list_on_cells(ObEvalCtx &eval_ctx, int size);
   int check_cached_result_on_cells(ObEvalCtx &eval_ctx, int size);
   int process_with_cache(ObEvalCtx &eval_ctx);
   int restore_with_cache(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t max_row_cnt);
