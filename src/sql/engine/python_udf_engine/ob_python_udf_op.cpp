@@ -17,8 +17,8 @@ typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
 static bool with_batch_control_ = false; // 是否进行batch size控制
-static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
-static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
+static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
+static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
 
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
@@ -206,9 +206,9 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
       } else if (OB_FAIL(controller_.store(eval_ctx_, brs_))){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Save input batchrows failed.", K(ret));
-      } else if (OB_FAIL(controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2))){
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("Save input batchrows failed.", K(ret));
+      // } else if (OB_FAIL(controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2))){
+      //   ret = OB_ERR_UNEXPECTED;
+      //   LOG_WARN("Save input batchrows failed.", K(ret));
       } else if (OB_FAIL(controller_.process())) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Process python udf failed.", K(ret));
@@ -1259,29 +1259,40 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   pModule = PyImport_AddModule("__main__");
   std::string pyfun_handler_input = name+"_input_pyfun";
   PyObject *pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
-  //PyObject *pArgs_input = PyList_New(1);
-  PyObject *pArgs_input = PyTuple_New(1);
+  //对于查询内冗余消除后得到的模型，如果复用中间结果，会有一些常数的输入，比如
+  //lr(a,b,c)+nb(a,b,c)>2--->opted(a,b,c,2)=1中的2
+  int const_count=0;
+  if(info->udf_meta_.ismerged_){
+    for(int i=expr_->arg_cnt_-1;i>=0;i--){
+      if(expr_->args_[i]->is_const_expr()){
+        const_count++;
+      }else{
+        break;
+      }
+    }
+  }
+  PyObject *pArgs_input = PyTuple_New(const_count+1);
   PyObject *pResult_Array_input = NULL;
   PyObject *pResult_input = NULL;
-  int count=0;
+  int rowcount=0;
   //for(int i=0;i<mid_res_bit_vector.size();i++){
   for(int i=0;i<input_store_.get_saved_size();i++){
     if(cells_cached_res_bit_vector[i]){
       continue;
     }
     if(mid_res_bit_vector[i]){
-      count++;
+      rowcount++;
     }
   }
-  if(count==0)
+  if(rowcount==0)
     return ret;
-  npy_intp numRows = count;
+  npy_intp numRows = rowcount;
   npy_intp numCols = count_cols;
   npy_intp dims[2] = {numRows, numCols};
   PyObject* pArray_input = PyArray_SimpleNew(2, dims, NPY_FLOAT32);
   gettimeofday(&ut2, NULL);
   float* data_input = static_cast<float*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(pArray_input)));
-  count=0;
+  int count=0;
   for(int i=0;i<input_store_.get_saved_size();i++){
     if(cells_cached_res_bit_vector[i]){
       continue;
@@ -1294,6 +1305,59 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   gettimeofday(&ut3, NULL);
   //PyList_SetItem(pArgs_input, 0, pArray_input);
   PyTuple_SetItem(pArgs_input, 0, pArray_input);
+  //构造常量
+  if(info->udf_meta_.ismerged_){
+    npy_intp elements[1] = {rowcount};
+    for(int i=const_count-1;i>=0;i--){
+      PyObject *numpyarray = nullptr;
+      switch (expr_->args_[expr_->arg_cnt_-i-1]->datum_meta_.type_) {
+        case ObCharType:
+        case ObVarcharType:
+        case ObTinyTextType:
+        case ObTextType:
+        case ObMediumTextType:
+        case ObLongTextType: {
+          ObDatum *src = reinterpret_cast<ObDatum *>(input_store_.get_data_ptr_at(expr_->arg_cnt_-i-1));
+          PyObject *unicode_str = PyUnicode_FromStringAndSize(src[0].ptr_, src[0].len_);
+          numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_OBJECT, NULL, NULL, 0, 0, NULL);
+          for(int j=0;j<rowcount;j++){
+            PyArray_SETITEM((PyArrayObject *)numpyarray, 
+              (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, j), unicode_str);
+          }
+          break;
+        }
+        case ObTinyIntType:
+        case ObSmallIntType:
+        case ObMediumIntType:
+        case ObInt32Type:
+        case ObIntType: {
+          int *src = reinterpret_cast<int *>(input_store_.get_data_ptr_at(expr_->arg_cnt_-i-1));
+          numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_INT32, NULL, NULL, 0, 0, NULL);
+          for(int j=0;j<rowcount;j++){
+            PyArray_SETITEM((PyArrayObject *)numpyarray, 
+              (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, j), PyLong_FromLong(src[0]));
+          }
+          break;
+        }
+        case ObDoubleType: {
+          numpyarray = PyArray_New(&PyArray_Type, 1, elements, NPY_FLOAT64, NULL, NULL, 0, 0, NULL);
+          double *src = reinterpret_cast<double *>(input_store_.get_data_ptr_at(expr_->arg_cnt_-i-1));
+          for(int j=0;j<rowcount;j++){
+            PyArray_SETITEM((PyArrayObject *)numpyarray,
+            (char *)PyArray_GETPTR1((PyArrayObject *)numpyarray, j), PyFloat_FromDouble(src[0]));
+          }
+          break;
+        }
+        default: {
+          //error
+          ret = OB_NOT_SUPPORTED;
+          LOG_WARN("Unsupported input type.", K(ret));
+        }
+      }
+      PyTuple_SetItem(pArgs_input, const_count-i, numpyarray);
+    }
+  }
+  
   gettimeofday(&ut4, NULL);
   //pResult_Array_input = PyObject_CallFunction(pFunc_input, "N", pArgs_input);
   pResult_Array_input = PyObject_CallObject(pFunc_input, pArgs_input);

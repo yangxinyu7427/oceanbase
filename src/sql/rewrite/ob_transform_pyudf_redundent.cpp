@@ -113,6 +113,9 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
         ObString tmpObstring(tmp.c_str());
         if(OB_FAIL(merged_udf_pre_map.get_refactored(tmpObstring, prefix))){
           //这里缓存的是正常模型，但如果待匹配的是优化后的模型，就需要给缓存的模型添加前缀
+          if(meta.ismerged_){
+            merged_udf_pre_map.get_refactored(ObString(meta.opted_model_path_.c_str()), prefix);
+          }
           add_prefix_on_model(tmp, new_model_prefix, prefix);
           list=check_redundant(new_model_prefix, model_path);
           ret =OB_SUCCESS;
