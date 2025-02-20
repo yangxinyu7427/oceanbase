@@ -1395,6 +1395,7 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   //Py_XDECREF(pArgs_input);
   Py_XDECREF(pArray_input);
   Py_XDECREF(pResult_Array_input);
+  PyGC_Disable();
   gettimeofday(&ut7, NULL);
   std::string file_name("/home/");
   file_name.append(std::string("midcachelog"));
