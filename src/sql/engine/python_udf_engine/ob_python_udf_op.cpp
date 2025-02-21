@@ -1372,6 +1372,9 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
     pResult_input = PyList_GetItem(pResult_Array_input, 0);
   count=0;
   for(int i=0;i<mid_res_bit_vector.size();i++){
+    if(cells_cached_res_bit_vector[i]){
+      continue;
+    }
     if(mid_res_bit_vector[i]){
       if(ret_type==PyUdfType::STRING){
         const char* value=PyUnicode_AsUTF8(
