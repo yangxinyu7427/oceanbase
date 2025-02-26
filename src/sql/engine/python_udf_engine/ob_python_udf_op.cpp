@@ -16,7 +16,7 @@ namespace sql
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
-static bool with_batch_control_ = false; // 是否进行batch size控制
+static bool with_batch_control_ = true; // 是否进行batch size控制
 static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
 
@@ -293,7 +293,7 @@ int ObPythonUDFOp::inner_get_next_batch_with_cache(const int64_t max_row_cnt)
         }
       }
       gettimeofday(&ut11, NULL);
-      controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable());
+      controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2);
       if (with_full_funcache_||with_fine_funcache_){
         // 检查每个cell是否有缓存，如果有就直接将其标识出来
         gettimeofday(&ut1, NULL);
