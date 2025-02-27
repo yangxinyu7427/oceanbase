@@ -109,14 +109,14 @@ public:
   int do_process_all(std::vector<std::vector<std::string>>& input_list); // process all saved store at one time
   int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
 
   int do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
   int do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
 
   //计算过程  
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // wrap all args
@@ -216,6 +216,7 @@ private:
   int64_t stored_input_cnt_;
   int64_t stored_output_cnt_;
   int64_t output_idx_;
+  int64_t cached_res_idx_;
 
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
 

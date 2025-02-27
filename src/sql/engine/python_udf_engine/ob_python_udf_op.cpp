@@ -1543,7 +1543,7 @@ int ObPythonUDFCell::do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t
 }
 
 int ObPythonUDFCell::do_restore_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector)
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx)
 {
   int ret = OB_SUCCESS;
   if (output_idx + output_size > result_size_) { //确保访问结果数组时不会越界
@@ -1552,10 +1552,10 @@ int ObPythonUDFCell::do_restore_with_cache(bool can_use_cache, ObEvalCtx &eval_c
   } else if (expr_ == nullptr) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Unexpected nullptr expr_.", K(ret));
-  } else if (expr_->enable_rich_format() && OB_FAIL(do_restore_vector_with_cache(can_use_cache, eval_ctx, output_idx, output_size, cached_res_for_double, cached_res_for_int, cached_res_for_str, input_list, bit_vector, mid_res_bit_vector))) {
+  } else if (expr_->enable_rich_format() && OB_FAIL(do_restore_vector_with_cache(can_use_cache, eval_ctx, output_idx, output_size, cached_res_for_double, cached_res_for_int, cached_res_for_str, input_list, bit_vector, mid_res_bit_vector, cached_res_idx))) {
     ret = OB_NOT_SUPPORTED;
     LOG_WARN("Unsupported result type.", K(ret));
-  } else if (!expr_->enable_rich_format() && OB_FAIL(do_restore_batch_with_cache(can_use_cache, eval_ctx, output_idx, output_size, cached_res_for_double, cached_res_for_int, cached_res_for_str, input_list, bit_vector, mid_res_bit_vector))) {
+  } else if (!expr_->enable_rich_format() && OB_FAIL(do_restore_batch_with_cache(can_use_cache, eval_ctx, output_idx, output_size, cached_res_for_double, cached_res_for_int, cached_res_for_str, input_list, bit_vector, mid_res_bit_vector, cached_res_idx))) {
     ret = OB_NOT_SUPPORTED;
     LOG_WARN("Unsupported result type.", K(ret));
   } else {
@@ -1613,7 +1613,7 @@ int ObPythonUDFCell::do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, i
 }
 
 int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector)
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx)
 {
   int ret = OB_SUCCESS;
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
@@ -1645,20 +1645,20 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         // 存储中间结果
         if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
           udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         // 存入缓存
-        const char* value=PyUnicode_AsUTF8(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        const char* value=PyUnicode_AsUTF8(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         string value_str(value);
         //udf_cache.set_string(udf_name, input_list[i], value_str);
         if(info->udf_meta_.ismerged_){
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            const char* tmpvalue = PyUnicode_AsUTF8(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            const char* tmpvalue = PyUnicode_AsUTF8(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             string tmpvalue_str(tmpvalue);
             udf_cache.set_string(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue_str);
           }
@@ -1668,6 +1668,7 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         result_datums[i].set_string(common::ObString(value));
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     case ObTinyIntType:
@@ -1690,19 +1691,19 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         // 存储中间结果
         if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
           udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         // 存入缓存
-        int value=PyLong_AsLong(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        int value=PyLong_AsLong(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         //udf_cache.set_int(udf_name, input_list[i], value);
         if(info->udf_meta_.ismerged_){
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            int tmpvalue=PyLong_AsLong(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            int tmpvalue=PyLong_AsLong(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             udf_cache.set_int(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue);
           }
         }else{
@@ -1711,6 +1712,7 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         result_datums[i].set_int(value);
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     case ObDoubleType: {
@@ -1729,19 +1731,19 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         // 存储中间结果
         if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
           udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         // 存入缓存
-        double value=PyFloat_AsDouble(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        double value=PyFloat_AsDouble(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         //udf_cache.set_double(udf_name, input_list[i], value);
         if(info->udf_meta_.ismerged_){
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            double tmpvalue=PyFloat_AsDouble(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            double tmpvalue=PyFloat_AsDouble(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             udf_cache.set_double(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue);
           }
         }else{
@@ -1750,6 +1752,7 @@ int ObPythonUDFCell::do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &
         result_datums[i].set_double(value);
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     default: {
@@ -1825,7 +1828,7 @@ int ObPythonUDFCell::do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, 
 }
 
 int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector)
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector,int64_t& cached_res_idx)
 {
   int ret = OB_SUCCESS;
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
@@ -1873,20 +1876,20 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         // 存储中间结果
         if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
           udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         // 存入缓存
-        const char* value=PyUnicode_AsUTF8(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        const char* value=PyUnicode_AsUTF8(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         string value_str(value);
         if(info->udf_meta_.ismerged_){
           udf_cache.set_string(udf_name, input_list[i+output_idx], value_str);
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            const char* tmpvalue = PyUnicode_AsUTF8(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            const char* tmpvalue = PyUnicode_AsUTF8(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             string tmpvalue_str(tmpvalue);
             udf_cache.set_string(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue_str);
           }
@@ -1896,6 +1899,7 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         vector->set_string(i, common::ObString(value));
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     case ObTinyIntType:
@@ -1916,12 +1920,12 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         }
         
         // 存入缓存
-        int value=PyLong_AsLong(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        int value=PyLong_AsLong(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         if(info->udf_meta_.ismerged_){
           udf_cache.set_int(udf_name, input_list[i+output_idx], value);
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            int tmpvalue=PyLong_AsLong(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            int tmpvalue=PyLong_AsLong(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             if(OB_FAIL(udf_cache.set_int(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue))){
               // ObString tmp2=info->udf_meta_.merged_udf_names_[j];
               // const char * tmp33=input_list[i+output_idx].c_str();
@@ -1940,7 +1944,7 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
           npy_intp numRows1 = PyArray_DIM(mid_result_store, 0);
           npy_intp numRows2 = PyArray_DIM(result_store, 0);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
@@ -1949,6 +1953,7 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         vector->set_int(i, value);
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     case ObDoubleType: {
@@ -1966,19 +1971,19 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         // 存储中间结果
         if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
           npy_intp numCols = PyArray_DIM(mid_result_store, 1);
-          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, output_idx + count, 0));
+          float* rowData = reinterpret_cast<float*>(PyArray_GETPTR2(mid_result_store, cached_res_idx + count, 0));
           float* tmp_mid_result = new float[numCols];
           std::copy(rowData, rowData + numCols, tmp_mid_result);
           udf_cache.set_mid_result(info->udf_meta_.model_path_, input_list[i+output_idx], tmp_mid_result);
           udf_cache.mid_res_col_count_map[std::string(info->udf_meta_.model_path_.ptr(), info->udf_meta_.model_path_.length())]=numCols;
         }
         // 存入缓存
-        double value=PyFloat_AsDouble(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, output_idx + count)));
+        double value=PyFloat_AsDouble(PyArray_GETITEM(result_store, (char *)PyArray_GETPTR1(result_store, cached_res_idx + count)));
         if(info->udf_meta_.ismerged_){
           udf_cache.set_double(udf_name, input_list[i+output_idx], value);
           for(int j=0; j<info->udf_meta_.merged_udf_names_.count(); j++){
             PyArrayObject *merged_udf_res = reinterpret_cast<PyArrayObject *>(merged_udf_res_list[j]);
-            double tmpvalue=PyFloat_AsDouble(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, output_idx + count)));
+            double tmpvalue=PyFloat_AsDouble(PyArray_GETITEM(merged_udf_res, (char *)PyArray_GETPTR1(merged_udf_res, cached_res_idx + count)));
             udf_cache.set_double(info->udf_meta_.merged_udf_names_[j], input_list[i+output_idx], tmpvalue);
           }
         }else{
@@ -1987,6 +1992,7 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
         vector->set_double(i, value);
         count++;
       }
+      cached_res_idx+=count;
       break;
     }
     default: {
@@ -2872,7 +2878,8 @@ int ObPUStoreController::restore_with_cache(ObEvalCtx &eval_ctx, ObBatchRows &br
         cell = cell->get_next()) {
           if(with_full_funcache_||with_fine_funcache_){
             if (OB_FAIL(cell->do_restore_with_cache(cells_can_use_cache[count]>0, eval_ctx, output_idx_, output_size, cells_cached_res_for_double[count],
-            cells_cached_res_for_int[count], cells_cached_res_for_str[count], input_list_for_cells[count], cells_cached_res_bit_vector[count], cells_cached_mid_res_bit_vector[count]))) {
+            cells_cached_res_for_int[count], cells_cached_res_for_str[count], input_list_for_cells[count], cells_cached_res_bit_vector[count], cells_cached_mid_res_bit_vector[count]
+            , cached_res_idx_))) {
               ret = OB_ERR_UNEXPECTED;
               LOG_WARN("Do Python UDF Cell restore failed.", K(ret));
             }
@@ -2922,6 +2929,7 @@ int ObPUStoreController::resize(int64_t size)
   stored_input_cnt_ = 0;
   stored_output_cnt_ = 0;
   output_idx_ = 0;
+  cached_res_idx_ =0;
   return ret;
 }
 
