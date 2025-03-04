@@ -43,6 +43,11 @@ public:
                                 const int64_t new_schema_version,
                                 common::ObISQLClient *sql_client,
                                 const common::ObString *ddl_stmt_str = NULL);
+  virtual int delete_udf_model_map(const uint64_t tenant_id,
+                                   const common::ObString &name,
+                                   const int64_t new_schema_version,
+                                   common::ObISQLClient *sql_client,
+                                   const common::ObString *ddl_stmt_str = NULL);
   virtual int drop_python_udf(const ObPythonUDF &udf_info,
                               const int64_t new_schema_version,
                               common::ObISQLClient *sql_client,

@@ -4680,6 +4680,7 @@ public:
   int set_udf_meta(share::schema::ObPythonUDF &udf, int batch_size);
   int set_udf_meta(share::schema::ObPythonUDFMeta &src);
   const share::schema::ObPythonUDFMeta &get_udf_meta() const { return udf_meta_; }
+  share::schema::ObPythonUDFMeta &get_udf_meta() { return udf_meta_; }
   int set_udf_meta_merged_udf_name_list(ObIArray<ObString> &merged_udf_name_list);
   int set_udf_meta_origin_input_count(int num);
   int set_udf_meta_has_new_output_model_path();

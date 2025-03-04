@@ -52,11 +52,11 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
   } else if (FALSE_IT(select_stmt = static_cast<ObSelectStmt*>(stmt))) {
     //准备进行改写
     LOG_WARN("select stmt is NULL", K(ret));
-  } else if (select_stmt->get_condition_exprs().empty()) {
+  } else if (select_stmt->get_python_udf_filter_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if (OB_FAIL(check_redundent_on_udfs(select_stmt->get_condition_exprs()))){
+  else if (OB_FAIL(check_redundent_on_udfs(select_stmt->get_python_udf_filter_exprs()))){
     LOG_WARN("check_redundent_on_udfs fail", K(ret));
   }
   else{
@@ -113,6 +113,9 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
         ObString tmpObstring(tmp.c_str());
         if(OB_FAIL(merged_udf_pre_map.get_refactored(tmpObstring, prefix))){
           //这里缓存的是正常模型，但如果待匹配的是优化后的模型，就需要给缓存的模型添加前缀
+          if(meta.ismerged_){
+            merged_udf_pre_map.get_refactored(ObString(meta.opted_model_path_.c_str()), prefix);
+          }
           add_prefix_on_model(tmp, new_model_prefix, prefix);
           list=check_redundant(new_model_prefix, model_path);
           ret =OB_SUCCESS;
@@ -202,8 +205,8 @@ int ObTransformPyUDFRedundent::need_transform(const common::ObIArray<ObParentDML
   ObSEArray<ObSelectStmt*, 16> child_stmts;
   int python_udf_count=0;
 
-  for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
-    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)));
+  for(int32_t i = 0; i < stmt.get_python_udf_filter_exprs().count(); i++) {
+    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_python_udf_filter_expr(i)));
   }
 
   if(python_udf_count>=1){

@@ -151,7 +151,7 @@ int ObCreateUdfModelResolver::resolve(const ParseNode &parse_tree)
                 create_udf_model_arg.udf_model_.set_framework(schema::ObPythonUdfEnumType::ModelFrameworkType::UNSUPPORTED);
             }
             //set model_type          
-            if (model_type == "DESISION_TREE"){
+            if (model_type == "DECISION_TREE"){
                 create_udf_model_arg.udf_model_.set_model_type(schema::ObPythonUdfEnumType::ModelType::DECISION_TREE);
             } else {
                 create_udf_model_arg.udf_model_.set_model_type(schema::ObPythonUdfEnumType::ModelType::INVALID_MODEL_TYPE);

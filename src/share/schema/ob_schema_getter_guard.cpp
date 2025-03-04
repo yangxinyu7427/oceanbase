@@ -7884,7 +7884,7 @@ int ObSchemaGetterGuard::get_python_udf_info(const uint64_t tenant_id,
                                              bool &exist)
 {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(schema_service_->get_python_udf_info(tenant_id, name, udf_info, exist))) {
+  if (OB_FAIL(schema_service_->get_python_udf_info(tenant_id, local_allocator_, name, udf_info, exist))) {
     LOG_WARN("failed to get python udf schema", K(ret));
   }
   return ret;

@@ -101,28 +101,28 @@ public:
   int free();
   int reset(int64_t size) { return input_store_.reset(size); }
   int do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs); // do real storing
-  int do_process(); // do real processing
+  int do_process(std::vector<std::vector<std::string>>& input_list); // do real processing
   int do_process_with_mid_res_cache(int count_mid_res, int count_cols, std::vector<bool>& mid_res_bit_vector, std::vector<float*>& mid_res_vector, 
-  std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str);
+  std::vector<int>& cached_res_for_int, std::vector<double>& cached_res_for_double, std::vector<std::string>& cached_res_for_str, std::vector<bool>& cells_cached_res_bit_vector);
   int do_process_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector); // do processing with udf cache
   int do_process_all_with_cache(std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
-  int do_process_all(); // process all saved store at one time
+  int do_process_all(std::vector<std::vector<std::string>>& input_list); // process all saved store at one time
   int do_restore(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
 
   int do_restore_batch(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector(ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size);
   int do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
   int do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
-  std::vector<std::string>& cached_res_for_str, std::vector<std::string>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector);
+  std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
 
   //计算过程  
-  int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size); // wrap all args
+  int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // wrap all args
   int wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx, 
   int64_t& real_eval_size, int64_t desirable_eval_size, std::vector<bool> &cached_bit_vector, std::vector<bool>& mid_res_bit_vector); // warp args in [idx, idx + predict_size] with cache
-  int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size); // warp args in [idx, idx + predict_size]
+  int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // warp args in [idx, idx + predict_size]
   
   int eval(PyObject *pArgs, int64_t eval_size);
   int eval_python_udf(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
@@ -200,6 +200,7 @@ public:
   bool is_empty() { return stored_input_cnt_ == 0; }
   bool can_output() { return output_idx_ < stored_output_cnt_; }
   bool end_output() { return output_idx_ == stored_output_cnt_; }
+  int init_input_list_on_cells(ObEvalCtx &eval_ctx, int size);
   int check_cached_result_on_cells(ObEvalCtx &eval_ctx, int size);
   int process_with_cache(ObEvalCtx &eval_ctx);
   int restore_with_cache(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t max_row_cnt);
@@ -215,6 +216,7 @@ private:
   int64_t stored_input_cnt_;
   int64_t stored_output_cnt_;
   int64_t output_idx_;
+  int64_t cached_res_idx_;
 
   int64_t batch_size_; // 系统参数，关系到存取时最大空间
 
@@ -226,7 +228,7 @@ private:
   std::vector<std::vector<std::string>> cells_cached_res_for_str; // string类型的已缓存结果
   std::vector<std::vector<double>> cells_cached_res_for_double; // double类型的已缓存结果
   std::vector<std::vector<float*>> cells_cached_res_for_mid_result; // 已缓存的中间结果
-  std::vector<std::vector<std::string>> input_list_for_cells; // 每个cell的input列表 
+  std::vector<std::vector<std::vector<std::string>>> input_list_for_cells; // 每个cell的input列表 
   std::vector<std::vector<bool>> cells_cached_res_bit_vector; // 每个cell的可用缓存标识数组
   std::vector<std::vector<bool>> cells_cached_mid_res_bit_vector; // 每个cell的可用缓存标识数组
   int count_cached_mid_res;
@@ -262,6 +264,8 @@ public:
   virtual int inner_rescan() override;
   virtual int inner_get_next_row() override;
   virtual int inner_get_next_batch(const int64_t max_row_cnt) override;
+  virtual int inner_get_next_batch_with_cache(const int64_t max_row_cnt);
+  virtual int inner_get_next_batch_without_cache(const int64_t max_row_cnt);
   virtual void destroy() override;
 
 private:

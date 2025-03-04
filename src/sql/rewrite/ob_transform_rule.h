@@ -176,6 +176,7 @@ enum TRANSFORM_TYPE {
   PROCESS_DBLINK                ,
   PYUDF_MERGE                   ,
   PYUDF_REDUNDENT               ,
+  PYUDF_DTPO                    ,
   TRANSFORM_TYPE_COUNT_PLUS_ONE ,
 };
 
