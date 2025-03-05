@@ -77,13 +77,13 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   } else if (FALSE_IT(select_stmt = static_cast<ObSelectStmt*>(stmt))) {
     //准备进行改写
     LOG_WARN("select stmt is NULL", K(ret));
-  } else if (select_stmt->get_condition_exprs().empty()) {
+  } else if (select_stmt->get_python_udf_filter_exprs().empty()) {
     //没有改写空间
     LOG_WARN("input preds is empty", K(ret));
   } 
-  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
+  else if(OB_FAIL(merge_python_udf_expr_in_condition(select_stmt->get_python_udf_filter_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
-  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_condition_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
+  } else if(OB_FAIL(push_predicate_into_onnx_model(select_stmt->get_python_udf_filter_exprs(), select_stmt, onnx_model_opted_path, merged_udf_name_list))){
     LOG_WARN("merge python udf in condition fail", K(ret));
   } else if(OB_FAIL(optimize_on_merged_onnx_model(onnx_model_opted_path))){
     LOG_WARN("optimize_on_merged_model fail", K(ret));
@@ -174,7 +174,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     prefix_list.erase(prefix_list.begin());
     prefix_list.push_back(prefix);
     // 生成新的udf_meta
-    oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+    oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -242,7 +242,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     if (FALSE_IT(python_udf_expr= static_cast<ObPythonUdfRawExpr*>(src_expr))) {
       LOG_WARN("convert expr to ObPythonUdfRawExpr fail", K(ret));
     }else{
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=python_udf_expr->get_udf_meta();
       // 替换model地址
       oceanbase::share::schema::ObPythonUDFMeta udf_meta=python_udf_expr->get_udf_meta();
       ObString pycall_ob=udf_meta.pycall_;
@@ -324,7 +324,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     // 生成新的prefix
     prefix=prefix_l+"_"+prefix_r;
     // 生成新的udf_meta
-    oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+    oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
     udf_meta_opted.name_="udf_opted";
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -416,7 +416,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       // 生成新的prefix
       prefix=prefix_l;
       // 生成新的udf_meta
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -503,7 +503,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       // 生成新的prefix
       prefix=prefix_r;
       // 生成新的udf_meta
-      oceanbase::share::schema::ObPythonUDFMeta udf_meta_opted;
+      oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_r;
       udf_meta_opted.name_="udf_opted";
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
@@ -681,8 +681,8 @@ int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt
   ObSEArray<ObSelectStmt*, 16> child_stmts;
   int python_udf_count=0;
 
-  for(int32_t i = 0; i < stmt.get_condition_size(); i++) {
-    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_condition_expr(i)));
+  for(int32_t i = 0; i < stmt.get_python_udf_filter_exprs().count(); i++) {
+    python_udf_count=python_udf_count+ObTransformUtils::count_python_udf_num(const_cast<ObRawExpr *>(stmt.get_python_udf_filter_expr(i)));
   }
 
   if(python_udf_count>1){

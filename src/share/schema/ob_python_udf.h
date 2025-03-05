@@ -276,6 +276,7 @@ public:
                  K_(udf_model));
 
 public:
+    typedef  ObPythonUdfEnumType::PyUdfRetType PyUdfRetType;
     uint64_t tenant_id_;
     uint64_t udf_id_;
     common::ObString name_;

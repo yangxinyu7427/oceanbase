@@ -341,8 +341,10 @@ int ObExprPythonUdf::import_udf(const share::schema::ObPythonUDFMeta &udf_meta)
       // 替换global变量名
       change_vars_in_pycall(pycall_input, "input");
       // 替换入参
+      // std::regex pattern2(R"(elem: .*)");
+      // std::string replacement = "elem: args[i]";
       std::regex pattern2(R"(elem: .*)");
-      std::string replacement = "elem: args[0]";
+      std::string replacement = "$& if i!=0 else args[0]";
       pycall_input = std::regex_replace(pycall_input, pattern2, replacement);
       const char* pycall_input_c = pycall_input.c_str();
       // 初始化pycall
