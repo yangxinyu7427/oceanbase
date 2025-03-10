@@ -175,7 +175,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     prefix_list.push_back(prefix);
     // 生成新的udf_meta
     oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-    udf_meta_opted.name_="udf_opted";
+    udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
     udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
@@ -266,7 +266,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       string num=std::to_string(countMap[udfname]);
       prefix=udfname+"_"+num;
       // 构建udf meta
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.udf_attributes_types_=udf_meta.udf_attributes_types_;
       udf_meta_opted.ret_=udf_meta.ret_;
       // 构建expr
@@ -325,7 +325,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     prefix=prefix_l+"_"+prefix_r;
     // 生成新的udf_meta
     oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-    udf_meta_opted.name_="udf_opted";
+    udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
     udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
@@ -417,7 +417,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       prefix=prefix_l;
       // 生成新的udf_meta
       oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
@@ -504,7 +504,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       prefix=prefix_r;
       // 生成新的udf_meta
       oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_r;
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;

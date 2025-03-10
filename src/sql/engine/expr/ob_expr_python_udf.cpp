@@ -466,18 +466,19 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
       case share::schema::ObPythonUdfEnumType::ModelFrameworkType::ONNX : {
         pycall += std::string("\nimport numpy as np") +
                   std::string("\nimport onnxruntime as ort") +
+                  std::string("\nimport jieba") +
                   std::string("\nclass ") + class_name + std::string(":") +
                   std::string("\n\tdef pyinitial(self):") +
                   std::string("\n\t\tortconfig = ort.SessionOptions()") + 
-                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str}") +
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
                   std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
                   std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
                   std::string("', sess_options=ortconfig)") +
                   std::string("\n\tdef pyfun(self, names, args):") +
-                  //std::string("\n\t\tinfer_batch = {") +
-                  //std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
-                  //std::string("\n\t\t\tfor i, elem in enumerate(names)}") +
-                  std::string("\n\t\tinfer_batch = {'float_input': np.column_stack(args).astype(np.float32)}") +
+                  std::string("\n\t\tinfer_batch = {") +
+                  std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
+                  std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
+                  //std::string("\n\t\tinfer_batch = {'float_input': np.column_stack(args).astype(np.float32)}") +
                   std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0].name], infer_batch)[0]");
 
         break;
