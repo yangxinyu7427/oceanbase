@@ -4701,6 +4701,8 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDFMeta &src){
   udf_meta_.ret_ = src.ret_;
   udf_meta_.batch_size_const_=src.batch_size_const_;
   udf_meta_.batch_size_ =src.batch_size_;
+  udf_meta_.is_retree_opt_=src.is_retree_opt_;
+  udf_meta_.model_type_=src.model_type_;
   if (OB_FAIL(ob_write_string(*inner_alloc_, src.name_, udf_meta_.name_))) {
     LOG_WARN("fail to write name", K(src.name_), K(ret));
   } else if (OB_FAIL(ob_write_string(*inner_alloc_, src.pycall_, udf_meta_.pycall_))) {
@@ -4709,6 +4711,9 @@ int ObPythonUdfRawExpr::set_udf_meta(share::schema::ObPythonUDFMeta &src){
     udf_meta_.udf_attributes_types_.reset();
     for (int64_t i = 0; i < src.udf_attributes_types_.count(); i++) {
       udf_meta_.udf_attributes_types_.push_back(src.udf_attributes_types_.at(i));
+    }
+    for(int i=0;i<src.udf_model_meta_.count(); i++){
+      udf_meta_.udf_model_meta_.push_back(src.udf_model_meta_.at(i));
     }
   }
   LOG_DEBUG("set udf meta");
@@ -4769,6 +4774,22 @@ int ObPythonUdfRawExpr::set_udf_meta_has_new_input_model_path(){
 int ObPythonUdfRawExpr::set_udf_meta_opted_model_path(std::string opted_model_path){
   int ret = OB_SUCCESS;
   udf_meta_.opted_model_path_=opted_model_path;
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_udf_model_meta(ObUdfModelMeta udf_model_meta){
+  int ret = OB_SUCCESS;
+  udf_meta_.udf_model_meta_.reset();
+  udf_meta_.udf_model_meta_.push_back(udf_model_meta);
+  return ret;
+}
+
+int ObPythonUdfRawExpr::set_udf_meta_model_attributes_name(ObIArray<ObString> &model_attributes_name){
+  int ret = OB_SUCCESS;
+  udf_meta_.udf_attributes_names_.reset();
+  for(int i=0;i<model_attributes_name.count();i++){
+    udf_meta_.udf_attributes_names_.push_back(model_attributes_name.at(i));
+  }
   return ret;
 }
 

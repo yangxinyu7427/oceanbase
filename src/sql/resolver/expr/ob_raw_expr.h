@@ -4690,6 +4690,8 @@ public:
   int set_udf_meta_can_be_used_model_path(ObString can_be_used_model_path);
   int set_udf_meta_has_new_input_model_path();
   int set_udf_meta_opted_model_path(std::string opted_model_path);
+  int set_udf_meta_udf_model_meta(ObUdfModelMeta udf_model_meta);
+  int set_udf_meta_model_attributes_name(ObIArray<ObString> &model_attributes_name);
   int set_udf_meta_new_input_model_path(std::string path);
   virtual bool inner_same_as(const ObRawExpr &expr,
                              ObExprEqualCheckContext *check_context = NULL) const override;

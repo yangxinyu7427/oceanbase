@@ -469,18 +469,28 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string("\nimport jieba") +
                   std::string("\nclass ") + class_name + std::string(":") +
                   std::string("\n\tdef pyinitial(self):") +
+                  std::string("\n\t\tpass") +
+                  std::string("\n\tdef tokenize_text(self, text):") +
+                  std::string("\n\t\treturn ' '.join(jieba.cut(text))") +
+                  std::string("\n\tdef process_element(self, args, i):") +
+                  std::string("\n\t\tdtype_name = args[i].dtype.name") +
+                  std::string("\n\t\tif dtype_name not in {'str416', 'object'}:") +
+                  std::string("\n\t\t\treturn args[i].astype(self.anonymous_model_type_map[dtype_name]).reshape((-1, 1))") +
+                  std::string("\n\t\telse:") +
+                  std::string("\n\t\t\treturn np.array([self.tokenize_text(text) for text in args[i]], dtype=object).astype(str).reshape((-1, 1))") +
+                  std::string("\n\tdef pyfun(self, names, args):") +
                   std::string("\n\t\tortconfig = ort.SessionOptions()") + 
                   std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
                   std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
                   std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
                   std::string("', sess_options=ortconfig)") +
-                  std::string("\n\tdef pyfun(self, names, args):") +
                   std::string("\n\t\tinfer_batch = {") +
-                  std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
+                  //std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
+                  std::string("\n\t\t\telem: self.process_element(args, i)") +
                   std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
                   //std::string("\n\t\tinfer_batch = {'float_input': np.column_stack(args).astype(np.float32)}") +
-                  std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0].name], infer_batch)[0]");
-
+                  //std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0].name], infer_batch)[0]");
+                  std::string("\n\t\treturn self.anonymous_model_session.run([label.name for label in self.anonymous_model_session.get_outputs()], infer_batch)");
         break;
       }
       case share::schema::ObPythonUdfEnumType::ModelFrameworkType::PYTORCH : {
@@ -549,6 +559,138 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
       LOG_DEBUG("Import python udf handler", K(ret));
     }
 
+    bool with_fine_funcache_ = true;
+    // 如果要导出缓存结果，就修改pycall的字段并加载到python环境中去，替换pyfun
+    if(with_fine_funcache_){
+      if(udf_meta.has_new_output_model_path_){
+        std::string pyinitial_handler_output("pyinitial_output");
+        std::string pyfun_handler_output("pyfun_output");
+        std::string class_name_output = name + std::string("UdfClass_output");
+        std::string instance_name_output = name + std::string("UdfInstance_output");
+        std::string pycall_output = 
+                  std::string("\nimport numpy as np") +
+                  std::string("\nimport onnxruntime as ort") +
+                  std::string("\nimport jieba") +
+                  std::string("\nclass ") + class_name_output + std::string(":") +
+                  std::string("\n\tdef pyinitial_output(self):") +
+                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
+                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
+                  udf_meta.new_output_model_path_ + 
+                  std::string("', sess_options=ortconfig)") +
+                  std::string("\n\tdef tokenize_text(self, text):") +
+                  std::string("\n\t\treturn ' '.join(jieba.cut(text))") +
+                  std::string("\n\tdef process_element(self, args, i):") +
+                  std::string("\n\t\tdtype_name = args[i].dtype.name") +
+                  std::string("\n\t\tif dtype_name not in {'str416', 'object'}:") +
+                  std::string("\n\t\t\treturn args[i].astype(self.anonymous_model_type_map[dtype_name]).reshape((-1, 1))") +
+                  std::string("\n\t\telse:") +
+                  std::string("\n\t\t\treturn np.array([self.tokenize_text(text) for text in args[i]], dtype=object).astype(str).reshape((-1, 1))") +
+                  std::string("\n\tdef pyfun_output(self, names, args):") +
+                  std::string("\n\t\tinfer_batch = {") +
+                  std::string("\n\t\t\telem: self.process_element(args, i)") +
+                  std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
+                  std::string("\n\t\treturn self.anonymous_model_session.run([label.name for label in self.anonymous_model_session.get_outputs()], infer_batch)");
+        
+        pycall_output += "\n" + instance_name_output +" = " + class_name_output + "()";
+        const char* pycall_c_output = pycall_output.c_str();
+        if (OB_FAIL(ret) || (pModule = PyImport_AddModule("__main__")) == nullptr) { // load main module
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to load main module", K(ret));
+        } else if ((dic = PyModule_GetDict(pModule)) == nullptr) { // get module dic
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get module dic", K(ret));
+        } else if((v = PyRun_StringFlags(pycall_c_output, Py_file_input, dic, dic, NULL)) == nullptr) { // test pycall
+          process_python_exception();
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to write pycall into module", K(ret));
+        } else if ((pClass = PyObject_GetAttrString(pModule, class_name_output.c_str())) == nullptr) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf class", K(ret));
+        /*} else if ((pInstance = PyObject_CallObject(pClass, NULL) == nullptr)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf instance", K(ret));*/
+        } else if ((pInstance = PyObject_GetAttrString(pModule, instance_name_output.c_str())) == nullptr) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf instance", K(ret));
+        } else if ((pInitial = PyObject_GetAttrString(pClass, pyinitial_handler_output.c_str())) == nullptr ||
+                    !PyCallable_Check(pInitial)) { // get and check pyInitial()
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Fail to check pyinitial", K(ret));
+        } else if (PyObject_CallMethod(pInstance, pyinitial_handler_output.c_str(), NULL) == nullptr) { // invocate pyInitial()
+          process_python_exception();
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Fail to run pyinitial in pInstance", K(ret));
+        } else {
+          LOG_DEBUG("Import python udf handler", K(ret));
+        }
+      }
+
+      // 如果要使用缓存结果，就修改pycall中的字段并加载到python环境中去
+      if(udf_meta.has_new_input_model_path_){
+        std::string pyinitial_handler_input("pyinitial_input");
+        std::string pyfun_handler_input("pyfun_input");
+        std::string class_name_input = name + std::string("UdfClass_input");
+        std::string instance_name_input = name + std::string("UdfInstance_input");
+        std::string pycall_input = 
+                  std::string("\nimport numpy as np") +
+                  std::string("\nimport onnxruntime as ort") +
+                  std::string("\nimport jieba") +
+                  std::string("\nclass ") + class_name_input + std::string(":") +
+                  std::string("\n\tdef pyinitial_input(self):") +
+                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
+                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
+                  udf_meta.new_input_model_path_ + 
+                  std::string("', sess_options=ortconfig)") +
+                  std::string("\n\tdef tokenize_text(self, text):") +
+                  std::string("\n\t\treturn ' '.join(jieba.cut(text))") +
+                  std::string("\n\tdef process_element(self, args, i):") +
+                  std::string("\n\t\tdtype_name = args[i].dtype.name") +
+                  std::string("\n\t\tif dtype_name not in {'str416', 'object'}:") +
+                  std::string("\n\t\t\treturn args[i].astype(self.anonymous_model_type_map[dtype_name]).reshape((-1, 1))") +
+                  std::string("\n\t\telse:") +
+                  std::string("\n\t\t\treturn np.array([self.tokenize_text(text) for text in args[i]], dtype=object).astype(str).reshape((-1, 1))") +
+                  std::string("\n\tdef pyfun_input(self, args):") +
+                  std::string("\n\t\tinfer_batch = {") +
+                  std::string("\n\t\t\telem: self.process_element(args, i) if i!=0 else args[0]") +
+                  std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
+                  std::string("\n\t\treturn self.anonymous_model_session.run([label.name for label in self.anonymous_model_session.get_outputs()], infer_batch)");
+        
+        pycall_input += "\n" + instance_name_input +" = " + class_name_input + "()";
+        const char* pycall_c_input = pycall_input.c_str();
+        if (OB_FAIL(ret) || (pModule = PyImport_AddModule("__main__")) == nullptr) { // load main module
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to load main module", K(ret));
+        } else if ((dic = PyModule_GetDict(pModule)) == nullptr) { // get module dic
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get module dic", K(ret));
+        } else if((v = PyRun_StringFlags(pycall_c_input, Py_file_input, dic, dic, NULL)) == nullptr) { // test pycall
+          process_python_exception();
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to write pycall into module", K(ret));
+        } else if ((pClass = PyObject_GetAttrString(pModule, class_name_input.c_str())) == nullptr) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf class", K(ret));
+        /*} else if ((pInstance = PyObject_CallObject(pClass, NULL) == nullptr)) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf instance", K(ret));*/
+        } else if ((pInstance = PyObject_GetAttrString(pModule, instance_name_input.c_str())) == nullptr) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("fail to get custom model udf instance", K(ret));
+        } else if ((pInitial = PyObject_GetAttrString(pClass, pyinitial_handler_input.c_str())) == nullptr ||
+                    !PyCallable_Check(pInitial)) { // get and check pyInitial()
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Fail to check pyinitial", K(ret));
+        } else if (PyObject_CallMethod(pInstance, pyinitial_handler_input.c_str(), NULL) == nullptr) { // invocate pyInitial()
+          process_python_exception();
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Fail to run pyinitial in pInstance", K(ret));
+        } else {
+          LOG_DEBUG("Import python udf handler", K(ret));
+        }
+      }
+    }
     //release GIL
     if(nStatus)
       PyGILState_Release(gstate);
