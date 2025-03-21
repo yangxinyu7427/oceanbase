@@ -89,9 +89,14 @@ int ObTransformPyUDFRedundent::compare_with_history_exprs(ObIArray<ObPythonUdfRa
     ObString name=meta.name_;
     string new_output_model_path="/root/onnx_output/model_out.onnx";
     string new_input_model_path="/root/onnx_output/model_in.onnx";
-    if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(model_path, meta))){
-      LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+    if(meta.model_type_==ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC){
+      model_path=meta.udf_model_meta_.at(0).model_path_.ptr();
+    }else{
+      if(OB_FAIL(get_onnx_model_path_from_python_udf_meta(model_path, meta))){
+        LOG_WARN("get_onnx_model_path_from_python_udf_meta fail", K(ret));
+      }
     }
+      
     // 分配新地址复制模型
     const char* cstr = model_path.c_str();
     size_t length = model_path.size();

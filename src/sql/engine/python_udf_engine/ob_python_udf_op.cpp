@@ -1249,10 +1249,6 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   std::string name(info->udf_meta_.name_.ptr());
   auto ret_type=info->udf_meta_.ret_;
   name = name.substr(0, info->udf_meta_.name_.length());
-  PyObject *pModule = NULL;
-  pModule = PyImport_AddModule("__main__");
-  std::string pyfun_handler_input = name+"_input_pyfun";
-  PyObject *pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
   //对于查询内冗余消除后得到的模型，如果复用中间结果，会有一些常数的输入，比如
   //lr(a,b,c)+nb(a,b,c)>2--->opted(a,b,c,2)=1中的2
   int const_count=0;
@@ -1351,10 +1347,66 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
       PyTuple_SetItem(pArgs_input, const_count-i, numpyarray);
     }
   }
-  
+  PyObject *pFunc_input;
   gettimeofday(&ut4, NULL);
+  if(info->udf_meta_.model_type_==ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC){
+    std::string pyfun_handler="pyfun_input";
+    std::string class_name = name + "UdfClass_input";
+    std::string instance_name = name + "UdfInstance_input";
+    PyObject *pModule = nullptr;
+    PyObject *pClass = nullptr;
+    PyObject *pInstance = nullptr;
+    PyObject *pFunc = nullptr;
+    PyObject *pResult = nullptr;
+    PyObject *pArgNames = nullptr;
+    PyObject *resultArray = nullptr;
+    PyObject *pArgs_input_with_instance;
+    ObSEArray<ObString, 16L> &udf_attributes_names = info->udf_meta_.udf_attributes_names_;
+    if (udf_attributes_names.count() != expr_->arg_cnt_) {
+      ret = OB_INIT_FAIL;
+      LOG_WARN("Unexpected udf arg counts", K(ret));
+    } else {
+      pArgNames = PyList_New(expr_->arg_cnt_);
+      for (int i = 0; OB_SUCC(ret) && i < expr_->arg_cnt_; ++i) {
+        if (udf_attributes_names.at(i).ptr() == nullptr) {
+          ret = OB_ERR_UNEXPECTED;
+          LOG_WARN("Null udf atttrbutes names", K(ret));
+        } else {
+          std::string name = std::string(udf_attributes_names.at(i).ptr(), udf_attributes_names.at(i).length());
+          const char* c_name = name.c_str();
+          PyList_SetItem(pArgNames, i, Py_BuildValue("s", c_name));
+        }
+      }
+    }
+    if ((pModule = PyImport_AddModule("__main__")) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Import main module failed.", K(ret));
+    } else if ((pInstance = PyObject_GetAttrString(pModule, instance_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Get custom model udf instance failed.", K(ret));
+    } else if ((pClass = PyObject_GetAttrString(pModule, class_name.c_str())) == nullptr) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("fail to get custom model udf class", K(ret));
+    } else if ((pFunc = PyObject_GetAttrString(pClass, pyfun_handler.c_str())) == nullptr ||
+                !PyCallable_Check(pFunc)) {
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Check function handler failed.", K(ret));
+    } else if ((pArgs_input_with_instance = PyTuple_Pack(2, pInstance, pArgs_input))==nullptr||
+        (pResult_Array_input = PyObject_CallObject(pFunc, pArgs_input_with_instance)) == nullptr) {
+      ObExprPythonUdf::process_python_exception();
+      ret = OB_ERR_UNEXPECTED;
+      LOG_WARN("Execute Python model UDF error.", K(ret));
+    }
+  }else{
+    PyObject *pModule = NULL;
+    pModule = PyImport_AddModule("__main__");
+    std::string pyfun_handler_input = name+"_input_pyfun";
+    pFunc_input = PyObject_GetAttrString(pModule, pyfun_handler_input.c_str());
+    pResult_Array_input = PyObject_CallObject(pFunc_input, pArgs_input);
+  }
   //pResult_Array_input = PyObject_CallFunction(pFunc_input, "N", pArgs_input);
-  pResult_Array_input = PyObject_CallObject(pFunc_input, pArgs_input);
+
+
   gettimeofday(&ut5, NULL);
   if (!pResult_Array_input) {
     ret = OB_ERR_UNEXPECTED;
@@ -1388,7 +1440,7 @@ int ObPythonUDFCell::do_process_with_mid_res_cache(int count_mid_res, int count_
   }
   gettimeofday(&ut6, NULL);
   // Release Python objects
-  Py_XDECREF(pFunc_input);
+  //Py_XDECREF(pFunc_input);
   //Py_XDECREF(pArgs_input);
   Py_XDECREF(pArray_input);
   Py_XDECREF(pResult_Array_input);
@@ -2208,10 +2260,19 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
   std::string name(info->udf_meta_.name_.ptr());
   name = name.substr(0, info->udf_meta_.name_.length());
   //std::string pyfun_handler = name.append("_pyfun");
-  std::string pyfun_handler("pyfun");
-
-  std::string class_name = name + "UdfClass";
-  std::string instance_name = name + "UdfInstance";
+  std::string pyfun_handler;
+  std::string class_name;
+  std::string instance_name;
+  if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
+    pyfun_handler="pyfun_output";
+    class_name = name + "UdfClass_output";
+    instance_name = name + "UdfInstance_output";
+  }else{
+    pyfun_handler="pyfun";
+    class_name = name + "UdfClass";
+    instance_name = name + "UdfInstance";
+  }
+  
   PyObject *method_name = Py_BuildValue("s", "pyfun");
 
   ObUdfModelMeta model_meta = info->udf_meta_.udf_model_meta_.at(0);
@@ -2222,8 +2283,10 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
   PyObject *pFunc = nullptr;
   PyObject *pResult = nullptr;
   PyObject *pArgNames = nullptr;
+  PyObject *resultArray = nullptr;
 
   ObSEArray<ObString, 16L> &udf_attributes_names = info->udf_meta_.udf_attributes_names_;
+  int tmp=udf_attributes_names.count();
   if (udf_attributes_names.count() != expr_->arg_cnt_) {
     ret = OB_INIT_FAIL;
     LOG_WARN("Unexpected udf arg counts", K(ret));
@@ -2256,11 +2319,50 @@ int ObPythonUDFCell::eval_model_udf(PyObject *pArgs, int64_t eval_size)
                 !PyCallable_Check(pFunc)) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Check function handler failed.", K(ret));
-    } else if ((pResult = PyObject_CallMethod(pInstance, "pyfun", "NN", pArgNames, pArgs)) == nullptr) {
+    } else if ((resultArray = PyObject_CallMethod(pInstance, pyfun_handler.c_str(), "NN", pArgNames, pArgs)) == nullptr) {
       ObExprPythonUdf::process_python_exception();
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Execute Python model UDF error.", K(ret));
     } else {
+      // 需要判断resultArray的返回类型，如果resultArray不是一个numpy数组，则代表他是一个多维数组，数组的第一维是正常执行流程的返回结果
+      // 后面的每一维是导出的中间结果
+      int isNumPyArray=PyArray_Check(resultArray);
+      if(isNumPyArray){
+        pResult = resultArray;
+      }else{
+        pResult = PyList_GetItem(resultArray, 0);
+        ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
+        if(with_full_funcache_&&info->udf_meta_.ismerged_){
+          // 导出查询内冗余消除后的中间结果
+          for(int i=0; i<merged_udf_res_list.size(); i++){
+            PyObject *tmpArray = PyList_GetItem(resultArray, i+1);
+            if (tmpArray==nullptr){
+              ret = OB_ERR_UNEXPECTED;
+              LOG_WARN("save merged udf res failed.", K(ret));
+            }
+            if (merged_udf_res_list[i] == nullptr) {
+              merged_udf_res_list[i] = reinterpret_cast<void *>(tmpArray);
+            } else {
+              PyObject *concat = PyTuple_New(2);
+              PyTuple_SetItem(concat, 0, reinterpret_cast<PyObject *>(merged_udf_res_list[i]));
+              PyTuple_SetItem(concat, 1, tmpArray);
+              merged_udf_res_list[i] = reinterpret_cast<void *>(PyArray_Concatenate(concat, 0));
+            }
+          }
+        }
+        if(with_fine_funcache_&&info->udf_meta_.has_new_output_model_path_){
+          // 导出可复用的中间结果
+          PyObject *tmpArray=PyList_GetItem(resultArray, PyList_Size(resultArray) - 1);
+          if(mid_result_store_==nullptr){
+            mid_result_store_=reinterpret_cast<void *>(tmpArray);
+          } else{
+            PyObject *concat = PyTuple_New(2);
+            PyTuple_SetItem(concat, 0, reinterpret_cast<PyObject *>(mid_result_store_));
+            PyTuple_SetItem(concat, 1, tmpArray);
+            mid_result_store_ = reinterpret_cast<void *>(PyArray_Concatenate(concat, 0));
+          }
+        }
+      }
       // numpy array concat
       if (result_store_ == nullptr) {
         result_store_ = reinterpret_cast<void *>(pResult);

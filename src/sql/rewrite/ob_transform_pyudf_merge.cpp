@@ -175,7 +175,7 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     prefix_list.push_back(prefix);
     // 生成新的udf_meta
     oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-    udf_meta_opted.name_="udf_opted";
+    udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
     udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
@@ -183,6 +183,9 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
     for(int i=udf_input_count;i<udf_meta_opted_r.udf_attributes_types_.count();i++){
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_opted_r.udf_attributes_types_.at(i));
     }
+    udf_meta_opted.udf_model_meta_[0].model_name_=udf_meta_opted.name_;
+    udf_meta_opted.udf_model_meta_[0].model_attributes_names_=udf_meta_opted.udf_attributes_names_;
+    udf_meta_opted.udf_model_meta_[0].model_attributes_types_=udf_meta_opted.udf_attributes_types_;
     // 构造新的python_udf_expr
     int64_t param_count_l = python_udf_expr_opted_l->get_param_count();
     int64_t param_count_r = python_udf_expr_opted_r->get_param_count();
@@ -212,6 +215,17 @@ int ObTransformPyUDFMerge::push_predicate_into_onnx_model(
   python_udf_expr->set_udf_meta_merged_udf_name_list(merged_udf_name_list);
   python_udf_expr->set_udf_meta_origin_input_count(udf_input_count);
   python_udf_expr->set_udf_meta_opted_model_path(out_path);
+  ObUdfModelMeta udf_model_meta;
+  udf_model_meta=python_udf_expr->get_udf_meta().udf_model_meta_[0];
+  udf_model_meta.model_path_=out_path.c_str();
+  int names_count=udf_model_meta.model_attributes_names_.count();
+  int tmp=python_udf_expr->get_udf_meta().udf_attributes_types_.count();
+  for(int i=0;i<python_udf_expr->get_udf_meta().udf_attributes_types_.count()-names_count;i++){
+    udf_model_meta.model_attributes_names_.push_back("var");
+  }
+  python_udf_expr->set_udf_meta_udf_model_meta(udf_model_meta);
+  python_udf_expr->set_udf_meta_model_attributes_name(udf_model_meta.model_attributes_names_);
+  
   expr=python_udf_expr;
   if (OB_FAIL(expr->formalize(ctx_->session_info_))) {
         LOG_WARN("failed to formalize", K(ret));
@@ -266,9 +280,12 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       string num=std::to_string(countMap[udfname]);
       prefix=udfname+"_"+num;
       // 构建udf meta
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.udf_attributes_types_=udf_meta.udf_attributes_types_;
       udf_meta_opted.ret_=udf_meta.ret_;
+      udf_meta_opted.udf_model_meta_[0].model_name_=udf_meta_opted.name_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_names_=udf_meta_opted.udf_attributes_names_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_types_=udf_meta_opted.udf_attributes_types_;
       // 构建expr
       if (OB_ISNULL(ctx_)) {
         ret = OB_ERR_UNEXPECTED;
@@ -325,7 +342,7 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     prefix=prefix_l+"_"+prefix_r;
     // 生成新的udf_meta
     oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-    udf_meta_opted.name_="udf_opted";
+    udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
     udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
     // todo 现在默认只返回bool值,并且所有udf的输入值全相同
     udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
@@ -333,6 +350,9 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
     for(int i=udf_input_count_l;i<udf_meta_opted_r.udf_attributes_types_.count();i++){
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_opted_r.udf_attributes_types_.at(i));
     }
+    udf_meta_opted.udf_model_meta_[0].model_name_=udf_meta_opted.name_;
+    udf_meta_opted.udf_model_meta_[0].model_attributes_names_=udf_meta_opted.udf_attributes_names_;
+    udf_meta_opted.udf_model_meta_[0].model_attributes_types_=udf_meta_opted.udf_attributes_types_;
     // 构造新的python_udf_expr
     int64_t param_count_l = python_udf_expr_opted_l->get_param_count();
     int64_t param_count_r = python_udf_expr_opted_r->get_param_count();
@@ -417,12 +437,15 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       prefix=prefix_l;
       // 生成新的udf_meta
       oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_l;
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.pycall_=udf_meta_opted_l.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
       udf_meta_opted.udf_attributes_types_=udf_meta_opted_l.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
+      udf_meta_opted.udf_model_meta_[0].model_name_=udf_meta_opted.name_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_names_=udf_meta_opted.udf_attributes_names_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_types_=udf_meta_opted.udf_attributes_types_;
       // 构造新的python_udf_expr
       if (OB_ISNULL(ctx_)) {
         ret = OB_ERR_UNEXPECTED;
@@ -504,12 +527,15 @@ int ObTransformPyUDFMerge::push_predicate_down(string& prefix, ObRawExpr * src_e
       prefix=prefix_r;
       // 生成新的udf_meta
       oceanbase::share::schema::ObPythonUDFMeta& udf_meta_opted=udf_meta_opted_r;
-      udf_meta_opted.name_="udf_opted";
+      udf_meta_opted.name_=("udf_"+std::to_string((int)time(0))).c_str();
       udf_meta_opted.pycall_=udf_meta_opted_r.pycall_;
       // todo 现在默认只返回bool值,并且所有udf的输入值全相同
       udf_meta_opted.ret_=share::schema::ObPythonUdfEnumType::PyUdfRetType::INTEGER;
       udf_meta_opted.udf_attributes_types_=udf_meta_opted_r.udf_attributes_types_;
       udf_meta_opted.udf_attributes_types_.push_back(udf_meta_ret_type);
+      udf_meta_opted.udf_model_meta_[0].model_name_=udf_meta_opted.name_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_names_=udf_meta_opted.udf_attributes_names_;
+      udf_meta_opted.udf_model_meta_[0].model_attributes_types_=udf_meta_opted.udf_attributes_types_;
       // 构造新的python_udf_expr
       if (OB_ISNULL(ctx_)) {
         ret = OB_ERR_UNEXPECTED;
@@ -653,6 +679,10 @@ int ObTransformPyUDFMerge::merge_onnx_model_from_python_udf_expr_list(
 
 int ObTransformPyUDFMerge::get_onnx_model_path_from_python_udf_meta(string &onnx_model_path, oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
   int ret =OB_SUCCESS;
+  if(python_udf_meta.model_type_==ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC){
+    onnx_model_path=python_udf_meta.udf_model_meta_[0].model_path_.ptr();
+    return ret;
+  }
   string pycall(python_udf_meta.pycall_.ptr());
   std::regex pattern("onnx_path='(.*?)'");
   std::smatch match;
