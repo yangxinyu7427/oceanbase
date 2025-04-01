@@ -573,11 +573,7 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string("\nimport jieba") +
                   std::string("\nclass ") + class_name_output + std::string(":") +
                   std::string("\n\tdef pyinitial_output(self):") +
-                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
-                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
-                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
-                  udf_meta.new_output_model_path_ + 
-                  std::string("', sess_options=ortconfig)") +
+                  std::string("\n\t\tpass") +
                   std::string("\n\tdef tokenize_text(self, text):") +
                   std::string("\n\t\treturn ' '.join(jieba.cut(text))") +
                   std::string("\n\tdef process_element(self, args, i):") +
@@ -587,6 +583,11 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string("\n\t\telse:") +
                   std::string("\n\t\t\treturn np.array([self.tokenize_text(text) for text in args[i]], dtype=object).astype(str).reshape((-1, 1))") +
                   std::string("\n\tdef pyfun_output(self, names, args):") +
+                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
+                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
+                  udf_meta.new_output_model_path_ + 
+                  std::string("', sess_options=ortconfig)") +
                   std::string("\n\t\tinfer_batch = {") +
                   std::string("\n\t\t\telem: self.process_element(args, i)") +
                   std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
@@ -638,11 +639,7 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string("\nimport jieba") +
                   std::string("\nclass ") + class_name_input + std::string(":") +
                   std::string("\n\tdef pyinitial_input(self):") +
-                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
-                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
-                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
-                  udf_meta.new_input_model_path_ + 
-                  std::string("', sess_options=ortconfig)") +
+                  std::string("\n\t\tpass") +
                   std::string("\n\tdef tokenize_text(self, text):") +
                   std::string("\n\t\treturn ' '.join(jieba.cut(text))") +
                   std::string("\n\tdef process_element(self, args, i):") +
@@ -652,6 +649,11 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string("\n\t\telse:") +
                   std::string("\n\t\t\treturn np.array([self.tokenize_text(text) for text in args[i]], dtype=object).astype(str).reshape((-1, 1))") +
                   std::string("\n\tdef pyfun_input(self, args):") +
+                  std::string("\n\t\tortconfig = ort.SessionOptions()") + 
+                  std::string("\n\t\tself.anonymous_model_type_map = {'int32': np.int64, 'int64': np.int64, 'float64': np.float32, 'object': str, 'str416': str,}") +
+                  std::string("\n\t\tself.anonymous_model_session = ort.InferenceSession('") + 
+                  udf_meta.new_input_model_path_ + 
+                  std::string("', sess_options=ortconfig)") +
                   std::string("\n\t\tinfer_batch = {") +
                   std::string("\n\t\t\telem: self.process_element(args, i) if i!=0 else args[0]") +
                   std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
