@@ -16,9 +16,9 @@ namespace sql
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 
-static bool with_batch_control_ = true; // 是否进行batch size控制
-static bool with_full_funcache_ = true; // 是否进行粗粒度缓存
-static bool with_fine_funcache_ = true; // 是否进行细粒度缓存
+static bool with_batch_control_ = false; // 是否进行batch size控制
+static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
+static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
 
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),

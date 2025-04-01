@@ -100,19 +100,19 @@ int ObTransformPyUdfDTPO::do_recursive_onnx_decision_tree_prune(ObSelectStmt *se
         switch(cmp_expr->get_expr_type()) {
         case T_OP_EQ:
         case T_OP_NSEQ:
-          comparison_operator = 1;
+          comparison_operator = 0;
           break;
         case T_OP_LT:
-          comparison_operator = 2;
+          comparison_operator = 1;
           break;
         case T_OP_LE:
-          comparison_operator = 3;
+          comparison_operator = 2;
           break;
         case T_OP_GT:
-          comparison_operator = 4;
+          comparison_operator = 3;
           break;
         case T_OP_GE:
-          comparison_operator = 5;
+          comparison_operator = 4;
           break;
         default:
           ret = OB_ERR_UNEXPECTED;
