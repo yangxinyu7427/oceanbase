@@ -34,7 +34,7 @@ public:
 
   virtual int extract_python_udf_expr_in_condition(
   ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<ObRawExpr *> &src_exprs);
+  const ObIArray<ObRawExpr *> &src_exprs);
 private:
   virtual int need_transform(
     const common::ObIArray<ObParentDMLStmt> &parent_stmts,
