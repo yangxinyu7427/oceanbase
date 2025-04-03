@@ -5,6 +5,7 @@
 #define USING_LOG_PREFIX SQL_REWRITE
 #include <regex>
 #include <string>
+#include <cstring>
 #include <map>
 #include "sql/rewrite/ob_transform_pyudf_redundent.h"
 #include "sql/rewrite/ob_stmt_comparer.h"
@@ -188,7 +189,7 @@ oceanbase::share::schema::ObPythonUDFMeta &python_udf_meta){
 
 int ObTransformPyUDFRedundent::extract_python_udf_expr_in_condition(
   ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<ObRawExpr *> &src_exprs)
+  const ObIArray<ObRawExpr *> &src_exprs)
 {
   int ret = OB_SUCCESS;
   for(int i=0;i<src_exprs.count();i++){
@@ -217,6 +218,22 @@ int ObTransformPyUDFRedundent::need_transform(const common::ObIArray<ObParentDML
   if(python_udf_count>=1){
     need_trans = true;
     LOG_DEBUG("this query need transform of ObTransformPyUDFRedundent ,udf count is ",K(python_udf_count));
+  }
+  ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
+  if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list, stmt.get_python_udf_filter_exprs()))){ 
+    LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
+  }
+  for(int32_t i = 0; i < python_udf_expr_list.count();i++){
+    oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
+    if(meta.model_type_==ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC){
+      if(meta.udf_model_meta_.at(0).framework_!=ObPythonUdfEnumType::ModelFrameworkType::ONNX){
+        need_trans = false;
+      }
+    }else{
+      if(std::strstr(meta.pycall_.ptr(),"onnx_path")==nullptr){
+        need_trans = false;
+      }
+    }
   }
   return ret;
 }

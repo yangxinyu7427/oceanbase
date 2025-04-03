@@ -589,7 +589,7 @@ int ObTransformPyUDFMerge::merge_python_udf_expr_in_condition(
 
 int ObTransformPyUDFMerge::extract_python_udf_expr_in_condition(
   ObIArray<ObPythonUdfRawExpr *> &python_udf_expr_list,
-  ObIArray<ObRawExpr *> &src_exprs)
+  const ObIArray<ObRawExpr *> &src_exprs)
 {
   int ret = OB_SUCCESS;
   for(int i=0;i<src_exprs.count();i++){
@@ -718,6 +718,22 @@ int ObTransformPyUDFMerge::need_transform(const common::ObIArray<ObParentDMLStmt
   if(python_udf_count>1){
     need_trans = true;
     LOG_DEBUG("this query need transform of ObTransformPyUDFMerge ,udf count is ",K(python_udf_count));
+  }
+  ObSEArray<ObPythonUdfRawExpr *, 4> python_udf_expr_list;
+  if(OB_FAIL(extract_python_udf_expr_in_condition(python_udf_expr_list, stmt.get_python_udf_filter_exprs()))){ 
+    LOG_WARN("extract_python_udf_expr_in_condition fail", K(ret));
+  }
+  for(int32_t i = 0; i < python_udf_expr_list.count();i++){
+    oceanbase::share::schema::ObPythonUDFMeta meta=python_udf_expr_list.at(i)->get_udf_meta();
+    if(meta.model_type_==ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC){
+      if(meta.udf_model_meta_.at(0).framework_!=ObPythonUdfEnumType::ModelFrameworkType::ONNX){
+        need_trans = false;
+      }
+    }else{
+      if(std::strstr(meta.pycall_.ptr(),"onnx_path")==nullptr){
+        need_trans = false;
+      }
+    }
   }
   return ret;
 }
