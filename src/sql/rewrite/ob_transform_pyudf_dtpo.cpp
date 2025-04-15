@@ -91,7 +91,7 @@ int ObTransformPyUdfDTPO::do_recursive_onnx_decision_tree_prune(ObSelectStmt *se
     if (udf_meta.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC &&
       udf_meta.udf_model_meta_.count() == 1 &&
       udf_meta.udf_model_meta_.at(0).framework_ == ObPythonUdfEnumType::ModelFrameworkType::ONNX &&
-      udf_meta.udf_model_meta_.at(0).model_type_ == ObPythonUdfEnumType::ModelType::DECISION_TREE &&
+      udf_meta.udf_model_meta_.at(0).model_type_ == ObPythonUdfEnumType::ModelType::RANDOM_FOREST &&
       !udf_meta.is_retree_opt_) {
       
       // prepare onnx decision tree pruning
@@ -222,7 +222,7 @@ int ObTransformPyUdfDTPO::need_transform(const common::ObIArray<ObParentDMLStmt>
         if (udf_meta.model_type_ == ObPythonUdfEnumType::PyUdfUsingType::MODEL_SPECIFIC &&
         udf_meta.udf_model_meta_.count() == 1 &&
         udf_meta.udf_model_meta_.at(0).framework_ == ObPythonUdfEnumType::ModelFrameworkType::ONNX &&
-        udf_meta.udf_model_meta_.at(0).model_type_ == ObPythonUdfEnumType::ModelType::DECISION_TREE &&
+        udf_meta.udf_model_meta_.at(0).model_type_ == ObPythonUdfEnumType::ModelType::RANDOM_FOREST &&
         !udf_meta.is_retree_opt_) {
           need_trans = true;
           break;
