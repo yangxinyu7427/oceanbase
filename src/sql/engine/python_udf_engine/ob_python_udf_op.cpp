@@ -1088,6 +1088,7 @@ int ObPythonUDFCell::do_process_all(std::vector<std::vector<std::string>>& input
   _import_array();
   gettimeofday(&t1, NULL);
   if (OB_FAIL(wrap_input_numpy(pArgs, eval_size, input_list)) || pArgs == nullptr) { // wrap all input
+  // if (OB_FAIL(wrap_input_pyobject(pArgs, eval_size)) || pArgs == nullptr) { // wrap all input into pyobject
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Wrap Cell Input Store as Python UDF input args failed.", K(ret));
   } else if (OB_FAIL(eval(pArgs, eval_size))) { // evaluation and keep the result
@@ -1537,6 +1538,7 @@ int ObPythonUDFCell::do_process(std::vector<std::vector<std::string>>& input_lis
     gettimeofday(&t1, NULL);
     PyObject *pArgs = nullptr;
     if (OB_FAIL(wrap_input_numpy(pArgs, idx, desirable_, eval_size, input_list)) || pArgs == nullptr) { // wrap the input
+    //if (OB_FAIL(wrap_input_pyobject(pArgs, idx, desirable_, eval_size)) || pArgs == nullptr) { // wrap the input
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Wrap Cell Input Store as Python UDF input args failed.", K(ret));
     } else if (OB_FAIL(eval(pArgs, eval_size))) { // evaluation and keep the result
@@ -2130,6 +2132,69 @@ std::vector<std::vector<std::string>>& input_list)
       if(PyTuple_SetItem(pArgs, i, numpyarray) != 0){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Set numpy array arg failed.", K(ret));
+      }
+    }
+  }
+  return ret;
+}
+
+int ObPythonUDFCell::wrap_input_pyobject(PyObject *&pArgs, int64_t &eval_size)
+{
+  return wrap_input_pyobject(pArgs, 0, input_store_.get_saved_size(), eval_size);
+}
+
+int ObPythonUDFCell::wrap_input_pyobject(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size) {
+  int ret = OB_SUCCESS;
+  pArgs = PyTuple_New(expr_->arg_cnt_);
+  int64_t saved_size = input_store_.get_saved_size();
+  eval_size = (idx + predict_size) < saved_size ? predict_size : saved_size - idx;
+  if (expr_ == nullptr) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("Expr in input store is nullptr.", K(ret));
+  } else {
+    for (int i = 0; i < expr_->arg_cnt_; ++i) {
+      PyObject *tuple = PyTuple_New(eval_size);
+      switch (expr_->args_[i]->datum_meta_.type_) {
+        case ObCharType:
+        case ObVarcharType:
+        case ObTinyTextType:
+        case ObTextType:
+        case ObMediumTextType:
+        case ObLongTextType: {
+          // construct unicode str
+          ObDatum *src = reinterpret_cast<ObDatum *>(input_store_.get_data_ptr_at(i)) + idx;
+          for (int j = 0; j < eval_size; ++j) {
+            PyObject *unicode_str = PyUnicode_FromStringAndSize(src[j].ptr_, src[j].len_);
+            //put unicode string pyobject into pyobject tuple
+            PyTuple_SetItem(tuple, j, unicode_str);
+          }
+          break;
+        }
+        case ObTinyIntType:
+        case ObSmallIntType:
+        case ObMediumIntType:
+        case ObInt32Type:
+        case ObIntType: {
+          for (int j = 0; j < eval_size; ++j) {
+            PyTuple_SetItem(tuple, j, PyLong_FromLong(reinterpret_cast<int *>(input_store_.get_data_ptr_at(i))[idx + j]));
+          }
+          break;
+        }
+        case ObDoubleType: {
+          for (int j = 0; j < eval_size; ++j) {
+            PyTuple_SetItem(tuple, j, PyFloat_FromDouble(reinterpret_cast<double *>(input_store_.get_data_ptr_at(i))[idx + j]));
+          }
+          break;
+        }
+        default: {
+          //error
+          ret = OB_NOT_SUPPORTED;
+          LOG_WARN("Unsupported input type.", K(ret));
+        }
+      }
+      if(PyTuple_SetItem(pArgs, i, tuple) != 0){
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Set pyobject arg failed.", K(ret));
       }
     }
   }

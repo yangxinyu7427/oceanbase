@@ -123,7 +123,10 @@ public:
   int wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx, 
   int64_t& real_eval_size, int64_t desirable_eval_size, std::vector<bool> &cached_bit_vector, std::vector<bool>& mid_res_bit_vector); // warp args in [idx, idx + predict_size] with cache
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // warp args in [idx, idx + predict_size]
-  
+  int wrap_input_pyobject(PyObject *&pArgs, int64_t &eval_size);
+  int wrap_input_pyobject(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size);
+
+
   int eval(PyObject *pArgs, int64_t eval_size);
   int eval_python_udf(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
   int eval_model_udf(PyObject *pArgs, int64_t eval_size); // do python single model udf evaluation
