@@ -41,6 +41,7 @@ public:
   enum ModelType {
     INVALID_MODEL_TYPE,
     DECISION_TREE,
+    RANDOM_FOREST,
   };
 
   //枚举计算结果后返回值类型
