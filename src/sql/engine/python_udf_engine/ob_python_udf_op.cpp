@@ -15,10 +15,20 @@ namespace sql
 
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
-
+static bool with_context_reuse_ = false; // 进行上下文复用优化
 static bool with_batch_control_ = false; // 是否进行batch size控制
+static bool with_transform_opt_ = false; // 是否进行数据传输优化
 static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
+
+static bool context_reuse_log_ = false; // 打印上下文初始化次数
+static bool batch_control_log_ = false; // 打印批次大小调整过程
+static bool transform_opt_log_ = true; // 打印数据传输开销
+
+
+static string context_reuse_log_path = "/root/JS_test/log/context_reuse.log";
+static string batch_control_log_path = "/root/JS_test/log/batch_control.log";
+static string transform_opt_log_path = "/root/JS_test/log/transform_opt.log";
 
 
 OB_SERIALIZE_MEMBER((ObPythonUDFSpec, ObOpSpec),
@@ -527,6 +537,12 @@ int ObPythonUDFOp::init_udfs(const common::ObIArray<ObExpr *> &udf_exprs)
         LOG_WARN("Fail to import udf", K(ret));
       } else {
         udf_meta.init_ = true;
+        if (context_reuse_log_) {
+          std::fstream log_stream;
+          log_stream.open(context_reuse_log_path, std::ios::app);
+          log_stream << std::string(udf_meta.name_.ptr(), udf_meta.name_.length())  << " init context" << std::endl;
+          log_stream.close();
+        }
       }
     }
   }
@@ -1087,7 +1103,7 @@ int ObPythonUDFCell::do_process_all(std::vector<std::vector<std::string>>& input
   //load numpy api
   _import_array();
   gettimeofday(&t1, NULL);
-  if (OB_FAIL(wrap_input_numpy(pArgs, eval_size, input_list)) || pArgs == nullptr) { // wrap all input
+  if (OB_FAIL(wrap_input(pArgs, eval_size, input_list)) || pArgs == nullptr) { // wrap all input
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Wrap Cell Input Store as Python UDF input args failed.", K(ret));
   } else if (OB_FAIL(eval(pArgs, eval_size))) { // evaluation and keep the result
@@ -1096,18 +1112,17 @@ int ObPythonUDFCell::do_process_all(std::vector<std::vector<std::string>>& input
   } else { /* do nothing */ }
   Py_CLEAR(pArgs);
   gettimeofday(&t2, NULL);
-  double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
-  double tps = eval_size * 1000000 / timeuse; // current tuples per sec
-  double time_s = timeuse / 1000;
-  // std::fstream time_log;
-  // time_log.open("/home/test/experiments/oceanbase/opt/pf_time.log", std::ios::app);
-  // time_log << time_s << " ";
-  // time_log.close(); 
-  // std::fstream tps_log;
-  // tps_log.open("/home/test/experiments/oceanbase/opt/both_pps.log", std::ios::app);
-  // tps_log << "batch size: " << eval_size << std::endl;
-  // tps_log << "prediction processing speed: " << tps << std::endl;
-  // tps_log.close();
+  if (batch_control_log_) {
+    double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
+    double tps = eval_size * 1000000 / timeuse; // current tuples per sec
+    double time_s = timeuse / 1000;
+    std::fstream log_stream;
+    log_stream.open(batch_control_log_path, std::ios::app);
+    log_stream << "udf name:" << std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()) << std::endl;
+    log_stream << "batch size: " << eval_size << std::endl;
+    log_stream << "prediction processing speed: " << tps << std::endl;
+    log_stream.close();
+  }
   return ret;
 }
 
@@ -1548,8 +1563,18 @@ int ObPythonUDFCell::do_process(std::vector<std::vector<std::string>>& input_lis
       if (!batch_size_const)
         modify_desirable(t1, t2, eval_size);
 
-      double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
-      double time_s = timeuse / 1000;
+      if (batch_control_log_) {
+        double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
+        double time_s = timeuse / 1000000;
+        double tps = eval_size / time_s; // current tuples per sec
+        std::fstream log_stream;
+        log_stream.open(batch_control_log_path, std::ios::app);
+        log_stream << "udf name: " << std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()) << std::endl;
+        log_stream << "batch size: " << eval_size << std::endl;
+        log_stream << "timeuse: " << time_s << std::endl;
+        log_stream << "prediction processing speed: " << tps << std::endl;
+        log_stream.close();
+      }
       // std::fstream time_log;
       // time_log.open("/home/test/experiments/oceanbase/opt/pf_time.log", std::ios::app);
       // time_log << time_s << " ";
@@ -2050,6 +2075,32 @@ int ObPythonUDFCell::do_restore_vector_with_cache(bool can_use_cache, ObEvalCtx 
   return ret;
 }
 
+
+
+int ObPythonUDFCell::wrap_input(PyObject *&pArgs, int64_t &eval_size, std::vector<std::vector<std::string>>& input_list)
+{
+  int ret = OB_SUCCESS;
+  struct timeval t1, t2;
+  ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
+  gettimeofday(&t1, NULL);
+  if (with_transform_opt_) {
+    ret = wrap_input_numpy(pArgs, eval_size, input_list);
+  } else {
+    ret = wrap_input_pyobject(pArgs, eval_size);
+  }
+  gettimeofday(&t2, NULL);
+  if (transform_opt_log_) {
+    double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec); // usec
+    double time_ms = timeuse / 1000; // ms
+    std::fstream log_stream;
+    log_stream.open(transform_opt_log_path, std::ios::app);
+    log_stream << "udf name:" << std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length()) << std::endl;
+    log_stream << "transform time: " << time_ms << " ms" << std::endl;
+    log_stream.close();
+  }
+  return ret;
+}
+
 // warp all saved input
 int ObPythonUDFCell::wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size, std::vector<std::vector<std::string>>& input_list)
 {
@@ -2136,6 +2187,69 @@ std::vector<std::vector<std::string>>& input_list)
   return ret;
 }
 
+int ObPythonUDFCell::wrap_input_pyobject(PyObject *&pArgs, int64_t &eval_size)
+{
+  return wrap_input_pyobject(pArgs, 0, input_store_.get_saved_size(), eval_size);
+}
+
+int ObPythonUDFCell::wrap_input_pyobject(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size) {
+  int ret = OB_SUCCESS;
+  pArgs = PyTuple_New(expr_->arg_cnt_);
+  int64_t saved_size = input_store_.get_saved_size();
+  eval_size = (idx + predict_size) < saved_size ? predict_size : saved_size - idx;
+  if (expr_ == nullptr) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("Expr in input store is nullptr.", K(ret));
+  } else {
+    for (int i = 0; i < expr_->arg_cnt_; ++i) {
+      PyObject *tuple = PyTuple_New(eval_size);
+      switch (expr_->args_[i]->datum_meta_.type_) {
+        case ObCharType:
+        case ObVarcharType:
+        case ObTinyTextType:
+        case ObTextType:
+        case ObMediumTextType:
+        case ObLongTextType: {
+          // construct unicode str
+          ObDatum *src = reinterpret_cast<ObDatum *>(input_store_.get_data_ptr_at(i)) + idx;
+          for (int j = 0; j < eval_size; ++j) {
+            PyObject *unicode_str = PyUnicode_FromStringAndSize(src[j].ptr_, src[j].len_);
+            //put unicode string pyobject into pyobject tuple
+            PyTuple_SetItem(tuple, j, unicode_str);
+          }
+          break;
+        }
+        case ObTinyIntType:
+        case ObSmallIntType:
+        case ObMediumIntType:
+        case ObInt32Type:
+        case ObIntType: {
+          for (int j = 0; j < eval_size; ++j) {
+            PyTuple_SetItem(tuple, j, PyLong_FromLong(reinterpret_cast<int *>(input_store_.get_data_ptr_at(i))[idx + j]));
+          }
+          break;
+        }
+        case ObDoubleType: {
+          for (int j = 0; j < eval_size; ++j) {
+            PyTuple_SetItem(tuple, j, PyFloat_FromDouble(reinterpret_cast<double *>(input_store_.get_data_ptr_at(i))[idx + j]));
+          }
+          break;
+        }
+        default: {
+          //error
+          ret = OB_NOT_SUPPORTED;
+          LOG_WARN("Unsupported input type.", K(ret));
+        }
+      }
+      if(PyTuple_SetItem(pArgs, i, tuple) != 0){
+        ret = OB_ERR_UNEXPECTED;
+        LOG_WARN("Set pyobject arg failed.", K(ret));
+      }
+    }
+  }
+  return ret;
+}
+
 int ObPythonUDFCell::eval(PyObject *pArgs, int64_t eval_size) {
   int ret = OB_SUCCESS;
   if (eval_size <= 0) {
@@ -2158,6 +2272,13 @@ int ObPythonUDFCell::eval(PyObject *pArgs, int64_t eval_size) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("invalid udf model type", K(ret));
     }
+  }
+  if (context_reuse_log_ && !with_context_reuse_) {
+    ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
+    std::fstream log_stream;
+    log_stream.open(context_reuse_log_path, std::ios::app);
+    log_stream << std::string(info->udf_meta_.name_.ptr(), info->udf_meta_.name_.length())  << " init context" << std::endl;
+    log_stream.close(); 
   }
   return ret;
 }
@@ -2388,11 +2509,6 @@ int ObPythonUDFCell::modify_desirable(timeval &start, timeval &end, int64_t eval
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
   double timeuse = (end.tv_sec - start.tv_sec) * 1000000 + (double)(end.tv_usec - start.tv_usec); // usec
   double tps = eval_size * 1000000 / timeuse; // current tuples per sec
-  // std::fstream tps_log;
-  // tps_log.open("/home/test/experiments/oceanbase/opt/both_pps.log", std::ios::app);
-  // tps_log << "batch size: " << eval_size << std::endl;
-  // tps_log << "prediction processing speed: " << tps << std::endl;
-  // tps_log.close();
   if (info->tps_s == 0) { // 初始化
     info->tps_s = tps;
     info->predict_size += info->delta; // 尝试调整
