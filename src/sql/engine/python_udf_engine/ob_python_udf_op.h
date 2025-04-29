@@ -118,12 +118,17 @@ public:
   int do_restore_batch_with_cache(bool can_use_cache, ObEvalCtx &eval_ctx, int64_t output_idx, int64_t output_size, std::vector<double>& cached_res_for_double, std::vector<int>& cached_res_for_int,
   std::vector<std::string>& cached_res_for_str, std::vector<std::vector<std::string>>& input_list, std::vector<bool>& bit_vector, std::vector<bool>& mid_res_bit_vector, int64_t& cached_res_idx);
 
-  //计算过程  
+  //计算过程
+
+  int wrap_input(PyObject *&pArgs, int64_t &eval_size, std::vector<std::vector<std::string>>& input_list);
+
   int wrap_input_numpy(PyObject *&pArgs, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // wrap all args
   int wrap_input_numpy_with_cache(PyObject *&pArgs, int64_t idx, 
   int64_t& real_eval_size, int64_t desirable_eval_size, std::vector<bool> &cached_bit_vector, std::vector<bool>& mid_res_bit_vector); // warp args in [idx, idx + predict_size] with cache
   int wrap_input_numpy(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size,std::vector<std::vector<std::string>>& input_list); // warp args in [idx, idx + predict_size]
-  
+  int wrap_input_pyobject(PyObject *&pArgs, int64_t &eval_size);
+  int wrap_input_pyobject(PyObject *&pArgs, int64_t idx, int64_t predict_size, int64_t &eval_size);
+
   int eval(PyObject *pArgs, int64_t eval_size);
   int eval_python_udf(PyObject *pArgs, int64_t eval_size); // do python udf evaluation
   int eval_model_udf(PyObject *pArgs, int64_t eval_size); // do python single model udf evaluation
