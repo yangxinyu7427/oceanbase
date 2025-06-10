@@ -10696,6 +10696,13 @@ OB_SERIALIZE_MEMBER((ObDropPythonUdfArg, ObDDLArg),
 
 OB_SERIALIZE_MEMBER((ObCreateUdfModelArg, ObDDLArg),
                      udf_model_);
+OB_SERIALIZE_MEMBER((ObAlterUdfModelArg, ObDDLArg),
+                     tenant_id_,
+                     model_name_,
+                     is_distillation_,
+                     is_binarization_,
+                     model_path_before_,
+                     model_path_after_);                   
 OB_SERIALIZE_MEMBER((ObDropUdfModelArg, ObDDLArg),
                      tenant_id_,
                      name_,

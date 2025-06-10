@@ -12,6 +12,8 @@
 #ifndef OB_MODEL_SQL_SERVICE_H_
 #define OB_MODEL_SQL_SERVICE_H_
 #include "ob_ddl_sql_service.h"
+#include "share/ob_rpc_struct.h"
+
 namespace oceanbase
 {
 namespace common
@@ -33,6 +35,10 @@ public:
   virtual int insert_udf_model(const ObUdfModel &model_info,
                                common::ObISQLClient *sql_client,
                                const common::ObString *ddl_stmt_str = NULL);
+  virtual int alter_udf_model(const obrpc::ObAlterUdfModelArg &alter_udf_model_arg,
+                              bool &exist,
+                              common::ObISQLClient *sql_client,
+                              const common::ObString *ddl_stmt_str = NULL);                         
   virtual int delete_udf_model(const uint64_t tenant_id,
                                const common::ObString &name,
                                const int64_t new_schema_version,
@@ -45,6 +51,11 @@ public:
 private:
   int add_udf_model(common::ObISQLClient &sql_client, 
                      const ObUdfModel &model_info);
+  int model_distillation(common::ObString &model_path_before, common::ObString &model_path_after);
+  int model_binarization(common::ObString &model_path_before, common::ObString &model_path_after);
+
+  void process_python_exception();
+  void message_error_dialog_show(char* buf);
 private:
   DISALLOW_COPY_AND_ASSIGN(ObUdfModelSqlService);
 };

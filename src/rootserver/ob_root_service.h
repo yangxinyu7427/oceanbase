@@ -576,6 +576,7 @@ public:
 
   //----Functions for managing Model---- IMBridge Metadata
   int create_udf_model(const obrpc::ObCreateUdfModelArg &arg);
+  int alter_udf_model(const obrpc::ObAlterUdfModelArg &arg);
   int drop_udf_model(const obrpc::ObDropUdfModelArg &arg);
   //----End of functions for managing Model
 

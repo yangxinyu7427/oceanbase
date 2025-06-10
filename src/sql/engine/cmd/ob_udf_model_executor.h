@@ -39,6 +39,16 @@ public:
 private:
   DISALLOW_COPY_AND_ASSIGN(ObCreateUdfModelExecutor);
 };
+class ObAlterUdfModelStmt;
+class ObAlterUdfModelExecutor
+{
+public:
+  ObAlterUdfModelExecutor(){}
+  virtual ~ObAlterUdfModelExecutor(){}
+  int execute(ObExecContext &ctx, ObAlterUdfModelStmt &stmt);
+private:
+  DISALLOW_COPY_AND_ASSIGN(ObAlterUdfModelExecutor);
+};
 class ObDropUdfModelStmt;
 class ObDropUdfModelExecutor
 {
