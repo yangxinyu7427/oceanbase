@@ -9645,6 +9645,30 @@ int ObDDLOperator::create_udf_model(share::schema::ObUdfModel &model_info,
   return ret;
 }
 
+int ObDDLOperator::alter_udf_model(const obrpc::ObAlterUdfModelArg &alter_udf_model_arg,
+                                   bool &exist,
+                                   common::ObMySQLTransaction &trans,
+                                   const common::ObString *ddl_stmt_str/*=NULL*/)
+{
+  int ret = OB_SUCCESS;
+  const uint64_t tenant_id = alter_udf_model_arg.tenant_id_;
+  ObSchemaService *schema_service = schema_service_.get_schema_service();
+  if (OB_UNLIKELY(OB_INVALID_ID == tenant_id)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid arguments", K(tenant_id), K(ret));
+  } else if (OB_ISNULL(schema_service)) {
+    ret = OB_ERR_SYS;
+    LOG_ERROR("schema_service must exist", K(ret));
+  } else if (OB_FAIL(schema_service->get_udf_model_sql_service().alter_udf_model(
+                     alter_udf_model_arg,
+                     exist,
+                     &trans,
+                     ddl_stmt_str))) {
+    LOG_WARN("alter udf model failed", K(tenant_id), K(alter_udf_model_arg), K(exist), K(ret));
+  } else {/*do nothing*/}
+  return ret;
+}
+
 int ObDDLOperator::drop_udf_model(const uint64_t tenant_id,
                                   const common::ObString &name,
                                   common::ObMySQLTransaction &trans,

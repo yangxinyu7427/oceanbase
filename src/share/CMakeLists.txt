@@ -558,6 +558,7 @@ target_link_libraries(ob_share PUBLIC python_lib)
 target_compile_options(ob_share PRIVATE)
 #target_compile_options(ob_share PRIVATE -Wshorten-64-to-32)
 target_link_libraries(ob_share PUBLIC ob_base)
+target_include_directories(ob_share PUBLIC "${PYTHON_DIR}/include/python3.11")
 
 add_library(ob_share_static
   STATIC

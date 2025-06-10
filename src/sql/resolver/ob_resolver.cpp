@@ -150,6 +150,7 @@
 #include "sql/resolver/ddl/ob_create_python_udf_resolver.h"
 #include "sql/resolver/ddl/ob_drop_python_udf_resolver.h"
 #include "sql/resolver/ddl/ob_create_udf_model_resolver.h"
+#include "sql/resolver/ddl/ob_alter_udf_model_resolver.h"
 #include "sql/resolver/ddl/ob_drop_udf_model_resolver.h"
 
 namespace oceanbase
@@ -1206,6 +1207,10 @@ int ObResolver::resolve(IsPrepared if_prepared, const ParseNode &parse_tree, ObS
         REGISTER_STMT_RESOLVER(DropUdfModel);
         break;
       }
+      case T_ALTER_UDF_MODEL: {
+        REGISTER_STMT_RESOLVER(AlterUdfModel);
+        break;
+      }  
       default: {
         ret = OB_NOT_SUPPORTED;
         const char *type_name = get_type_name(parse_tree.type_);

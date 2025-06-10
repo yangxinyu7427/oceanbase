@@ -85,6 +85,7 @@ class ObAlterIndexArg;
 class ObRenameIndexArg;
 class ObCreateTenantArg;
 class ObDropForeignKeyArg;
+class ObAlterUdfModelArg;
 } // end of namespace rpc
 
 namespace rootserver
@@ -856,6 +857,10 @@ public:
   int create_udf_model(share::schema::ObUdfModel &model_info,
                        common::ObMySQLTransaction &trans,
                        const common::ObString *ddl_stmt_str/*=NULL*/);
+  int alter_udf_model(const obrpc::ObAlterUdfModelArg &alter_udf_model_arg,
+                      bool &exist,
+                      common::ObMySQLTransaction &trans,
+                      const common::ObString *ddl_stmt_str/*=NULL*/);                   
   int drop_udf_model(const uint64_t tenant_id,
                      const common::ObString &name,
                      common::ObMySQLTransaction &trans,

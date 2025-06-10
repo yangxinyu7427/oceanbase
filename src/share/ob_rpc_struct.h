@@ -6611,6 +6611,28 @@ public:
   share::schema::ObUdfModel udf_model_;
 };
 
+struct ObAlterUdfModelArg : public ObDDLArg
+{
+  OB_UNIS_VERSION(1);
+public:
+  ObAlterUdfModelArg(): ObDDLArg(), tenant_id_(common::OB_INVALID_ID), model_name_(), is_distillation_(false), 
+                        is_binarization_(false), model_path_before_(), model_path_after_() {}
+  virtual ~ObAlterUdfModelArg() {}
+
+  bool is_valid() const {
+    return !model_name_.empty();
+  }
+  TO_STRING_KV(K_(tenant_id), K_(model_name), K_(is_distillation), 
+               K_(is_binarization), K_(model_path_before), K_(model_path_after));
+
+  uint64_t tenant_id_;
+  common::ObString model_name_;
+  bool is_distillation_;      //是否使用模型蒸馏
+  bool is_binarization_;      //是否使用二值网络
+  common::ObString model_path_before_;
+  common::ObString model_path_after_;
+};
+
 struct ObDropUdfModelArg : public ObDDLArg
 {
   OB_UNIS_VERSION(1);

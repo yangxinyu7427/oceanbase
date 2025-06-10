@@ -263,7 +263,7 @@ END_P SET_VAR DELIMITER
 
         BACKUP BACKUP_COPIES BALANCE BANDWIDTH BASE BASELINE BASELINE_ID BASIC BEGI BINDING SHARDING BINLOG BIT BIT_AND
         BIT_OR BIT_XOR BLOCK BLOCK_INDEX BLOCK_SIZE BLOOM_FILTER BOOL BOOLEAN BOOTSTRAP BTREE BYTE
-        BREADTH BUCKETS BISON_LIST BACKUPSET BACKED BACKUPPIECE BACKUP_BACKUP_DEST BACKUPROUND
+        BREADTH BUCKETS BINARIZATION BISON_LIST BACKUPSET BACKED BACKUPPIECE BACKUP_BACKUP_DEST BACKUPROUND
         BADFILE
 
         CACHE CALIBRATION CALIBRATION_INFO CANCEL CASCADED CAST CATALOG_NAME CHAIN CHANGED CHARSET CHECKSUM CHECKPOINT CHUNK CIPHER
@@ -275,7 +275,7 @@ END_P SET_VAR DELIMITER
 
         DAG DATA DATAFILE DATA_TABLE_ID DATE DATE_ADD DATE_SUB DATETIME DAY DEALLOCATE DECRYPTION
         DEFAULT_AUTH DEFAULT_LOB_INROW_THRESHOLD DEFINER DELAY DELAY_KEY_WRITE DEPTH DES_KEY_FILE DENSE_RANK DESCRIPTION DESTINATION DIAGNOSTICS
-        DIRECTORY DISABLE DISCARD DISK DISKGROUP DO DUMP DUMPFILE DUPLICATE DUPLICATE_SCOPE DYNAMIC
+        DIRECTORY DISABLE DISCARD DISK DISKGROUP DISTILLATION DO DUMP DUMPFILE DUPLICATE DUPLICATE_SCOPE DYNAMIC
         DATABASE_ID DEFAULT_TABLEGROUP DISCONNECT DEMAND
 
         EFFECTIVE EMPTY ENABLE ENABLE_ARBITRATION_SERVICE ENABLE_EXTENDED_ROWID ENCRYPTED ENCRYPTION END ENDS ENFORCED ENGINE_ ENGINES ENUM ENTITY ERROR_CODE ERROR_P ERRORS ESTIMATE
@@ -540,8 +540,9 @@ END_P SET_VAR DELIMITER
 /*python udf*/
 %type <node> create_python_udf_stmt drop_python_udf_stmt
 %type <node> function_element_list function_element param_name param_type python_code_type python_udf_model_list python_udf_model
-%type <node> create_udf_model_stmt drop_udf_model_stmt
+%type <node> create_udf_model_stmt drop_udf_model_stmt alter_udf_model_stmt
 %type <node> model_metadata_list model_metadata_element predict_python_udf_element
+%type <node> compression_method input_model_path output_model_path
 %start sql_stmt
 %%
 ////////////////////////////////////////////////////////////////
@@ -602,6 +603,7 @@ stmt:
   | drop_python_udf_stmt    { $$ = $1; check_question_mark($$, result); }
   | create_udf_model_stmt   { $$ = $1; check_question_mark($$, result); }
   | drop_udf_model_stmt     { $$ = $1; check_question_mark($$, result); }
+  | alter_udf_model_stmt    { $$ = $1; check_question_mark($$, result); }
   | create_table_like_stmt  { $$ = $1; check_question_mark($$, result); }
   | create_database_stmt    { $$ = $1; check_question_mark($$, result); }
   | drop_database_stmt      { $$ = $1; check_question_mark($$, result); }
@@ -5205,6 +5207,43 @@ DROP MODEL opt_if_exists NAME_OB
 {
   malloc_non_terminal_node($$, result->malloc_pool_, T_DROP_UDF_MODEL, 2, $3, $4);
 }
+;
+
+alter_udf_model_stmt:
+ALTER MODEL NAME_OB compression_method input_model_path ',' output_model_path
+{
+  malloc_non_terminal_node($$, result->malloc_pool_, T_ALTER_UDF_MODEL, 4, $3, $4, $5, $7);
+}
+;
+
+compression_method:
+DISTILLATION
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_DISTILLATION);
+}
+|
+BINARIZATION
+{
+  malloc_terminal_node($$, result->malloc_pool_, T_BINARIZATION);
+}
+;
+
+input_model_path:
+STRING_VALUE
+{
+  $$ = $1;
+}
+| /* EMPTY */
+{ $$ = NULL; }
+;
+
+output_model_path:
+STRING_VALUE
+{
+  $$ = $1;
+}
+| /* EMPTY */
+{ $$ = NULL; }
 ;
 
 //show_udf_model_stmt:

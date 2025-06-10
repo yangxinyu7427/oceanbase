@@ -157,6 +157,7 @@ public:
 
   //----Definitions for managing model---- IMBridge Metadata
   RPC_S(PRD create_udf_model, obrpc::OB_CREATE_UDF_MODEL, (ObCreateUdfModelArg));
+  RPC_S(PRD alter_udf_model, obrpc::OB_ALTER_UDF_MODEL, (ObAlterUdfModelArg));
   RPC_S(PRD drop_udf_model, obrpc::OB_DROP_UDF_MODEL, (ObDropUdfModelArg));
   //----End of definitions for managing python udf----
 

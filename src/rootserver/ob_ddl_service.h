@@ -930,6 +930,7 @@ int check_table_udt_id_is_exist(share::schema::ObSchemaGetterGuard &schema_guard
   //----Functions for managing udf---- IMBridge_Metadata
   virtual int create_udf_model(share::schema::ObUdfModel &model_info,
                                const common::ObString &ddl_stmt_str);
+  virtual int alter_udf_model(const obrpc::ObAlterUdfModelArg &alter_udf_model_arg);                            
   virtual int drop_udf_model(const obrpc::ObDropUdfModelArg &drop_udf_model_arg);
   virtual int check_udf_model_exist(uint64 tenant_id, const common::ObString &name, bool &is_exsit, uint64_t &model_id);
   //----End of Functions for managing udf----    

@@ -140,6 +140,7 @@ void oceanbase::observer::init_srv_xlator_for_rootserver(ObSrvRpcXlator *xlator)
     RPC_PROCESSOR(rootserver::ObRpcCreatePythonUdfP, *gctx_.root_service_);
     RPC_PROCESSOR(rootserver::ObRpcDropPythonUdfP, *gctx_.root_service_);
     RPC_PROCESSOR(rootserver::ObRpcCreateUdfModelP, *gctx_.root_service_);
+    RPC_PROCESSOR(rootserver::ObRpcAlterUdfModelP, *gctx_.root_service_);
     RPC_PROCESSOR(rootserver::ObRpcDropUdfModelP, *gctx_.root_service_);// IMBridge_Metadata    
     RPC_PROCESSOR(rootserver::ObRpcDoSequenceDDLP, *gctx_.root_service_);
     RPC_PROCESSOR(rootserver::ObRpcCreateUDTP, *gctx_.root_service_);

@@ -67,6 +67,7 @@
 #include "sql/resolver/ddl/ob_create_python_udf_stmt.h"
 #include "sql/resolver/ddl/ob_drop_python_udf_stmt.h"
 #include "sql/resolver/ddl/ob_create_udf_model_stmt.h"
+#include "sql/resolver/ddl/ob_alter_udf_model_stmt.h"
 #include "sql/resolver/ddl/ob_drop_udf_model_stmt.h"
 #include "sql/resolver/dcl/ob_alter_user_profile_stmt.h"
 #include "sql/resolver/dcl/ob_alter_user_primary_zone_stmt.h"
@@ -820,6 +821,10 @@ int ObCmdExecutor::execute(ObExecContext &ctx, ObICmd &cmd)
       }
       case stmt::T_CREATE_UDF_MODEL: {
         DEFINE_EXECUTE_CMD(ObCreateUdfModelStmt, ObCreateUdfModelExecutor);
+        break;
+      }
+      case stmt::T_ALTER_UDF_MODEL: {
+        DEFINE_EXECUTE_CMD(ObAlterUdfModelStmt, ObAlterUdfModelExecutor);
         break;
       }
       case stmt::T_DROP_UDF_MODEL: {

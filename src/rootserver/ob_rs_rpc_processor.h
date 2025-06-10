@@ -440,6 +440,7 @@ DEFINE_DDL_RS_RPC_PROCESSOR(obrpc::OB_CREATE_PYTHON_UDF, ObRpcCreatePythonUdfP, 
 DEFINE_DDL_RS_RPC_PROCESSOR(obrpc::OB_DROP_PYTHON_UDF, ObRpcDropPythonUdfP, drop_python_udf(arg_));
 
 DEFINE_DDL_RS_RPC_PROCESSOR(obrpc::OB_CREATE_UDF_MODEL, ObRpcCreateUdfModelP, create_udf_model(arg_));
+DEFINE_DDL_RS_RPC_PROCESSOR(obrpc::OB_ALTER_UDF_MODEL, ObRpcAlterUdfModelP, alter_udf_model(arg_));
 DEFINE_DDL_RS_RPC_PROCESSOR(obrpc::OB_DROP_UDF_MODEL, ObRpcDropUdfModelP, drop_udf_model(arg_));
 
 //package ddl

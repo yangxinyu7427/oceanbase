@@ -35056,6 +35056,68 @@ int ObDDLService::create_udf_model(share::schema::ObUdfModel &model_info,
   return ret;
 }
 
+int ObDDLService::alter_udf_model(const obrpc::ObAlterUdfModelArg &alter_udf_model_arg)
+{
+  int ret = OB_SUCCESS;
+  const uint64_t tenant_id = alter_udf_model_arg.tenant_id_;
+  const ObString &model_name = alter_udf_model_arg.model_name_;
+  // const bool if_exist = alter_udf_model_arg.if_exist_;
+  ObDDLSQLTransaction trans(schema_service_);
+  ObSchemaGetterGuard schema_guard;
+  if (OB_FAIL(check_inner_stat())) {
+    LOG_WARN("variable is not init", K(ret));
+  } else if (OB_FAIL(get_tenant_schema_guard_with_version_in_inner_table(tenant_id, schema_guard))) {
+    LOG_WARN("fail to get schema guard with version in inner table", K(ret), K(tenant_id));
+  } else if (OB_UNLIKELY(false == alter_udf_model_arg.is_valid())
+             || OB_ISNULL(schema_service_)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid argument", K(alter_udf_model_arg), K(ret));
+  }
+
+  //check model exist & alter model
+  if (OB_SUCC(ret)) {
+    bool is_exist = false;
+    uint64_t model_id = OB_INVALID_ID;
+    int64_t refreshed_schema_version = 0;
+    if (OB_FAIL(schema_service_->check_udf_model_exist(tenant_id, model_name,
+                                                       is_exist, model_id))) {
+      LOG_WARN("check_udf_model_exist failed", K(tenant_id), K(model_name), K(is_exist), K(ret));                                             
+    } else if (OB_FAIL(schema_guard.get_schema_version(tenant_id, refreshed_schema_version))) {
+      LOG_WARN("failed to get tenant schema version", KR(ret), K(tenant_id));
+    } else if (OB_FAIL(trans.start(sql_proxy_, tenant_id, refreshed_schema_version))) {
+      LOG_WARN("start transaction failed", KR(ret), K(tenant_id));
+    } else {
+      ObDDLOperator ddl_operator(*schema_service_, *sql_proxy_);
+      if (OB_FAIL(ObDependencyInfo::modify_dep_obj_status(trans, tenant_id, model_id,
+                                                          ddl_operator, *schema_service_))) {
+        LOG_WARN("failed to modify obj status", K(ret));
+      } 
+      else if (OB_FAIL(ddl_operator.alter_udf_model(alter_udf_model_arg, is_exist, trans, &alter_udf_model_arg.ddl_stmt_str_))) {
+        LOG_WARN("ddl_operator alter_udf_model failed", K(tenant_id), K(ret));
+      } 
+      else {/*do nothing*/}
+    }
+  }
+
+  if (trans.is_started()) {
+    int temp_ret = OB_SUCCESS;
+    if (OB_SUCCESS != (temp_ret = trans.end(OB_SUCC(ret)))) {
+      LOG_WARN("trans end failed", "is_commit", OB_SUCCESS == ret, K(temp_ret));
+      ret = (OB_SUCC(ret)) ? temp_ret : ret;
+    }
+  }
+
+  if (OB_SUCC(ret)) {
+    if (OB_FAIL(publish_schema(tenant_id))) {
+      LOG_WARN("publish schema failed", K(ret));
+    }
+  }
+
+  LOG_INFO("finish drop udf model", K(tenant_id), K(model_name), K(ret));
+
+  return ret;
+}
+
 int ObDDLService::drop_udf_model(const obrpc::ObDropUdfModelArg &drop_udf_model_arg)
 {
   int ret = OB_SUCCESS;

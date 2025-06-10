@@ -392,6 +392,7 @@ public:
             //model
             || stmt_type == stmt::T_CREATE_UDF_MODEL
             || stmt_type == stmt::T_DROP_UDF_MODEL
+            || stmt_type == stmt::T_ALTER_UDF_MODEL
             );
   }
 

@@ -6542,6 +6542,25 @@ int ObRootService::create_udf_model(const obrpc::ObCreateUdfModelArg &arg)
   return ret;
 }
 
+// IMBridge Metadata
+int ObRootService::alter_udf_model(const obrpc::ObAlterUdfModelArg &arg)
+{
+  int ret = OB_SUCCESS;
+  bool exist = false;
+  uint64_t model_id = OB_INVALID_ID;
+  if (!inited_) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("not init", K(ret));
+  } else if (!arg.is_valid()) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_WARN("invalid arg", K(arg), K(ret));
+  } else if (OB_FAIL(ddl_service_.alter_udf_model(arg))) {
+    LOG_WARN("failed to create udf model", K(arg), K(ret));
+  } else {/*do nothing*/}
+
+  return ret;
+}
+
 int ObRootService::drop_udf_model(const obrpc::ObDropUdfModelArg &arg)
 {
   int ret = OB_SUCCESS;

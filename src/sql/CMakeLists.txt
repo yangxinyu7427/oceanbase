@@ -1154,6 +1154,7 @@ ob_set_subtarget(ob_sql resolver_ddl
   resolver/ddl/ob_create_python_udf_resolver.cpp
   resolver/ddl/ob_drop_python_udf_resolver.cpp
   resolver/ddl/ob_create_udf_model_resolver.cpp
+  resolver/ddl/ob_alter_udf_model_resolver.cpp
   resolver/ddl/ob_drop_udf_model_resolver.cpp
 )
 
