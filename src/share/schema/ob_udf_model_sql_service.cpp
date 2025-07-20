@@ -398,7 +398,6 @@ int ObUdfModelSqlService::model_distillation(common::ObString &model_path_before
     LOG_WARN("failed to get __main__ dict", K(ret));
   } else if ((py_result = PyRun_StringFlags(python_code.c_str(), Py_file_input, pGlobals, pGlobals, NULL)) == nullptr) {
     // 捕获 Python 错误
-    process_python_exception();
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Failed to run Python model distillation script", K(ret));
   } else {
@@ -493,7 +492,6 @@ print("Binary model saved successfully.")
     LOG_WARN("failed to get __main__ dict", K(ret));
   } else if ((py_result = PyRun_StringFlags(python_code.c_str(), Py_file_input, pGlobals, pGlobals, NULL)) == nullptr) {
     // 捕获 Python 错误
-    process_python_exception();
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Failed to run Python model distillation script", K(ret));
   } else {

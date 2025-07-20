@@ -54,8 +54,6 @@ private:
   int model_distillation(common::ObString &model_path_before, common::ObString &model_path_after);
   int model_binarization(common::ObString &model_path_before, common::ObString &model_path_after);
 
-  void process_python_exception();
-  void message_error_dialog_show(char* buf);
 private:
   DISALLOW_COPY_AND_ASSIGN(ObUdfModelSqlService);
 };

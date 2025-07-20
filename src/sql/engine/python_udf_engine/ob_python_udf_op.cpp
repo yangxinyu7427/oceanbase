@@ -17,13 +17,13 @@ typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
 static bool with_context_reuse_ = false; // 进行上下文复用优化
 static bool with_batch_control_ = false; // 是否进行batch size控制
-static bool with_transform_opt_ = false; // 是否进行数据传输优化
+static bool with_transform_opt_ = true; // 是否进行数据传输优化
 static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
 
 static bool context_reuse_log_ = false; // 打印上下文初始化次数
 static bool batch_control_log_ = false; // 打印批次大小调整过程
-static bool transform_opt_log_ = true; // 打印数据传输开销
+static bool transform_opt_log_ = false; // 打印数据传输开销
 
 
 static string context_reuse_log_path = "/root/JS_test/log/context_reuse.log";
