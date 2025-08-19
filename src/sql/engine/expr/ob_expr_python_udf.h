@@ -90,6 +90,9 @@ public:
   int delta; // delta batch size
   bool is_new_full_cache=false;
   bool is_new_mid_cache=false;
+  bool last_turn_off_fine_cache=false;
+  bool can_use_fine_cache=false;
+  bool finish_check=false;
 };
 } /* namespace sql */
 } /* namespace oceanbase */

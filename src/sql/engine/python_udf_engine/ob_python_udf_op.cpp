@@ -2507,6 +2507,7 @@ int ObPythonUDFCell::modify_desirable(timeval &start, timeval &end, int64_t eval
 {
   int ret = OB_SUCCESS;
   ObPythonUdfInfo *info = static_cast<ObPythonUdfInfo *>(expr_->extra_info_);
+  double pre=info->tps_s;
   double timeuse = (end.tv_sec - start.tv_sec) * 1000000 + (double)(end.tv_usec - start.tv_usec); // usec
   double tps = eval_size * 1000000 / timeuse; // current tuples per sec
   if (info->tps_s == 0) { // 初始化
@@ -2528,6 +2529,26 @@ int ObPythonUDFCell::modify_desirable(timeval &start, timeval &end, int64_t eval
   }
   if (OB_SUCC(ret)) {
     desirable_ = info->predict_size;
+  }
+  if(info->round > info->round_limit && !info->finish_check){
+    if(!with_fine_funcache_&&!info->last_turn_off_fine_cache){
+      //本身就没开缓存
+      info->finish_check=true;
+    }else{
+      if(!info->last_turn_off_fine_cache){
+        // 尝试关掉cache
+        with_fine_funcache_=false;
+        info->last_turn_off_fine_cache=true;
+      }else{
+        info->finish_check=true;
+        //当前的tps是没开缓存的dps
+        if(tps>pre){
+          with_fine_funcache_=false;
+        }else{
+          with_fine_funcache_=true;
+        }
+      }
+    }
   }
   return ret;
 }
