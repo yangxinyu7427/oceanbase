@@ -467,7 +467,10 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
         pycall += std::string("\nimport numpy as np") +
                   std::string("\nimport onnxruntime as ort") +
                   std::string("\nimport jieba") +
+                  std::string("\nimport time") +  
                   std::string("\nclass ") + class_name + std::string(":") +
+                  std::string("\n\tdef __init__(self):") +
+                  std::string("\n\t\tself.total_execution_time = 0.0") +
                   std::string("\n\tdef pyinitial(self):") +
                   std::string("\n\t\tpass") +
                   std::string("\n\tdef tokenize_text(self, text):") +
@@ -485,12 +488,15 @@ int ObExprPythonUdf::import_model_udf(const share::schema::ObPythonUDFMeta &udf_
                   std::string(udf_meta.udf_model_meta_[0].model_path_.ptr()) + 
                   std::string("', sess_options=ortconfig)") +
                   std::string("\n\t\tinfer_batch = {") +
-                  //std::string("\n\t\t\telem: args[i].astype(self.anonymous_model_type_map[args[i].dtype.name]).reshape((-1, 1))") +
                   std::string("\n\t\t\telem: self.process_element(args, i)") +
                   std::string("\n\t\t\tfor i, elem in enumerate([input_node.name for input_node in self.anonymous_model_session.get_inputs()])}") +
-                  //std::string("\n\t\tinfer_batch = {'float_input': np.column_stack(args).astype(np.float32)}") +
-                  //std::string("\n\t\treturn self.anonymous_model_session.run([self.anonymous_model_session.get_outputs()[0].name], infer_batch)[0]");
-                  std::string("\n\t\treturn self.anonymous_model_session.run([label.name for label in self.anonymous_model_session.get_outputs()], infer_batch)");
+                  std::string("\n\t\tstart_time = time.time()") +
+                  std::string("\n\t\tresult = self.anonymous_model_session.run([label.name for label in self.anonymous_model_session.get_outputs()], infer_batch)") +
+                  std::string("\n\t\tbatch_time = time.time() - start_time") +
+                  std::string("\n\t\tself.total_execution_time += batch_time") +
+                  std::string("\n\t\twith open('/home/time.log', 'w', encoding='utf-8') as f:") +
+                  std::string("\n\t\t\tf.write(f'ONNX模型总执行时间: {self.total_execution_time:.6f}')") +
+                  std::string("\n\t\treturn result");
         break;
       }
       case share::schema::ObPythonUdfEnumType::ModelFrameworkType::PYTORCH : {

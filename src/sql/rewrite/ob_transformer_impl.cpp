@@ -324,8 +324,8 @@ int ObTransformerImpl::transform_rule_set(ObDMLStmt *&stmt,
   { // pull up python udf filter
     // pile
     bool trans_happened = false;
-    APPLY_RULE_IF_NEEDED(PYUDF_DTPO, ObTransformPyUdfDTPO);
-    APPLY_RULE_IF_NEEDED(PYUDF_MERGE,ObTransformPyUDFMerge);
+    //APPLY_RULE_IF_NEEDED(PYUDF_DTPO, ObTransformPyUdfDTPO);
+    //APPLY_RULE_IF_NEEDED(PYUDF_MERGE,ObTransformPyUDFMerge);
     APPLY_RULE_IF_NEEDED(PYUDF_REDUNDENT,ObTransformPyUDFRedundent);
   }
   return ret;

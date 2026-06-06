@@ -280,7 +280,8 @@ private:
 private:
   int predict_size_; //每次python udf计算的元组数
   ObPUStoreController controller_;
-
+  double timecount_1;
+  double timecount_2;
   void* _save; //for Python Interpreter Thread State
 };
 

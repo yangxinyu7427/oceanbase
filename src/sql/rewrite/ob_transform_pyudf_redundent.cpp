@@ -3,6 +3,7 @@
  * find redundancy of python udf and then change them
  */
 #define USING_LOG_PREFIX SQL_REWRITE
+#include <fstream>
 #include <regex>
 #include <string>
 #include <cstring>
@@ -40,6 +41,7 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
   common::ObIArray<ObParentDMLStmt> &parent_stmts, ObDMLStmt *&stmt, bool &trans_happened)
 {
   int ret = OB_SUCCESS;
+  auto start = std::chrono::high_resolution_clock::now();
   trans_happened = false;
   LOG_TRACE("Run transform ObTransformPyUDFRedundent", K(ret));
   ObSelectStmt *select_stmt = NULL;
@@ -64,6 +66,10 @@ int ObTransformPyUDFRedundent::transform_one_stmt(
     trans_happened = true;
     stmt = select_stmt;
   }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  std::ofstream out_file("/root/time_test/redundent.log", std::ios::app);
+  out_file << "total_duration: " << total_duration.count()/ 1000000.0 << "\n";
   return ret;  
 
 }

@@ -4,6 +4,7 @@
  */
 #define USING_LOG_PREFIX SQL_REWRITE
 #include <regex>
+#include <fstream>
 #include <string>
 #include <map>
 #include <cstdlib>
@@ -63,6 +64,7 @@ int ObTransformPyUDFMerge::transform_one_stmt(
   common::ObIArray<ObParentDMLStmt> &parent_stmts, ObDMLStmt *&stmt, bool &trans_happened)
 {
   int ret = OB_SUCCESS;
+  auto start = std::chrono::high_resolution_clock::now();
   trans_happened = false;
   LOG_TRACE("Run transform ObTransformPyUDFMerge", K(ret));
   ObSelectStmt *select_stmt = NULL;
@@ -92,6 +94,10 @@ int ObTransformPyUDFMerge::transform_one_stmt(
     trans_happened = true;
     stmt = select_stmt;
   }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  std::ofstream out_file("/root/time_test/merge.log", std::ios::app);
+  out_file << "total_duration: " << total_duration.count()/ 1000000.0 << "\n";
   return ret;  
 
 }

@@ -15,11 +15,12 @@ namespace sql
 
 typedef share::schema::ObPythonUdfEnumType::PyUdfRetType PyUdfType;
 
-static bool with_context_reuse_ = false; // 进行上下文复用优化
-static bool with_batch_control_ = false; // 是否进行batch size控制
+static bool with_context_reuse_ = true; // 进行上下文复用优化
+static bool with_batch_control_ = true; // 是否进行batch size控制
 static bool with_transform_opt_ = true; // 是否进行数据传输优化
 static bool with_full_funcache_ = false; // 是否进行粗粒度缓存
 static bool with_fine_funcache_ = false; // 是否进行细粒度缓存
+static bool with_redundent_tune = false; // 是否进行缓存复用负优化检测
 
 static bool context_reuse_log_ = false; // 打印上下文初始化次数
 static bool batch_control_log_ = false; // 打印批次大小调整过程
@@ -177,6 +178,7 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
     nStatus = true;
   }
   struct timeval t1, t2;
+  struct timeval ut1, ut2, ut3, ut4, ut5, ut6, ut7, ut8, ut9, ut10, ut11;
   gettimeofday(&t1, NULL);
 
   if (with_batch_control_) {
@@ -196,11 +198,21 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
           LOG_WARN("Save input batchrows failed.", K(ret));
         }
       }
+      gettimeofday(&ut1, NULL);
       controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2);
+      gettimeofday(&ut2, NULL);
+
+      // auto start = std::chrono::high_resolution_clock::now();
       if (OB_FAIL(ret) || OB_FAIL(controller_.process())) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Process python udf failed.", K(ret));
       }
+      // auto end = std::chrono::high_resolution_clock::now();
+      // auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+      // std::ofstream out_file("/root/time_test/udf_time.log", std::ios::app);
+      // timecount_+=total_duration.count();
+      // out_file << "total_duration: " << timecount_/ 1000000.0 << "\n";
+      gettimeofday(&ut3, NULL);
     }
   } else { // 无batch size控制
     if (OB_SUCC(ret)) { 
@@ -216,16 +228,24 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
       } else if (OB_FAIL(controller_.store(eval_ctx_, brs_))){
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Save input batchrows failed.", K(ret));
-      } else if (OB_FAIL(controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2))){
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("Save input batchrows failed.", K(ret));
-      } else if (OB_FAIL(controller_.process())) {
-        ret = OB_ERR_UNEXPECTED;
-        LOG_WARN("Process python udf failed.", K(ret));
-      } else {}
+      } 
+      //else if (OB_FAIL(controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2))){
+      //  ret = OB_ERR_UNEXPECTED;
+      //  LOG_WARN("Save input batchrows failed.", K(ret));
+      //} else if (OB_FAIL(controller_.process())) {
+      //  ret = OB_ERR_UNEXPECTED;
+      //  LOG_WARN("Process python udf failed.", K(ret));
+      //} 
+      else {
+        gettimeofday(&ut1, NULL);
+        controller_.init_input_list_on_cells(eval_ctx_, controller_.get_desirable() * 2);
+        gettimeofday(&ut2, NULL);
+        controller_.process();
+        gettimeofday(&ut3, NULL);
+      }
     }
   }
-
+  gettimeofday(&ut6, NULL);
   if (OB_FAIL(ret) || OB_FAIL(controller_.restore(eval_ctx_, brs_, max_row_cnt))) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("Restore output batchrows failed.", K(ret));
@@ -236,6 +256,7 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
       (*e)->get_eval_info(eval_ctx_).clear_evaluated_flag();
     }
   }
+  gettimeofday(&ut7, NULL);
   gettimeofday(&t2, NULL);
   double timeuse = (t2.tv_sec - t1.tv_sec) * 1000000 + (double)(t2.tv_usec - t1.tv_usec);
   double time_s = timeuse / 1000;
@@ -256,7 +277,17 @@ int ObPythonUDFOp::inner_get_next_batch_without_cache(const int64_t max_row_cnt)
     outputFile << brs_.size_ << std::endl;
   }
   outputFile.close();*/
-
+  std::string file_name("/home/");
+  file_name.append(std::string("runlog"));
+  file_name.append(".log");
+  std::fstream f;
+  f.open(file_name, std::ios::out | std::ios::app); // 追加写入
+  f << "Start a new batch without cache!" << std::endl;
+  //f << "execution time: " << timeuse/1000 << " ms" << std::endl;
+  //f << "get_next_batch time: " << (ut11.tv_sec - ut10.tv_sec) * 1000 + (double)(ut11.tv_usec - ut10.tv_usec) / 1000 << " ms" << std::endl;
+  //f << "check_cached_result_on_cells time: " << (ut2.tv_sec - ut1.tv_sec) * 1000 + (double)(ut2.tv_usec - ut1.tv_usec) / 1000 << " ms" << std::endl;
+  f << "process time: " << (ut3.tv_sec - ut2.tv_sec) * 1000 + (double)(ut3.tv_usec - ut2.tv_usec) / 1000 << " ms" << std::endl;
+  f << "restore time: " << (ut7.tv_sec - ut6.tv_sec) * 1000 + (double)(ut7.tv_usec - ut6.tv_usec) / 1000 << " ms" << std::endl;
   return ret;
 }
 
@@ -309,10 +340,16 @@ int ObPythonUDFOp::inner_get_next_batch_with_cache(const int64_t max_row_cnt)
         gettimeofday(&ut1, NULL);
         controller_.check_cached_result_on_cells(eval_ctx_, controller_.get_desirable() * 2);
         gettimeofday(&ut2, NULL);
+        // auto start = std::chrono::high_resolution_clock::now();
         if (OB_FAIL(ret) || OB_FAIL(controller_.process_with_cache(eval_ctx_))) {
           ret = OB_ERR_UNEXPECTED;
           LOG_WARN("Process python udf failed.", K(ret));
         }
+        // auto end = std::chrono::high_resolution_clock::now();
+        // auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // std::ofstream out_file("/root/time_test/udf_time.log", std::ios::app);
+        // timecount_+=total_duration.count();
+        // out_file << "total_duration: " << timecount_/ 1000000.0 << "\n";
         gettimeofday(&ut3, NULL);
       }else{
         gettimeofday(&ut4, NULL);
@@ -420,14 +457,12 @@ int ObPythonUDFOp::inner_get_next_batch_with_cache(const int64_t max_row_cnt)
   file_name.append(".log");
   std::fstream f;
   f.open(file_name, std::ios::out | std::ios::app); // 追加写入
-  f << "Start a new batch!" << std::endl;
+  f << "Start a new batch with cache!" << std::endl;
   f << "execution time: " << timeuse/1000 << " ms" << std::endl;
-  f << "get_next_batch time: " << (ut11.tv_sec - ut10.tv_sec) * 1000 + (double)(ut11.tv_usec - ut10.tv_usec) / 1000 << " ms" << std::endl;
-  f << "check_cached_result_on_cells time: " << (ut2.tv_sec - ut1.tv_sec) * 1000 + (double)(ut2.tv_usec - ut1.tv_usec) / 1000 << " ms" << std::endl;
-  f << "process_with_cache time: " << (ut3.tv_sec - ut2.tv_sec) * 1000 + (double)(ut3.tv_usec - ut2.tv_usec) / 1000 << " ms" << std::endl;
-  f << "process time: " << (ut5.tv_sec - ut4.tv_sec) * 1000 + (double)(ut5.tv_usec - ut4.tv_usec) / 1000 << " ms" << std::endl;
-  f << "restore_with_cache time: " << (ut7.tv_sec - ut6.tv_sec) * 1000 + (double)(ut7.tv_usec - ut6.tv_usec) / 1000 << " ms" << std::endl;
-  f << "restore time: " << (ut9.tv_sec - ut8.tv_sec) * 1000 + (double)(ut9.tv_usec - ut8.tv_usec) / 1000 << " ms" << std::endl;
+  timecount_1+=(ut2.tv_sec - ut1.tv_sec) * 1000 + (double)(ut2.tv_usec - ut1.tv_usec) / 1000;
+  f << "check_cached_result_on_cells time: " << timecount_1 << " ms" << std::endl;
+  timecount_2+=(ut7.tv_sec - ut6.tv_sec) * 1000 + (double)(ut7.tv_usec - ut6.tv_usec) / 1000;
+  f << "restore_with_cache time: " << timecount_2 << " ms" << std::endl;
   return ret;
 }
 
@@ -1066,8 +1101,8 @@ int ObPythonUDFCell::do_store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
       ObExpr *e = expr_->args_[i];
       // eval_batch() = eval_vector() + cast_to_uniform()
       //if (OB_FAIL(e->eval_batch(eval_ctx, *brs.skip_, brs.size_))) {
-      //if (OB_FAIL(e->eval_batch(eval_ctx, my_skip, batch_size_))) {
-      if (OB_FAIL(e->eval_vector(eval_ctx, brs))) {
+      if (OB_FAIL(e->eval_batch(eval_ctx, my_skip, batch_size_))) {
+      //if (OB_FAIL(e->eval_vector(eval_ctx, brs))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Eval Python UDF args' vector/batch result failed.", K(ret));
       } else if (OB_FAIL(e->cast_to_uniform(brs.size_, eval_ctx))) {
@@ -2530,7 +2565,7 @@ int ObPythonUDFCell::modify_desirable(timeval &start, timeval &end, int64_t eval
   if (OB_SUCC(ret)) {
     desirable_ = info->predict_size;
   }
-  if(info->round > info->round_limit && !info->finish_check){
+  if(with_redundent_tune && info->round > info->round_limit && !info->finish_check){
     if(!with_fine_funcache_&&!info->last_turn_off_fine_cache){
       //本身就没开缓存
       info->finish_check=true;
@@ -2645,8 +2680,8 @@ int ObPUStoreController::store(ObEvalCtx &eval_ctx, ObBatchRows &brs)
     // 要判断skip进行数据重整，使用local allocator进行数据复制
     // load时要转为相应类型的vector
     // 下层传上来的数据不一定为uniform格式，需要save_vector()或cast_to_uniform()
-    if (OB_FAIL(other_store_.save_vector(eval_ctx, brs))) {
-    //if (OB_FAIL(other_store_.save_batch(eval_ctx, brs))) {
+    //if (OB_FAIL(other_store_.save_vector(eval_ctx, brs))) {
+    if (OB_FAIL(other_store_.save_batch(eval_ctx, brs))) {
       ret = OB_ERR_UNEXPECTED;
       LOG_WARN("Save other input cols failed.", K(ret));
     } else {
@@ -3078,8 +3113,8 @@ int ObPUStoreController::restore(ObEvalCtx &eval_ctx, ObBatchRows &brs, int64_t 
       }
     }
     if (OB_SUCC(ret)) {
-      if (OB_FAIL(other_store_.load_vector(eval_ctx, output_size))) {
-      //if (OB_FAIL(other_store_.load_batch(eval_ctx, output_size))) {
+      //if (OB_FAIL(other_store_.load_vector(eval_ctx, output_size))) {
+      if (OB_FAIL(other_store_.load_batch(eval_ctx, output_size))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Load other input cols failed.", K(ret));
       } else {
@@ -3125,8 +3160,8 @@ int ObPUStoreController::restore_with_cache(ObEvalCtx &eval_ctx, ObBatchRows &br
           count++;
     }
     if (OB_SUCC(ret)) {
-      if (OB_FAIL(other_store_.load_vector(eval_ctx, output_size))) {
-      //if (OB_FAIL(other_store_.load_batch(eval_ctx, output_size))) {
+      //if (OB_FAIL(other_store_.load_vector(eval_ctx, output_size))) {
+      if (OB_FAIL(other_store_.load_batch(eval_ctx, output_size))) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("Load other input cols failed.", K(ret));
       } else {
